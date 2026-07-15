@@ -1,0 +1,74 @@
+<%
+    function formatDate(date) {
+        if(!date){
+            return "-";
+        };
+
+        let d=new Date(date);
+        let day=('0' + d.getDate()).slice(-2);
+        let month=('0' + (d.getMonth() + 1)).slice(-2);
+        let year=d.getFullYear();
+        
+        return `${year}-${month}-${day}`;
+    };
+%>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Bookings</th>
+                <th>Joined</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if(body?.carOwnerList !== undefined && body?.carOwnerList?.length > 0) { %>
+                <% body.carOwnerList.forEach((item, index) => { %>
+                    <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                    <tr>
+                        <td><%= start_index %></td>
+                        <td><%= item?.fullName || "-" %></td>
+                        <td><%= item?.email || "-" %></td>
+                        <td>
+                            <% if(item?.phoneNumber) { %>
+                                <%= item?.countryCode || "+91" %>  <%= item?.phoneNumber %>
+                            <% } else { %>
+                                -
+                            <% } %>
+                        </td>
+                        <td><%= item?.totalBooking || 0 %></td>
+                        <td><%= formatDate(item?.createdAt) || "-" %></td>
+                        <td>
+                            <% if(item?.status === 2) { %>
+                                <span class="bet-status alert-success">Active</span>
+                            <% } else if(item?.status === 3) { %>
+                                <span class="bet-status alert-end">In Active</span>
+                            <% } else if(item?.status === 4) { %>
+                                <span class="bet-status alert-end">Suspended</span>
+                            <% } else { %>
+                                <span class="bet-status alert-pending">Pending</span>
+                            <% } %>
+                        </td>
+                        <td class="text-end d-flex gap-1">
+                            <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                                <a href="javascript:void(0);" class="car_owner_details_show" data-car-owner-id="<%= item?._id %>">
+                                    <i class="fa-regular fa-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="8" class="text-center">No car owners found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

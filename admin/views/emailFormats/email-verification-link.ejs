@@ -1,0 +1,32 @@
+<%- include("header"), { title } %>
+
+<!-- Greeting Section -->
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+    <tr>
+        <td>
+            <h2 style="margin: 0 0 12px 0; color: var(--white); font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 600; line-height: 1.4;">
+                Hello <span style="font-weight: bold; color: var(--yellow);"><%= name %></span>,
+            </h2>
+            <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-family: 'Manrope', sans-serif; font-size: 16px; line-height: 1.6;">
+                We’re excited to have you onboard! Please verify your account by clicking the magic link below:
+            </p>
+            <p style="margin: 16px 0; text-align: center;">
+                <a href="<%= verifyLink %>" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; font-size: 16px; font-weight: 600; border-radius: 10px; background-color: var(--red); color: var(--white); text-decoration: none; box-shadow: 0px 4px 8px rgba(220, 38, 38, 0.2); transition: all 0.3s ease;">
+                    Verify Your Account
+                </a>
+            </p>
+            <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-family: 'Manrope', sans-serif; font-size: 16px; line-height: 1.6;">
+                If you didn’t request this, please ignore this email.
+            </p>
+            <p style="margin: 24px 0 0 0; color: var(--white); font-family: 'Manrope', sans-serif; font-size: 16px; font-weight: 600;">
+                Best regards,
+            </p>
+            <p style="margin: 0; color: var(--text-secondary); font-family: 'Manrope', sans-serif; font-size: 16px; line-height: 1.6;">
+                The Indycare Team
+            </p>
+        </td>
+    </tr>
+</table>
+
+
+<% include("footer") %>

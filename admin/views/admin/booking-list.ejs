@@ -1,0 +1,79 @@
+<%
+    function formatDate(date) {
+        if(!date){
+            return "-";
+        };
+
+        let d=new Date(date);
+        let day=('0' + d.getDate()).slice(-2);
+        let month=('0' + (d.getMonth() + 1)).slice(-2);
+        let year=d.getFullYear();
+        
+        return `${year}-${month}-${day}`;
+    };
+%>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Booking ID</th>
+                <th>Car Owner</th>
+                <th>Mechanic</th>
+                <th>Service Name</th>
+                <th>Car Name</th>
+                <th>Date | Time</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (body?.bookingList !==  undefined && body?.bookingList?.length > 0) { body.bookingList.forEach((booking, index) => { let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                <tr>
+                    <td><%= start_index %></td>
+                    <td><%= booking?._id %></td>
+                    <td><%= booking?.ownerDetails?.fullName || "-" %></td>
+                    <td><%= booking?.mechanicDetails?.fullName || "-" %></td>
+                    <td><%= booking?.serviceDetails?.fullName || "-" %></td>
+                    <td><%= booking?.carDetails?.fullName || "-" %></td>
+                    <td><%= formatDate(booking?.date) || "-" %> | <%= booking?.time || "-" %></td>
+                    <td><%= booking?.totalAmount || 0 %></td>
+                    <td>
+                        <% if(booking?.status === 2) { %>
+                            <span class="bet-status alert-accept">Confirm</span>
+                        <% } else if(booking?.status === 3) { %>
+                            <span class="bet-status alert-end">Cancel</span>
+                        <% } else { %>
+                            <span class="bet-status alert-pending">Pending</span>
+                        <% } %>
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <div class="action-btn">
+                                <a href="javascript:void(0);" class="booking_details_show" data-booking-id="<%= booking?._id %>">
+                                    <i class="fa-regular fa-eye"></i>
+                                </a>
+                            </div>
+                            <div class="action-btn">
+                                <a href="javascript:void(0);">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                            </div>
+                            <!-- <div class="action-btn">
+                                <a href="javascript:void(0);" class="booking_delete" data-booking-id="<%= booking?._id %>">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </a>
+                            </div> -->
+                        </div>
+                    </td>
+                </tr>
+            <% })} else { %>
+                <tr>
+                    <td colspan="10" class="text-center">No bookings found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

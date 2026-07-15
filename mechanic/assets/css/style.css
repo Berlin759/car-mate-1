@@ -1,0 +1,174 @@
+body {
+    color: var(--dark);
+    background-color: #f7f8fa;
+    font-family: "Manrope", sans-serif;
+    line-height: 1.5;
+}
+
+:root {
+    --gar: "EB Garamond", serif;
+    --man: "Manrope", sans-serif;
+    --dark: #201611;
+    --yellow: #d3ae59;
+    --white: #ffffff;
+    --red: #eb5d5f;
+    --green: #00b906;
+    --gray: #706868;
+    --border: 1px solid #ebd885;
+    --grd_1: radial-gradient(50% 50% at 50% 50%, #e2c792 0%, #bfa057 100%);
+    --grd_3: radial-gradient(50% 50% at 50% 50%, #ddbe82 0%, #6e4a0c 100%);
+    --gold: radial-gradient(99.49% 53.2% at 52.24% 46.8%, #faeaa5 0%);
+    --gold_2: radial-gradient(99.49% 53.2% at 52.24% 46.8%,
+            #faeaa5 0%,
+            #c89f3a 100%);
+    --choco: #432b00;
+}
+
+/* width */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 2px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+    background: #432b00;
+    border-radius: 6px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: #d3ae59;
+    border-radius: 6px;
+}
+
+a {
+    text-decoration: none;
+}
+
+img {
+    max-width: 100%;
+}
+
+ul,
+li {
+    margin: 0px;
+    padding: 0px;
+    list-style: none;
+}
+
+p {
+    margin: 0px;
+}
+
+.weight-500 {
+    font-weight: 500;
+}
+
+.weight-600 {
+    font-weight: 600;
+}
+
+.font-bold {
+    font-weight: bold;
+}
+
+.fs-12 {
+    font-size: 12px !important;
+}
+
+.fs-14 {
+    font-size: 14px;
+}
+
+.fs-16 {
+    font-size: 16px;
+}
+
+.fs-18 {
+    font-size: 18px;
+}
+
+.fs-20 {
+    font-size: 20px;
+}
+
+.fs-24 {
+    font-size: 24px;
+}
+
+.mb-16 {
+    margin-bottom: 16px;
+}
+
+.mb-24 {
+    margin-bottom: 24px;
+}
+
+.mb-30 {
+    margin-bottom: 30px;
+}
+
+.mt-16 {
+    margin-top: 16px;
+}
+
+.mt-24 {
+    margin-top: 24px;
+}
+
+.gap-16 {
+    gap: 16px;
+}
+
+.gap-30 {
+    gap: 30px;
+}
+
+header {
+    padding: 12px 0px;
+    background-color: var(--white);
+}
+
+/* Header */
+.main-header.fixed-header {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    right: 0px;
+    z-index: 999;
+    padding: 0px 0px;
+    background: rgb(67 43 0 / 80%);
+    box-shadow: 0 4px 30px rgb(181 181 181 / 20%);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    animation: slideDown 0.35s ease-out;
+}
+
+.main-header.fixed-header .navbar {
+    padding: 0px;
+}
+
+@keyframes slideDown {
+    0% {
+        transform: translateY(-100%);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.navbar {
+    z-index: 999;
+}
+
+.brand-logo {
+    max-width: 130px;
+    width: 100%;
+    display: block;
+}
+
+.brand-logo img {
+    width: 100%;
+}

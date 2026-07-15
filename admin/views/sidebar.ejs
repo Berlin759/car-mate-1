@@ -1,0 +1,79 @@
+<nav class="navbar-vertical bg-white d-flex justify-content-start flex-column top-0 vh-100 position-sticky" id="navbar">
+    <div class="sidebar-close d-inline-block d-lg-none">
+        <i class="fa-solid fa-xmark rounded-2 cursor-pointer d-flex justify-content-center align-items-center" id="close-navbar"></i>
+    </div>
+    <div class="company-admin-info">
+        <a href="/dashboard" class="navbar-brand text-center cursor-pointer">
+            <div class="company-logo d-flex justify-content-center align-items-center">
+                <img src="<%= process.env.SERVER_URL %>/images/logo.png" alt="logo">
+            </div>
+        </a>
+    </div>
+    <div class="menu-items bg-white d-flex flex-column gap-5 position-relative accordion" id="sidenavAccordion">
+        <ul class="navbar-nav flex-column">
+            <li class="nav-item <%= header?.page === "Dashboard" ? "active" : "" %>">
+                <a href="/dashboard">
+                    <i class="fa-solid fa-house"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Car-Owner" ? "active" : "" %>">
+                <a href="/car-owner">
+                    <i class="fa-solid fa-users"></i>
+                    Car Owners
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Cars" ? "active" : "" %>">
+                <a href="/cars">
+                    <i class="fa-solid fa-car"></i>
+                    Cars
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Mechanic" ? "active" : "" %>">
+                <a href="/mechanic">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                    Mechanics
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Service" ? "active" : "" %>">
+                <a href="/service">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                    Service
+                </a>
+            </li>
+            <!-- <li class="nav-item <%= header?.page === "Users" ? "active" : "" %>">
+                <a href="/users">
+                    <i class="fa-solid fa-users"></i>
+                    Users
+                </a>
+            </li> -->
+            <li class="nav-item <%= header?.page === "Bookings" ? "active" : "" %>">
+                <a href="/bookings">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Bookings
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Transactions" ? "active" : "" %>">
+                <a href="/transactions">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Transactions
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Reviews" ? "active" : "" %>">
+                <a href="/reviews">
+                    <i class="fa-solid fa-star-half-stroke"></i>
+                    Reviews
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Settings" ? "active" : "" %>">
+                <a href="/settings">
+                    <i class="fa-solid fa-gear"></i>
+                    Settings
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="water-mark text-center">
+        <%= header?.admin?.name %>
+    </div>
+</nav>

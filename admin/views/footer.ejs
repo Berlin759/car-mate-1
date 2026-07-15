@@ -1,0 +1,352 @@
+</div>
+</div>
+</main>
+
+<!-- Logout Modal -->
+<div class="modal custom-popup fade" id="logoutModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0">
+            <div class="modal-body">
+                <div class="modal-header d-flex justify-content-center border-bottom-0">
+                    <h5 class="modal-title" id="exampleModalLabel">Come back soon!</h5>
+                </div>
+                <div class="popup-text">
+                    <p class="text-center t-secondary fs-6">
+                        You are about to log out of your Super Admin account. Are you sure you want to proceed?
+                    </p>
+                </div>
+                <div class="page-btn two-btn mt-20">
+                    <button id="confirm-logout" class="btn btn-primary w-100 text-center">
+                        Yes, Logout
+                    </button>
+                    <button class="btn btn-primary btn-transparent w-100 text-center" data-bs-dismiss="modal" aria-label="Close">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--------------- Booking Details Modal --------------->
+<div class="modal custom-popup fade" id="booking_detail_modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-modal="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body" id="booking_details_body">
+                <div class="modal-header border-0">
+                    <div class="modal-text">
+                        <h5 class="modal-title mb-1">Booking details</h5>
+                        <p class="text-gray mb-0" id="booking_trx"></p>
+                    </div>
+                    <!-- <div class="modal-cl">
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-icon lucide-x">
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
+                        </button>
+                    </div> -->
+                </div>
+                <div class="mdl-details">
+                    <div class="divider"></div>
+                    <div class="info-grid d-flex flex-wrap">
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Guest</p>
+                            <div class="value" id="booking_guest_name"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Room</p>
+                            <div class="value" id="booking_room_type"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Check-in</p>
+                            <div class="value" id="booking_check_in"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Check-out</p>
+                            <div class="value" id="booking_check_out"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Payment</p>
+                            <div class="status">
+                                <span id="booking_trx_status" class="bet-status"></span>
+                            </div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Status</p>
+                            <div class="status">
+                                <span id="booking_status" class="bet-status"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="divider"></div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Detail Modal -->
+<div class="modal custom-popup fade" id="payment_detail_modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-modal="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body" id="transaction_details_body">
+                <div class="modal-header border-0">
+                    <div class="modal-text">
+                        <h5 class="modal-title mb-1">Payment Details</h5>
+                        <p class="text-gray mb-0" id="booking_id"></p>
+                    </div>
+                    <div class="modal-cl">
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="lucide lucide-x-icon lucide-x">
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="mdl-details">
+                    <div class="status-row d-flex justify-content-between align-items-center">
+                        <div class="status">
+                            <span id="transaction_status" class="bet-status"></span>
+                        </div>
+                        <div class="price" id="transaction_total_amount"></div>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="info-grid d-flex flex-wrap">
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Guest</p>
+                            <div class="value" id="transaction_guest_name"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Method</p>
+                            <div class="value" id="transaction_pay_method"></div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Date</p>
+                            <div class="value" id="transaction_date"></div>
+                        </div>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="service-box">
+                        <p class="text-xs mb-1 text-gray">Transaction ID</p>
+                        <div class="value" id="transaction_id"></div>
+                    </div>
+                    <div class="stats-wrapper d-flex flex-wrap mt-20">
+                        <div class="stat-card">
+                            <div class="value" id="booking_total_amount"></div>
+                            <p class="mt-1 mb-0 text-gray">Total</p>
+                        </div>
+                        <div class="stat-card">
+                            <div class="value" id="booking_discount_amount"></div>
+                            <p class="mt-1 mb-0 text-gray">Discount</p>
+                        </div>
+                        <div class="stat-card">
+                            <div class="value" id="booking_final_amount"></div>
+                            <p class="mt-1 mb-0 text-gray">Provider Payout</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reviews Details Modal -->
+<div class="modal custom-popup fade" id="reviews-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-modal="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-header border-0">
+                    <div class="modal-text">
+                        <h5 class="modal-title mb-1">Review Details</h5>
+                        <p class="text-gray mb-0">Review by Alice Brown</p>
+                    </div>
+                    <div class="modal-cl">
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="lucide lucide-x-icon lucide-x">
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="mdl-details">
+                    <div class="divider"></div>
+                    <div class="info-grid d-flex flex-wrap">
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Guest</p>
+                            <div class="value">Alice Brown</div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Rating</p>
+                            <div class="d-flex align-items-center">
+                                <img src="/images/star.svg" alt="">
+                                <img src="/images/star.svg" alt="">
+                                <img src="/images/star.svg" alt="">
+                                <img src="/images/star.svg" alt="">
+                                <img src="/images/star.svg" alt="">
+                            </div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Status</p>
+                            <span class="bet-status alert-accept">Approved</span>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Date</p>
+                            <div class="value">2026-03-09</div>
+                        </div>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="address mt-20">
+                        <p class="mb-1 text-gray">Comment</p>
+                        <div class="value">
+                            Exceptional stay! The service was impeccable and the slot was spotless.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!----------- Change API ------------>
+<div class="modal fade custom-popup" id="change-api" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-header mb-20">
+                    <h5 class="modal-title" id="exampleModalLabel">Change API Key Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <svg width="30" height="31" viewBox="0 0 30 31" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_161_15505)">
+                                <path d="M22.5 8L7.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M7.5 8L22.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <defs>
+                                <clipPath id="clip0_161_15505">
+                                    <rect width="30" height="30" fill="white" transform="translate(0 0.5)" />
+                                </clipPath>
+                            </defs>
+                        </svg>
+                    </button>
+                </div>
+                <div class="ch-api-box">
+                    <label>Current API Key:</label>
+                    <h3>KYxIifKk8kjGZBsqVlrOAcEgInqo5ZBO16B</h3>
+                    <div class="form-group both-icon position-relative">
+                        <svg class="ico-left" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_417_58442)">
+                                <path d="M3.75 9.75C3.75 9.35218 3.90804 8.97064 4.18934 8.68934C4.47064 8.40804 4.85218 8.25 5.25 8.25H12.75C13.1478 8.25 13.5294 8.40804 13.8107 8.68934C14.092 8.97064 14.25 9.35218 14.25 9.75V14.25C14.25 14.6478 14.092 15.0294 13.8107 15.3107C13.5294 15.592 13.1478 15.75 12.75 15.75H5.25C4.85218 15.75 4.47064 15.592 4.18934 15.3107C3.90804 15.0294 3.75 14.6478 3.75 14.25V9.75Z" stroke="#7E8B95" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M8.25 12C8.25 12.1989 8.32902 12.3897 8.46967 12.5303C8.61032 12.671 8.80109 12.75 9 12.75C9.19891 12.75 9.38968 12.671 9.53033 12.5303C9.67098 12.3897 9.75 12.1989 9.75 12C9.75 11.8011 9.67098 11.6103 9.53033 11.4697C9.38968 11.329 9.19891 11.25 9 11.25C8.80109 11.25 8.61032 11.329 8.46967 11.4697C8.32902 11.6103 8.25 11.8011 8.25 12Z" stroke="#7E8B95" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M6 8.25V5.25C6 4.45435 6.31607 3.69129 6.87868 3.12868C7.44129 2.56607 8.20435 2.25 9 2.25C9.79565 2.25 10.5587 2.56607 11.1213 3.12868C11.6839 3.69129 12 4.45435 12 5.25V8.25" stroke="#7E8B95" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </g>
+                            <defs>
+                                <clipPath id="clip0_417_58442">
+                                    <rect width="18" height="18" fill="white"></rect>
+                                </clipPath>
+                            </defs>
+                        </svg>
+                        <input class="form-control" type="password" name="" placeholder="Enter a new password for your API key">
+                        <i class="far fa-eye-slash fa-fw ico-right cursor-pointer" id="ey1"></i>
+                    </div>
+                    <p>Your new password must be at least 6 characters long.</p>
+                </div>
+                <div class="page-btn two-btn mt-20">
+                    <button class="btn btn-primary w-100 text-center" disabled>Change Password</button>
+                    <button class="btn btn-primary btn-transparent w-100 text-center" data-bs-dismiss="modal" aria-label="Close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!----------- Confirm Deletion ------------>
+<div class="modal fade custom-popup" id="confirm-deletion" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-header mb-20">
+                    <h5 class="modal-title" id="exampleModalLabel">Change API Key Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <svg width="30" height="31" viewBox="0 0 30 31" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_161_15505)">
+                                <path d="M22.5 8L7.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M7.5 8L22.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <defs>
+                                <clipPath id="clip0_161_15505">
+                                    <rect width="30" height="30" fill="white" transform="translate(0 0.5)" />
+                                </clipPath>
+                            </defs>
+                        </svg>
+                    </button>
+                </div>
+                <div class="popup-text confirm-deletion">
+                    <p>Are you sure you want to delete this API key?</p>
+                </div>
+                <div class="page-btn two-btn mt-20">
+                    <button class="btn btn-primary btn-red w-100 text-center">Yes, Delete</button>
+                    <button class="btn btn-primary btn-transparent w-100 text-center" data-bs-dismiss="modal" aria-label="Close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!----------- Create New API ------------>
+<div class="modal fade custom-popup" id="create-new-api" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-header text-center border-bottom-0 pb-0 mb-30">
+                    <h5 class="modal-title" id="exampleModalLabel">Are you sure you want to create a new API Key ?</h5>
+                </div>
+                <div class="page-btn two-btn mt-20">
+                    <button class="btn btn-primary w-100 text-center">Create</button>
+                    <button class="btn btn-primary btn-transparent w-100 text-center" data-bs-dismiss="modal" aria-label="Close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="<%= process.env.SERVER_URL %>/js/bootstrap.bundle.js"></script>
+<script src="<%= process.env.SERVER_URL %>/js/jquery-3.7.1.min.js"></script>
+<script src="<%= process.env.SERVER_URL %>/js/chart.js"></script>
+<script src="<%= process.env.SERVER_URL %>/js/select2.min.js"></script>
+<script src="<%= process.env.SERVER_URL %>/js/custom.js"></script>
+<script src="<%= process.env.SERVER_URL %>/js/common.js"></script>
+
+<script type="text/javascript">
+    function formatState(state) {
+        if (!state.id) { return state.text; }
+        var $state = $(
+            '<span><img src="' + $(state.element).attr('data-src') + '" class="img-flag" /> ' + state.text + '</span>'
+        );
+        return $state;
+    };
+    $('.select-control').select2({
+        minimumResultsForSearch: Infinity,
+        templateResult: formatState,
+        templateSelection: formatState
+    });
+</script>
+
+<% if (footer?.js && Array.isArray(footer?.js) && footer?.js.length> 0) { footer?.js.forEach(file => { %>
+    <script src="<%= process.env.SERVER_URL %>/js/<%= file %>"></script>
+<% }); }; %>
+
+    </body>
+</html>

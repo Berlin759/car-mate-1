@@ -1,0 +1,145 @@
+@media screen and (max-width: 479px){
+	
+}
+@media screen and (max-width: 575px){
+
+}
+@media screen and (max-width: 767px){
+	
+}
+@media screen and (max-width: 991px) and (min-width: 768px){
+	.static-card-group .custom-space {
+	    flex-wrap: wrap;
+	}
+	.total-conversions .static-card {
+	    width: calc(33.33% - 11px);
+	}
+	.genral-setting .g-items {
+	    display: block !important;
+	}
+	.g-items > label {
+	    display: block !important;
+	    width: auto;
+	    margin-bottom: 6px;
+	}
+	.g-items .form-group {
+	    width: auto;
+	}
+}
+@media screen and (max-width: 1199px) and (min-width: 768px){
+	.us-main > .user-detail {
+	    display: flex;
+	    justify-content: center;
+	    align-items: center;
+	}
+	.us-main {
+	    display: flex;
+	    gap: 15px;
+	}
+	.us-main > div {
+	    width: 50%;
+	    margin: 0px;
+	}
+	.us-main > div > .st-details-wrapper {
+	    margin: 0px;
+	}
+	.fs-20 {
+	    font-size: 16px;
+	}
+	.conversions-text > h2 {
+		font-size: 16px;
+	}
+	.con-media > img {
+	    max-width: 30px;
+	}
+	.custom-card.setting-card {
+	    height: 80%;
+	}
+}
+@media screen and (max-width: 1199px) and (min-width: 992px){
+	.static-card-group .custom-space {
+	    flex-wrap: wrap;
+	}
+	.total-conversions .static-card {
+	    width: calc(33.33% - 11px);
+	}
+	.genral-setting .g-items {
+	    display: block !important;
+	}
+	.g-items .form-group {
+	    width: 100%;
+	}
+	.g-items > label {
+	    width: auto;
+	    margin-bottom: 8px;
+	}
+}
+@media screen and (max-width: 1399px) and (min-width: 1200px){
+	.user-managment {
+	    width: 50%;
+	}
+	.static-card-group .custom-space {
+	    flex-wrap: wrap;
+	}
+	.total-conversions .static-card {
+	    width: calc(33.33% - 11px);
+	}
+	.wallet-main {
+	    flex-wrap: wrap;
+	}
+	.wallet-main > .static-card {
+	    width: calc(50% - 8px);
+	}
+	.us-main .admin-table .table-responsive table {
+	    min-width: auto;
+	    table-layout: fixed;
+	}
+	.genral-setting .g-items {
+	    gap: 20px;
+	}
+}
+@media screen and (max-width: 1599px) and (min-width: 1200px){
+	.custom-card.setting-card {
+	    height: 80%;
+	}
+	.genral-setting .g-items {
+        display: block !important;
+    }
+    .g-items > label {
+        width: auto;
+        margin-bottom: 8px;
+    }
+    .g-items .form-group {
+        width: 100%;
+    }
+}
+@media screen and (max-width: 1769px) and (min-width: 1600px){
+	.custom-card.setting-card {
+	    height: 72%;
+	}
+	.g-items .form-group {
+	    width: 360px;
+	}
+}
+@media screen and (max-width: 1800px) and (min-width: 1400px){
+	.user-managment {
+	    width: 33.33%;
+	}
+	.trx-overview,
+	.fi-overview {
+	    width: 33.33%;
+	}
+	.static-card-group .custom-space {
+	    flex-wrap: wrap;
+	}
+	.total-conversions .static-card {
+        width: calc(25% - 12px);
+    }
+    .user-detail {
+	    padding: 30px 20px;
+	}
+	.us-main .admin-table .table-responsive table {
+	    min-width: auto;
+	    table-layout: fixed;
+	}
+}

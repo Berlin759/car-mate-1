@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Car Mate | Login</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="icon" type="image/x-icon" href="<%= process.env.SERVER_URL %>/images/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<%= process.env.SERVER_URL %>/css/all.min.css">
+    <link rel="stylesheet" href="<%= process.env.SERVER_URL %>/css/bootstrap.min.css">
+    <link rel="stylesheet" href="<%= process.env.SERVER_URL %>/css/style.css">
+</head>
+
+<body>
+    <div class="preloader">
+        <div class="loading">
+            <svg viewBox="0 0 84 24" fill="#3BC117">
+                <circle cx="18" cy="12" r="6"></circle>
+                <circle cx="18" cy="12" r="6"></circle>
+                <circle cx="42" cy="12" r="6"></circle>
+                <circle cx="66" cy="12" r="6"></circle>
+            </svg>
+        </div>
+    </div>
+    <div class="login-main d-flex justify-content-center align-items-center">
+        <div class="login-box">
+            <div class="l-head text-center">
+                <div class="auth-logo mb-20">
+                    <a href="/dashboard">
+                        <img src="<%= process.env.SERVER_URL %>/images/logo.png" alt="">
+                    </a>
+                </div>
+                <h2>Admin Login</h2>
+                <p>Manage Your Platform with Full Access</p>
+            </div>
+            <div class="l-form mt-20">
+                <form>
+                    <div class="form-group">
+                        <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email address">
+                    </div>
+                    <div class="form-group position-relative mt-15">
+                        <input type="password" id="password" name="password" class="form-control password-input" placeholder="Enter your password">
+                        <button type="button" class="toggle-password login">
+                            <i class="far fa-eye-slash fa-fw ico-right cursor-pointer" id="ey2"></i>
+                        </button>
+                    </div>
+                    <div class="form-group mt-15">
+                        <button class="btn btn-primary w-100" type="button" id="login" name="login">
+                            Sign In
+                        </button>
+                        <a href="javascript:void(0);" class="btn btn-primary w-100" disabled>
+                            <div class="t-loader spin d-none">
+                                <svg width="24" height="24" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10.2364 3.50094C9.76604 2.56213 10.1432 1.40874 11.1287 1.04607C13.5502 0.154906 16.1512 -0.176247 18.7346 0.0887223C21.9506 0.418584 25.0059 1.65864 27.5421 3.66344C30.0783 5.66824 31.9903 8.35467 33.0538 11.4076C34.1173 14.4606 34.2883 17.7535 33.5466 20.9002C32.8048 24.0469 31.1813 26.9168 28.8662 29.1734C26.5512 31.43 23.6407 32.9798 20.4761 33.6408C17.3115 34.3019 14.024 34.0469 10.9992 32.9057C8.5695 31.989 6.39018 30.5311 4.62158 28.6523C3.90184 27.8877 4.07948 26.6872 4.91963 26.0573V26.0573C5.75978 25.4274 6.94286 25.6098 7.68687 26.3508C9.00402 27.6626 10.5888 28.6866 12.3415 29.3478C14.6897 30.2338 17.2418 30.4317 19.6986 29.9185C22.1553 29.4054 24.4148 28.2023 26.212 26.4504C28.0092 24.6986 29.2696 22.4706 29.8454 20.0278C30.4212 17.585 30.2885 15.0286 29.4629 12.6586C28.6372 10.2885 27.1529 8.20297 25.184 6.64661C23.2151 5.09024 20.8432 4.12757 18.3466 3.87149C16.4831 3.68036 14.6078 3.88878 12.8434 4.47427C11.8468 4.805 10.7068 4.43976 10.2364 3.50094V3.50094Z" fill="#fff"></path>
+                                    <defs>
+                                        <linearGradient id="paint0_linear_435_28485" x1="17" y1="0" x2="17" y2="34" gradientUnits="userSpaceOnUse">
+                                            <stop stop-color="#A4F4B7"></stop>
+                                            <stop offset="0.285" stop-color="#6FF78C"></stop>
+                                            <stop offset="1" stop-color="#58D673"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="<%= process.env.SERVER_URL %>/js/jquery-3.7.1.min.js"></script>
+    <script src="<%= process.env.SERVER_URL %>/js/bootstrap.bundle.js"></script>
+    <script src="<%= process.env.SERVER_URL %>/js/custom.js"></script>
+    <script src="<%= process.env.SERVER_URL %>/js/common.js"></script>
+    <% if (footer?.js && Array.isArray(footer?.js) && footer?.js.length> 0) { footer?.js.forEach(file => { %>
+        <script src="<%= process.env.NODE_URL %>/js/<%= file %>"></script>
+        <% }); }; %>
+</body>
+
+</html>
