@@ -30,29 +30,8 @@ const mechanicSchema = new Schema(
         },
         serviceIds: [
             {
-                _id: false,
-                categoryName: {
-                    type: String,
-                    required: true,
-                },
-                subCategories: [
-                    {
-                        _id: false,
-                        subCategoryName: {
-                            type: String,
-                            required: true,
-                        },
-                        price: {
-                            type: Number,
-                            required: true,
-                            min: 0,
-                        },
-                        description: {
-                            type: String,
-                            default: "",
-                        },
-                    },
-                ],
+                type: Schema.Types.ObjectId,
+                ref: "Service",
             },
         ],
         location: {

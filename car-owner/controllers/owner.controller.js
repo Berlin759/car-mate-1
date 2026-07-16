@@ -689,6 +689,7 @@ export const postServiceList = async (req, res) => {
 
         const filter = {
             parentId: { $ne: null },
+            "mechanicIds.0": { $exists: true },
         };
 
         if (categoryId) {
@@ -696,66 +697,35 @@ export const postServiceList = async (req, res) => {
         };
 
         const services = await Service.find(filter)
-            .select("_id fullName description parentId status createdAt updatedAt")
+            .select("_id fullName description parentId mechanicIds")
+            .populate("parentId", "fullName description")
+            .populate("mechanicIds.mechanicId", "fullName email profileImage")
             .lean();
-
-        const parentIds = [...new Set(services.map(s => s.parentId?.toString()).filter(Boolean))];
-        const parents = await Service.find({ _id: { $in: parentIds.map(id => new ObjectId(id)) } })
-            .select("_id fullName description")
-            .lean();
-
-        const parentMap = {};
-        parents.forEach(p => { parentMap[p._id.toString()] = p; });
-
-        const mechanics = await Mechanic.find({ status: Constants.MECHANIC_STATUS.ACTIVE })
-            .select("fullName email phoneNumber profileImage serviceIds")
-            .lean();
-
-        const mechanicServiceMap = {};
-        mechanics.forEach(mechanic => {
-            (mechanic.serviceIds || []).forEach(entry => {
-                (entry.subCategories || []).forEach(sub => {
-                    const key = `${entry.categoryName}|${sub.subCategoryName}`;
-
-                    if (!mechanicServiceMap[key]) {
-                        mechanicServiceMap[key] = [];
-                    };
-
-                    mechanicServiceMap[key].push({
-                        _id: mechanic._id,
-                        fullName: mechanic.fullName,
-                        email: mechanic.email,
-                        profileImage: mechanic.profileImage,
-                        price: sub.price,
-                        description: sub.description,
-                    });
-                });
-            });
-        });
 
         const items = services.map(service => {
-            const parent = parentMap[service.parentId?.toString()];
-            const categoryName = parent?.fullName || "";
-            const key = `${categoryName}|${service.fullName}`;
-            const mechanicsList = mechanicServiceMap[key] || [];
-            const firstMechanic = mechanicsList[0] || null;
+            const parent = service.parentId;
+            const activeMechanics = (service.mechanicIds || []).filter(
+                m => m.mechanicId && m.mechanicId.status !== undefined
+                    ? m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE
+                    : true
+            );
 
             return {
                 serviceId: service._id,
-                mechanicDetails: firstMechanic ? {
-                    _id: firstMechanic._id,
-                    fullName: firstMechanic.fullName,
-                    email: firstMechanic.email,
-                    profileImage: firstMechanic.profileImage,
-                } : null,
+                mechanicDetails: activeMechanics.map(m => ({
+                    _id: m.mechanicId._id || m.mechanicId,
+                    fullName: m.mechanicId.fullName || "",
+                    email: m.mechanicId.email || "",
+                    profileImage: m.mechanicId.profileImage || "",
+                })),
                 categoryDetails: {
                     _id: parent?._id || null,
-                    fullName: categoryName,
+                    fullName: parent?.fullName || "",
                     description: parent?.description || "",
                     subCategoryDetails: {
                         fullName: service.fullName,
-                        description: firstMechanic?.description || service.description || "",
-                        price: firstMechanic?.price || 0,
+                        description: activeMechanics[0]?.description || service.description || "",
+                        price: activeMechanics[0]?.price || 0,
                     },
                 },
             };
@@ -765,10 +735,10 @@ export const postServiceList = async (req, res) => {
         const paginatedItems = items.slice(skip, skip + Number(itemPerPage));
 
         const response = {
-            items: paginatedItems,
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: totalCount,
+            items: paginatedItems,
         };
 
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
@@ -971,19 +941,20 @@ export const postAddBooking = async (req, res) => {
         let mechanicId;
 
         const serviceFullName = serviceDetails.fullName;
-        const parentService = await Service.findOne({ _id: new ObjectId(serviceDetails.parentId) }).select("fullName").lean();
-        const serviceCategoryName = parentService?.fullName || "";
+        const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
 
         if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
+            const isServiceAvailable = (serviceDoc?.mechanicIds || []).some(
+                m => m.mechanicId?.toString() === param.mechanicId
+            );
+
+            if (!isServiceAvailable) {
+                return res.status(400).json(errorResponse("Selected mechanic is unavailable for this service."));
+            };
+
             const mechanicDetails = await Mechanic.findOne({
                 _id: new ObjectId(param.mechanicId),
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                "serviceIds": {
-                    $elemMatch: {
-                        categoryName: serviceCategoryName,
-                        "subCategories.subCategoryName": serviceFullName,
-                    },
-                },
             });
 
             if (!mechanicDetails) {
@@ -1004,14 +975,15 @@ export const postAddBooking = async (req, res) => {
 
             mechanicId = mechanicDetails._id;
         } else {
+            const mechanicIdsForService = (serviceDoc?.mechanicIds || []).map(m => m.mechanicId);
+
+            if (!mechanicIdsForService.length) {
+                return res.status(400).json(errorResponse("No mechanics are available for this service."));
+            };
+
             const mechanics = await Mechanic.find({
+                _id: { $in: mechanicIdsForService },
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                "serviceIds": {
-                    $elemMatch: {
-                        categoryName: serviceCategoryName,
-                        "subCategories.subCategoryName": serviceFullName,
-                    },
-                },
             }).select("_id");
 
             if (!mechanics.length) {

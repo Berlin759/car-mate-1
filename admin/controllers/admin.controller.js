@@ -1096,14 +1096,25 @@ export const postAllServiceList = async (req, res) => {
                 return res.status(200).json(successResponse("No data found", { blade: "", total_record: 0, param }));
             };
 
-            const mechanicServiceList = (mechanic.serviceIds || []).map(entry => ({
-                categoryName: entry.categoryName,
-                subCategories: (entry.subCategories || []).map(sub => ({
-                    subCategoryName: sub.subCategoryName,
-                    price: sub.price,
-                    description: sub.description,
-                })),
-            }));
+            const services = await Service.find({
+                _id: { $in: mechanic.serviceIds || [] },
+                parentId: { $ne: null },
+            })
+                .select("_id fullName description parentId")
+                .populate("parentId", "fullName description")
+                .lean();
+
+            const mechanicServiceList = services.map(service => {
+                const mechanicEntry = (service.mechanicIds || []).find(
+                    m => m.mechanicId?.toString() === mechanicId.toString()
+                );
+                return {
+                    categoryName: service.parentId?.fullName || "",
+                    subCategoryName: service.fullName,
+                    price: mechanicEntry?.price || 0,
+                    description: mechanicEntry?.description || "",
+                };
+            });
 
             const totalRecords = mechanicServiceList.length;
             const paginatedList = mechanicServiceList.slice(skip, skip + limit);

@@ -17,6 +17,25 @@ const serviceSchema = new Schema(
             ref: "Service",
             default: null,
         },
+        mechanicIds: [
+            {
+                _id: false,
+                mechanicId: {
+                    type: Schema.Types.ObjectId,
+                    ref: "Mechanic",
+                    required: true,
+                },
+                price: {
+                    type: Number,
+                    required: true,
+                    min: 0,
+                },
+                description: {
+                    type: String,
+                    default: "",
+                },
+            },
+        ],
         status: {
             type: Number,
             enum: Object.values(Constants.SERVICE_STATUS),

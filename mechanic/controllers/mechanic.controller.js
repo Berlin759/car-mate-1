@@ -519,43 +519,58 @@ export const postAddService = async (req, res) => {
         };
 
         for (const service of services) {
-            if (!service.categoryName || service.categoryName.trim() === "") {
-                return res.status(400).json(errorResponse("Category name is required."));
+            if (!service.serviceId) {
+                return res.status(400).json(errorResponse("serviceId is required for each service."));
             };
-            if (!Array.isArray(service.subCategories) || service.subCategories.length === 0) {
-                return res.status(400).json(errorResponse("Each category must have at least one sub-category."));
-            };
-            for (const sub of service.subCategories) {
-                if (!sub.subCategoryName || sub.subCategoryName.trim() === "") {
-                    return res.status(400).json(errorResponse("Sub-category name is required."));
-                };
-                if (sub.price === undefined || sub.price === null || sub.price < 0) {
-                    return res.status(400).json(errorResponse("Valid price is required for each sub-category."));
-                };
+            if (service.price === undefined || service.price === null || service.price < 0) {
+                return res.status(400).json(errorResponse("Valid price is required for each service."));
             };
         };
 
-        const serviceIdsPayload = services.map(service => ({
-            categoryName: service.categoryName.trim(),
-            subCategories: service.subCategories.map(sub => ({
-                subCategoryName: sub.subCategoryName.trim(),
-                price: Number(sub.price),
-                description: sub.description ? sub.description.trim() : "",
-            })),
-        }));
+        const serviceIds = services.map(s => new mongoose.Types.ObjectId(s.serviceId));
 
-        const updatedMechanic = await Mechanic.findByIdAndUpdate(
+        const existingMechanic = await Mechanic.findById(mechanicId).select("serviceIds").lean();
+        const oldServiceIds = (existingMechanic?.serviceIds || []).map(id => id.toString());
+        const newServiceIds = serviceIds.map(id => id.toString());
+
+        const servicesToRemove = oldServiceIds.filter(id => !newServiceIds.includes(id));
+
+        await Mechanic.findByIdAndUpdate(
             mechanicId,
-            {
-                serviceIds: serviceIdsPayload,
-            },
-            {
-                new: true,
-            }
+            { serviceIds: serviceIds },
         );
 
-        if (!updatedMechanic) {
-            return res.status(400).json(errorResponse("Mechanic not found."));
+        for (const service of services) {
+            const serviceObjId = new mongoose.Types.ObjectId(service.serviceId);
+
+            await Service.findByIdAndUpdate(
+                serviceObjId,
+                {
+                    $pull: { mechanicIds: { mechanicId: new mongoose.Types.ObjectId(mechanicId) } },
+                },
+            );
+
+            await Service.findByIdAndUpdate(
+                serviceObjId,
+                {
+                    $addToSet: {
+                        mechanicIds: {
+                            mechanicId: new mongoose.Types.ObjectId(mechanicId),
+                            price: Number(service.price),
+                            description: service.description ? service.description.trim() : "",
+                        },
+                    },
+                },
+            );
+        };
+
+        for (const serviceId of servicesToRemove) {
+            await Service.findByIdAndUpdate(
+                serviceId,
+                {
+                    $pull: { mechanicIds: { mechanicId: new mongoose.Types.ObjectId(mechanicId) } },
+                },
+            );
         };
 
         return res.status(200).json(successResponse("Services added successfully!"));
@@ -631,14 +646,27 @@ export const postServiceList = async (req, res) => {
             );
         };
 
-        const items = mechanic.serviceIds.map(entry => ({
-            categoryName: entry.categoryName,
-            subCategories: entry.subCategories.map(sub => ({
-                subCategoryName: sub.subCategoryName,
-                price: sub.price,
-                description: sub.description,
-            })),
-        }));
+        const services = await Service.find({
+            _id: { $in: mechanic.serviceIds },
+            parentId: { $ne: null },
+        })
+            .select("_id fullName description parentId mechanicIds")
+            .populate("parentId", "fullName description")
+            .lean();
+
+        const items = services.map(service => {
+            const mechanicEntry = (service.mechanicIds || []).find(
+                m => m.mechanicId?.toString() === mechanicId.toString()
+            );
+
+            return {
+                serviceId: service._id,
+                categoryName: service.parentId?.fullName || "",
+                subCategoryName: service.fullName,
+                price: mechanicEntry?.price || 0,
+                description: mechanicEntry?.description || "",
+            };
+        });
 
         const totalRecords = items.length;
         const paginatedItems = items.slice(skip, skip + limit);
