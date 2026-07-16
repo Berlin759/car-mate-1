@@ -15,6 +15,27 @@ const validate_rules = {
             current_password: "required",
             new_password: "required|min:6",
         },
+        add_owner: {
+            fullName: "required",
+            phoneNumber: "required",
+        },
+        update_owner: {
+            ownerId: "required",
+        },
+        add_mechanic: {
+            fullName: "required",
+            phoneNumber: "required",
+        },
+        update_mechanic: {
+            mechanicId: "required",
+        },
+        add_car: {
+            vehicle_number: "required",
+        },
+        update_car: {
+            carId: "required",
+            vehicle_number: "required",
+        },
         add_service: {
             fullName: "required",
             description: "required",

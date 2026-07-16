@@ -682,66 +682,90 @@ export const postServiceList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            categoryId,
         } = req.body;
-
-        let filter = {};
 
         const skip = (Number(currentPage) - 1) * Number(itemPerPage);
 
-        // ---------- AGGREGATE ----------
-        const pipeline = [
-            {
-                $match: filter,
-            },
-            {
-                $lookup: {
-                    from: "mechanics",
-                    localField: "mechanicId",
-                    foreignField: "_id",
-                    as: "mechanicDetails",
-                    pipeline: [
-                        {
-                            $project: {
-                                _id: 1,
-                                fullName: 1,
-                                email: 1,
-                                profileImage: 1
-                            },
-                        },
-                    ],
-                },
-            },
-            {
-                $unwind: {
-                    path: "$mechanicDetails",
-                    preserveNullAndEmptyArrays: true
-                },
-            },
-            {
-                $project: {
-                    _id: 1,
-                    mechanicId: 1,
-                    fullName: 1,
-                    description: 1,
-                    status: 1,
-                    mechanicDetails: 1,
-                    createdAt: 1,
-                    updatedAt: 1,
-                },
-            },
-            { $sort: { _id: -1 } },
-            { $skip: skip },
-            { $limit: Number(itemPerPage) },
-        ];
+        const filter = {
+            parentId: { $ne: null },
+        };
 
-        const [items, totalCount] = await Promise.all([
-            Service.aggregate(pipeline),
+        if (categoryId) {
+            filter.parentId = new ObjectId(categoryId);
+        };
 
-            Service.countDocuments(filter),
-        ]);
+        const services = await Service.find(filter)
+            .select("_id fullName description parentId status createdAt updatedAt")
+            .lean();
+
+        const parentIds = [...new Set(services.map(s => s.parentId?.toString()).filter(Boolean))];
+        const parents = await Service.find({ _id: { $in: parentIds.map(id => new ObjectId(id)) } })
+            .select("_id fullName description")
+            .lean();
+
+        const parentMap = {};
+        parents.forEach(p => { parentMap[p._id.toString()] = p; });
+
+        const mechanics = await Mechanic.find({ status: Constants.MECHANIC_STATUS.ACTIVE })
+            .select("fullName email phoneNumber profileImage serviceIds")
+            .lean();
+
+        const mechanicServiceMap = {};
+        mechanics.forEach(mechanic => {
+            (mechanic.serviceIds || []).forEach(entry => {
+                (entry.subCategories || []).forEach(sub => {
+                    const key = `${entry.categoryName}|${sub.subCategoryName}`;
+
+                    if (!mechanicServiceMap[key]) {
+                        mechanicServiceMap[key] = [];
+                    };
+
+                    mechanicServiceMap[key].push({
+                        _id: mechanic._id,
+                        fullName: mechanic.fullName,
+                        email: mechanic.email,
+                        profileImage: mechanic.profileImage,
+                        price: sub.price,
+                        description: sub.description,
+                    });
+                });
+            });
+        });
+
+        const items = services.map(service => {
+            const parent = parentMap[service.parentId?.toString()];
+            const categoryName = parent?.fullName || "";
+            const key = `${categoryName}|${service.fullName}`;
+            const mechanicsList = mechanicServiceMap[key] || [];
+            const firstMechanic = mechanicsList[0] || null;
+
+            return {
+                serviceId: service._id,
+                mechanicDetails: firstMechanic ? {
+                    _id: firstMechanic._id,
+                    fullName: firstMechanic.fullName,
+                    email: firstMechanic.email,
+                    profileImage: firstMechanic.profileImage,
+                } : null,
+                categoryDetails: {
+                    _id: parent?._id || null,
+                    fullName: categoryName,
+                    description: parent?.description || "",
+                    subCategoryDetails: {
+                        fullName: service.fullName,
+                        description: firstMechanic?.description || service.description || "",
+                        price: firstMechanic?.price || 0,
+                    },
+                },
+            };
+        });
+
+        const totalCount = items.length;
+        const paginatedItems = items.slice(skip, skip + Number(itemPerPage));
 
         const response = {
-            items: items,
+            items: paginatedItems,
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: totalCount,
@@ -946,11 +970,20 @@ export const postAddBooking = async (req, res) => {
 
         let mechanicId;
 
+        const serviceFullName = serviceDetails.fullName;
+        const parentService = await Service.findOne({ _id: new ObjectId(serviceDetails.parentId) }).select("fullName").lean();
+        const serviceCategoryName = parentService?.fullName || "";
+
         if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
             const mechanicDetails = await Mechanic.findOne({
                 _id: new ObjectId(param.mechanicId),
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                serviceIds: new ObjectId(param.serviceId),
+                "serviceIds": {
+                    $elemMatch: {
+                        categoryName: serviceCategoryName,
+                        "subCategories.subCategoryName": serviceFullName,
+                    },
+                },
             });
 
             if (!mechanicDetails) {
@@ -973,7 +1006,12 @@ export const postAddBooking = async (req, res) => {
         } else {
             const mechanics = await Mechanic.find({
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                serviceIds: new ObjectId(param.serviceId),
+                "serviceIds": {
+                    $elemMatch: {
+                        categoryName: serviceCategoryName,
+                        "subCategories.subCategoryName": serviceFullName,
+                    },
+                },
             }).select("_id");
 
             if (!mechanics.length) {
@@ -1004,6 +1042,7 @@ export const postAddBooking = async (req, res) => {
 
         const alreadyBooked = await Booking.exists({
             ownerId: new ObjectId(ownerId),
+            carId: new ObjectId(param.carId),
             date: new Date(param.date),
             time: param.time,
             status: {

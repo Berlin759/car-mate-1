@@ -507,35 +507,47 @@ export const postAddService = async (req, res) => {
         log1(["postAddService mechanicId----->", mechanicId]);
         log1(["postAddService req.body----->", req.body]);
 
-        const { serviceIds } = req.body;
+        const { services } = req.body;
 
         const validate = await custom_validation(req.body, "mechanic.add_service");
         if (validate.flag !== 1) {
             return res.status(400).json(validate);
         };
 
-        if (!Array.isArray(serviceIds) || serviceIds.length === 0 || serviceIds.some(id => !mongoose.Types.ObjectId.isValid(id))) {
-            return res.status(400).json(errorResponse("Please provide a valid non-empty serviceIds array."));
+        if (!Array.isArray(services) || services.length === 0) {
+            return res.status(400).json(errorResponse("Please provide a valid services array."));
         };
 
-        const serviceCount = await Service.countDocuments({
-            _id: { $in: serviceIds }
-        });
-
-        if (serviceCount !== serviceIds.length) {
-            return res.status(400).json(errorResponse("One or more service IDs are invalid."));
+        for (const service of services) {
+            if (!service.categoryName || service.categoryName.trim() === "") {
+                return res.status(400).json(errorResponse("Category name is required."));
+            };
+            if (!Array.isArray(service.subCategories) || service.subCategories.length === 0) {
+                return res.status(400).json(errorResponse("Each category must have at least one sub-category."));
+            };
+            for (const sub of service.subCategories) {
+                if (!sub.subCategoryName || sub.subCategoryName.trim() === "") {
+                    return res.status(400).json(errorResponse("Sub-category name is required."));
+                };
+                if (sub.price === undefined || sub.price === null || sub.price < 0) {
+                    return res.status(400).json(errorResponse("Valid price is required for each sub-category."));
+                };
+            };
         };
 
-        const objectIds = serviceIds.map(id => new ObjectId(id));
+        const serviceIdsPayload = services.map(service => ({
+            categoryName: service.categoryName.trim(),
+            subCategories: service.subCategories.map(sub => ({
+                subCategoryName: sub.subCategoryName.trim(),
+                price: Number(sub.price),
+                description: sub.description ? sub.description.trim() : "",
+            })),
+        }));
 
         const updatedMechanic = await Mechanic.findByIdAndUpdate(
             mechanicId,
             {
-                $addToSet: {
-                    serviceIds: {
-                        $each: objectIds,
-                    },
-                },
+                serviceIds: serviceIdsPayload,
             },
             {
                 new: true,
@@ -619,25 +631,20 @@ export const postServiceList = async (req, res) => {
             );
         };
 
-        const filter = {
-            _id: {
-                $in: mechanic.serviceIds,
-            },
-        };
+        const items = mechanic.serviceIds.map(entry => ({
+            categoryName: entry.categoryName,
+            subCategories: entry.subCategories.map(sub => ({
+                subCategoryName: sub.subCategoryName,
+                price: sub.price,
+                description: sub.description,
+            })),
+        }));
 
-        const [items, totalRecords] = await Promise.all([
-            Service.find(filter)
-                .select("_id fullName description status createdAt updatedAt")
-                .sort({ _id: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-
-            Service.countDocuments(filter),
-        ]);
+        const totalRecords = items.length;
+        const paginatedItems = items.slice(skip, skip + limit);
 
         let response = {
-            items,
+            items: paginatedItems,
             page,
             limit,
             totalRecords,

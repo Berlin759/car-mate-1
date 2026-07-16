@@ -187,16 +187,20 @@ $(document).on("click", "#add_new_mechanic", function () {
 });
 
 $(document).on("click", "#add_mechanic", function () {
-    const full_name = $("#addMechanicModal #mechanic_name").val();
-    const description = $("#addMechanicModal #mechanic_description").val();
+    const full_name = $("#addMechanicModal #full_name").val();
+    const phone_number = $("#addMechanicModal #phone_number").val();
+
+    const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
 
     let validationMessage = "";
     if (!full_name) {
         validationMessage = "Mechanic name is required. Please enter mechanic name.";
     } else if (full_name && full_name.length < 3) {
         validationMessage = "Mechanic name minimum 3 character.";
-    } else if (!description) {
-        validationMessage = "Description is required. Please enter description.";
+    } else if (!phone_number) {
+        validationMessage = "Phone number is required. Please enter phone number.";
+    } else if (phone_number && !regex.test(phone_number)) {
+        validationMessage = "Please enter a valid phone number. Ensure it follows the correct format.";
     };
 
     if (validationMessage !== "") {
@@ -206,7 +210,7 @@ $(document).on("click", "#add_mechanic", function () {
 
     const payload = {
         fullName: full_name,
-        description: description,
+        phoneNumber: phone_number,
     };
 
     postAjaxCall("/add-mechanic", payload, function (response) {
@@ -237,8 +241,8 @@ $(document).on("click", ".edit-mechanic-button", function () {
             $("#addMechanicModal #addMechanicModalLabel").text("Update Mechanic");
 
             $("#addMechanicModal #mechanic_id").val(mechanicDetails._id);
-            $("#addMechanicModal #mechanic_name").val(mechanicDetails.fullName);
-            $("#addMechanicModal #mechanic_description").val(mechanicDetails.description);
+            $("#addMechanicModal #full_name").val(mechanicDetails.fullName);
+            $("#addMechanicModal #phone_number").val(mechanicDetails.phoneNumber);
         } else if (response.flag === 8) {
             window.location.reload();
         } else if (response.flag === 0) {
@@ -250,8 +254,8 @@ $(document).on("click", ".edit-mechanic-button", function () {
 
 $(document).on("click", "#update_mechanic", function () {
     const mechanicId = $("#addMechanicModal #mechanic_id").val();
-    const full_name = $("#addMechanicModal #mechanic_name").val();
-    const description = $("#addMechanicModal #mechanic_description").val();
+    const full_name = $("#addMechanicModal #full_name").val();
+    const phone_number = $("#addMechanicModal #phone_number").val();
 
     let validationMessage = "";
     if (!mechanicId) {
@@ -260,8 +264,10 @@ $(document).on("click", "#update_mechanic", function () {
         validationMessage = "Mechanic name is required. Please enter mechanic name.";
     } else if (full_name && full_name.length < 3) {
         validationMessage = "Mechanic name minimum 3 character.";
-    } else if (!description) {
-        validationMessage = "Description is required. Please enter description.";
+    } else if (!phone_number) {
+        validationMessage = "Phone number is required. Please enter phone number.";
+    } else if (phone_number && !regex.test(phone_number)) {
+        validationMessage = "Please enter a valid phone number. Ensure it follows the correct format.";
     };
 
     if (validationMessage !== "") {
@@ -272,7 +278,7 @@ $(document).on("click", "#update_mechanic", function () {
     const payload = {
         mechanicId: mechanicId,
         fullName: full_name,
-        description: description,
+        phoneNumber: phone_number,
     };
 
     postAjaxCall("/mechanic-update", payload, function (response) {
@@ -290,8 +296,8 @@ $(document).on("click", "#update_mechanic", function () {
 
 function resetAddMechanicModal() {
     $("#addMechanicModal #mechanic_id").val("");
-    $("#addMechanicModal #mechanic_name").val("");
-    $("#addMechanicModal #mechanic_description").val("");
+    $("#addMechanicModal #full_name").val("");
+    $("#addMechanicModal #phone_number").val("");
 };
 
 function fetchAllMechanicList(filterObj = {}) {

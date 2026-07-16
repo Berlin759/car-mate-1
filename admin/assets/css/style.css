@@ -215,6 +215,10 @@ button {
     margin-top: 50px;
 }
 
+.font-i {
+    font-style: italic;
+}
+
 .fs-10 {
     font-size: 10px;
 }

@@ -12,6 +12,11 @@ const serviceSchema = new Schema(
             type: String,
             default: "",
         },
+        parentId: {
+            type: Schema.Types.ObjectId,
+            ref: "Service",
+            default: null,
+        },
         status: {
             type: Number,
             enum: Object.values(Constants.SERVICE_STATUS),

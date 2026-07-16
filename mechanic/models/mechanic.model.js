@@ -31,8 +31,28 @@ const mechanicSchema = new Schema(
         serviceIds: [
             {
                 _id: false,
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "services",
+                categoryName: {
+                    type: String,
+                    required: true,
+                },
+                subCategories: [
+                    {
+                        _id: false,
+                        subCategoryName: {
+                            type: String,
+                            required: true,
+                        },
+                        price: {
+                            type: Number,
+                            required: true,
+                            min: 0,
+                        },
+                        description: {
+                            type: String,
+                            default: "",
+                        },
+                    },
+                ],
             },
         ],
         location: {

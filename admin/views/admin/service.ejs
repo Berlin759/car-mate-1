@@ -1,6 +1,6 @@
 <%- include('../header.ejs') %>
     <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
-        <div class="filter-area" id="service-filter-section">
+        <div class="filter-area d-flex align-items-center gap-2 flex-wrap" id="service-filter-section">
             <div class="dropdown filter-dropdown">
                 <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="fs-14 fw-md d-flex align-items-center gap-1">
@@ -17,10 +17,33 @@
                     <li>
                         <a class="dropdown-item service-status-filter" data-status="2" data-status-text="InActive">InActive</a>
                     </li>
-                    <!-- <div class="cl-btn-wrapper">
-                        <button class="clear-btn fs-14 fw-normal text-center w-100">Clear filters</button>
-                    </div> -->
                     <button id="clear-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
+                        Clear filters
+                    </button>
+                </ul>
+            </div>
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="mechanic-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Mechanic
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer" style="max-height: 300px; overflow-y: auto;">
+                    <% if (body?.mechanics && body.mechanics.length > 0) { %>
+                        <% body.mechanics.forEach(function(mechanic) { %>
+                            <li>
+                                <a class="dropdown-item mechanic-filter" data-mechanic-id="<%= mechanic._id %>" data-mechanic-name="<%= mechanic.fullName %>">
+                                    <%= mechanic.fullName %>
+                                </a>
+                            </li>
+                        <% }); %>
+                    <% } else { %>
+                        <li><span class="dropdown-item text-muted">No mechanics found</span></li>
+                    <% } %>
+                    <button id="clear-mechanic-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
                         Clear filters
                     </button>
                 </ul>
@@ -70,7 +93,7 @@
 
     <!-- Add New Service Modal -->
     <div class="modal custom-popup fade" id="addServiceModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="addServiceModalLabel" aria-modal="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <!-- Modal Header -->
                 <div class="modal-header justify-content-center mt-3">
@@ -85,12 +108,25 @@
                         <input type="hidden" id="service_id" name="service_id" value="" />
                         <div class="row g-3">
                             <div class="col-lg-12">
-                                <label for="fullName" class="form-label text-dark">Enter Service Name</label>
-                                <input class="form-control" type="text" name="fullName" id="service_name" placeholder="Enter Service Name">
+                                <label for="fullName" class="form-label text-dark">Category Name</label>
+                                <input class="form-control" type="text" name="fullName" id="service_name" placeholder="Enter Category Name">
                             </div>
                             <div class="col-lg-12">
-                                <label for="description" class="form-label text-dark">Description</label>
-                                <textarea class="form-control" type="text" name="description" id="service_description" rows="3" placeholder="Enter Description"></textarea>
+                                <label for="description" class="form-label text-dark">Category Description</label>
+                                <textarea class="form-control" type="text" name="description" id="service_description" rows="3" placeholder="Enter Category Description"></textarea>
+                            </div>
+                            
+                            <!-- Sub-categories Section -->
+                            <div class="col-lg-12 mt-4">
+                                <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                                    <h6 class="text-dark mb-0 fw-semibold">Sub-categories</h6>
+                                    <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 fs-12 d-flex align-items-center gap-1" id="add_subcategory_row_btn">
+                                        <i class="fa-solid fa-plus"></i> Add Sub-category
+                                    </button>
+                                </div>
+                                <div id="subcategory_list_container" class="d-flex flex-column gap-3">
+                                    <!-- Dynamic Sub-category rows will be appended here -->
+                                </div>
                             </div>
                         </div>
                     </form>

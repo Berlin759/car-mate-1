@@ -88,8 +88,8 @@ $(document).on("click", "#reset-car-owner-filters", function () {
 
 $(document).on("click", ".car_owner_details_show", function () {
     return;
-    const carOwnerId = $(this).data("car-owner-id");
-    if (!carOwnerId) {
+    const ownerId = $(this).data("car-owner-id");
+    if (!ownerId) {
         showToast(0, "Invalid car owner Id");
         return;
     };
@@ -102,7 +102,7 @@ $(document).on("click", ".car_owner_details_show", function () {
     $("#car_owner_details_body #car_owner_status").text("-");
     $("#car_owner_details_body #car_owner_trx_status").text("-");
 
-    postAjaxCall("/car-owner-details", { carOwnerId: carOwnerId }, function (response) {
+    postAjaxCall("/car-owner-details", { ownerId: ownerId }, function (response) {
         if (response.flag !== 1) {
             showToast(response.flag, response.msg);
             return;
@@ -162,16 +162,16 @@ $(document).on("click", ".car_owner_details_show", function () {
 });
 
 $(document).on("click", ".car_owner_delete", function () {
-    const carOwnerId = $(this).data("car-owner-id");
-    if (!carOwnerId) {
+    const ownerId = $(this).data("car-owner-id");
+    if (!ownerId) {
         showToast(0, "Invalid car owner Id");
         return;
     };
 
-    postAjaxCall("/car-owner-delete", { carOwnerId: carOwnerId }, function (response) {
+    postAjaxCall("/car-owner-delete", { ownerId: ownerId }, function (response) {
         showToast(response.flag, response.msg);
         if (response.flag === 1) {
-            filterData("/car-owner-list", "car-owner-list-table-data");
+            fetchAllCarOwnerList();
         };
     });
 });
@@ -213,7 +213,7 @@ $(document).on("click", "#add_car_owner", function () {
         phoneNumber: phone_number,
     };
 
-    postAjaxCall("/add-car-owner", payload, function (response) {
+    postAjaxCall("/add-owner", payload, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -226,10 +226,10 @@ $(document).on("click", "#add_car_owner", function () {
 });
 
 $(document).on("click", ".edit-car-owner-button", function () {
-    const carOwnerId = $(this).data("car-owner-id");
+    const ownerId = $(this).data("car-owner-id");
     const car_owner_status = $(this).data("car-owner-status");
 
-    const data = { carOwnerId: carOwnerId };
+    const data = { ownerId: ownerId };
 
     postAjaxCall("/car-owner-details", data, function (response) {
         if (response.flag === 1) {
@@ -278,12 +278,12 @@ $(document).on("click", "#update_car_owner", function () {
     };
 
     const payload = {
-        carOwnerId: car_owner_id,
+        ownerId: car_owner_id,
         fullName: full_name,
         phoneNumber: phone_number,
     };
 
-    postAjaxCall("/car-owner-update", payload, function (response) {
+    postAjaxCall("/update-owner", payload, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -299,6 +299,7 @@ $(document).on("click", "#update_car_owner", function () {
 function resetAddCarOwnerModal() {
     $("#addCarOwnerModal #car_owner_id").val("");
     $("#addCarOwnerModal #full_name").val("");
+    $("#addCarOwnerModal #phone_number").val("");
 };
 
 function fetchAllCarOwnerList(filterObj = {}) {

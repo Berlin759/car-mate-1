@@ -357,3 +357,37 @@ export const generateThumbnailFileName = () => {
 
     return timestamp + "_" + randomString + ".jpg";
 };
+
+export const getVehicleDetails = async (vehicleNumber) => {
+    try {
+        if (!vehicleNumber) return errorResponse("Invallid vehicle number.");
+
+        const result = await axios.post(
+            `${process.env.CASHFREE_BASE_URL}/verification/vehicle-rc`,
+            {
+                verification_id: `verify_${Date.now()}`,
+                vehicle_number: vehicleNumber,
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-client-id": process.env.CASHFREE_CLIENT_ID,
+                    "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
+                },
+            },
+        );
+
+        if (!result.data) {
+            return errorResponse(messages.unexpectedDataError);
+        };
+
+        if (result?.data?.status === "INVALID") {
+            return errorResponse("Invalid Vehicle Number.");
+        };
+
+        return successResponse("Vehicle Details Get Successfully.", result.data);
+    } catch (error) {
+        log1(["Error in getVehicleDetails ----->", error]);
+        return errorResponse(messages.unexpectedDataError);
+    };
+};

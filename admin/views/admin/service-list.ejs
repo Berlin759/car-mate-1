@@ -13,48 +13,114 @@
     };
 %>
 
-<div class="table-responsive">
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Created Date</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <% if(body?.serviceList !== undefined && body?.serviceList?.length > 0) { %>
-                <% body.serviceList.forEach((item, index) => { %>
-                    <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
-                    <tr>
-                        <td><%= start_index %></td>
-                        <td><%= item?.fullName || "-" %></td>
-                        <td><%= item?.description || "-" %></td>
-                        <td>
-                            <% if(item?.status === 1) { %>
-                                <span class="bet-status alert-success">Active</span>
-                            <% } else { %>
-                                <span class="bet-status alert-end">InActive</span>
-                            <% } %>
-                        </td>
-                        <td><%= formatDate(item?.createdAt) || "-" %></td>
-                        <td class="text-end d-flex gap-1">
-                            <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                                <a href="javascript:void(0);" class="service_details_show" data-service-id="<%= item?._id %>">
-                                    <i class="fa-regular fa-eye"></i>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                <% }) %>
-            <% } else { %>
+<% if (body?.mechanicFilter) { %>
+    <div class="table-responsive">
+        <table>
+            <thead>
                 <tr>
-                    <td colspan="6" class="text-center">No services found</td>
+                    <th>#</th>
+                    <th>Category</th>
+                    <th>Sub-Category</th>
+                    <th>Price</th>
+                    <th>Description</th>
                 </tr>
-            <% } %>
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                <% if (body?.mechanicServiceList && body.mechanicServiceList.length > 0) { %>
+                    <% let rowIndex = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + 1; %>
+                    <% body.mechanicServiceList.forEach(function(category) { %>
+                        <% category.subCategories.forEach(function(sub, subIndex) { %>
+                            <tr>
+                                <td><%= rowIndex %></td>
+                                <% if (subIndex === 0) { %>
+                                    <td rowspan="<%= category.subCategories.length %>">
+                                        <strong><%= category.categoryName %></strong>
+                                    </td>
+                                <% } %>
+                                <td><%= sub.subCategoryName %></td>
+                                <td><%= sub.price %></td>
+                                <td><%= sub.description || "-" %></td>
+                            </tr>
+                            <% rowIndex++; %>
+                        <% }); %>
+                    <% }); %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="5" class="text-center">No services found for this mechanic</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+<% } else { %>
+    <!-- Default View -->
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Category</th>
+                    <th>Sub-category</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if(body?.serviceList !== undefined && body?.serviceList?.length > 0) { %>
+                    <% body.serviceList.forEach((item, index) => { %>
+                        <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                        <tr>
+                            <td><%= start_index %></td>
+                            <td>
+                                <strong><%= item?.fullName || "-" %></strong>
+                            </td>
+                            <td>
+                                <% if (item?.subCategories && item?.subCategories.length > 0) { %>
+                                    <div class="mt-2 text-muted" style="font-size: 13px;">
+                                        <ul class="mb-0 mt-1 pl-3 px-2">
+                                            <% item.subCategories.forEach((sub, count) => { %>
+                                                <li>
+                                                    <span class="px-1"><strong><%= count + 1 %>.</strong></span>
+                                                    <strong><%= sub.fullName %></strong>
+                                                </li>
+                                            <% }) %>
+                                        </ul>
+                                    </div>
+                                <% } else { %>
+                                    <div class="text-muted mt-1 text-center fs-12 font-i">
+                                        No sub-categories
+                                    </div>
+                                <% } %>
+                            </td>
+                            <td><%= item?.description || "-" %></td>
+                            <td>
+                                <% if(item?.status === 1) { %>
+                                    <span class="bet-status alert-success">Active</span>
+                                <% } else { %>
+                                    <span class="bet-status alert-end">InActive</span>
+                                <% } %>
+                            </td>
+                            <td><%= formatDate(item?.createdAt) || "-" %></td>
+                            <td class="text-end">
+                                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                                    <a href="javascript:void(0);" class="edit-service-button" data-service-id="<%= item?._id %>" title="Edit">
+                                        <i class="fa-regular fa-pen-to-square"></i>
+                                    </a>
+                                    <a href="javascript:void(0);" class="service_delete text-danger" data-service-id="<%= item?._id %>" title="Delete">
+                                        <i class="fa-regular fa-trash-can"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    <% }) %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="6" class="text-center">No services found</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+<% } %>

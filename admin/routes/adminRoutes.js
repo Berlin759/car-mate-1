@@ -7,16 +7,22 @@ import {
 import {
     getDashboardPage,
     getCarOwnerPage,
+    postAddOwner,
     postAllCarOwnerList,
     postCarOwnerDetails,
+    postUpdateOwner,
     postCarOwnerDelete,
-    getCarMechanicPage,
-    postAllCarMechanicList,
-    postCarMechanicDetails,
-    postCarMechanicDelete,
+    getMechanicPage,
+    postAddMechanic,
+    postAllMechanicList,
+    postMechanicDetails,
+    postMechanicUpdate,
+    postMechanicDelete,
     getCarsPage,
+    postAddCar,
     postAllCarsList,
     postCarDetails,
+    postUpdateCar,
     postCarDelete,
     getServicePage,
     postAddService,
@@ -49,20 +55,26 @@ adminRouter.get("/dashboard", authMiddleware, getDashboardPage);
 
 // Car Owner API
 adminRouter.get("/car-owner", authMiddleware, getCarOwnerPage);
+adminRouter.post("/add-owner", authMiddleware, postAddOwner);
 adminRouter.post("/car-owner-list", authMiddleware, postAllCarOwnerList);
 adminRouter.post("/car-owner-details", authMiddleware, postCarOwnerDetails);
+adminRouter.post("/update-owner", authMiddleware, postUpdateOwner);
 adminRouter.post("/car-owner-delete", authMiddleware, postCarOwnerDelete);
 
 // Mechanic API
-adminRouter.get("/mechanic", authMiddleware, getCarMechanicPage);
-adminRouter.post("/mechanic-list", authMiddleware, postAllCarMechanicList);
-adminRouter.post("/mechanic-details", authMiddleware, postCarMechanicDetails);
-adminRouter.post("/mechanic-delete", authMiddleware, postCarMechanicDelete);
+adminRouter.get("/mechanic", authMiddleware, getMechanicPage);
+adminRouter.post("/add-mechanic", authMiddleware, postAddMechanic);
+adminRouter.post("/mechanic-list", authMiddleware, postAllMechanicList);
+adminRouter.post("/mechanic-details", authMiddleware, postMechanicDetails);
+adminRouter.post("/mechanic-update", authMiddleware, postMechanicUpdate);
+adminRouter.post("/mechanic-delete", authMiddleware, postMechanicDelete);
 
 // Car API
 adminRouter.get("/cars", authMiddleware, getCarsPage);
+adminRouter.post("/add-car", authMiddleware, postAddCar);
 adminRouter.post("/car-list", authMiddleware, postAllCarsList);
 adminRouter.post("/car-details", authMiddleware, postCarDetails);
+adminRouter.post("/car-update", authMiddleware, postUpdateCar);
 adminRouter.post("/car-delete", authMiddleware, postCarDelete);
 
 // Service API

@@ -22,7 +22,7 @@ const validate_rules = {
             otp: "required",
         },
         add_service: {
-            serviceIds: "required",
+            services: "required",
         },
         updateDeviceToken: {
             deviceToken: "required",

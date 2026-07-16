@@ -398,8 +398,15 @@ function AjaxCall(url, callback, method = "GET") {
                 callback(response);
             };
         },
-        error: function (err) {
-            console.error("Error:", err);
+        error: function (xhr) {
+
+            console.log(xhr);
+
+            if (xhr.responseJSON) {
+                callback(xhr.responseJSON);
+            } else {
+                showToast(0, "Something went wrong.");
+            }
         },
     });
 };
@@ -415,6 +422,16 @@ function postAjaxCall(url, data, callback) {
             } else {
                 callback(response);
             };
+        },
+        error: function (xhr) {
+
+            console.log(xhr);
+
+            if (xhr.responseJSON) {
+                callback(xhr.responseJSON);
+            } else {
+                showToast(0, "Something went wrong.");
+            }
         },
     });
 };
@@ -433,8 +450,15 @@ function postFileCall(url, formData, callback) {
                 callback(response);
             };
         },
-        error: function (err) {
-            console.error("Error:", err);
+        error: function (xhr) {
+
+            console.log(xhr);
+
+            if (xhr.responseJSON) {
+                callback(xhr.responseJSON);
+            } else {
+                showToast(0, "Something went wrong.");
+            }
         },
     });
 };

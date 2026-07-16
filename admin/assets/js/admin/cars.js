@@ -122,7 +122,7 @@ $(document).on("click", "#add_car", function () {
     };
 
     const payload = {
-        vehicleNumber: vehicle_number,
+        vehicle_number: vehicle_number,
     };
 
     postAjaxCall("/add-car", payload, function (response) {
@@ -183,7 +183,7 @@ $(document).on("click", "#update_car", function () {
 
     const payload = {
         carId: carId,
-        vehicleNumber: vehicle_number,
+        vehicle_number: vehicle_number,
     };
 
     postAjaxCall("/car-update", payload, function (response) {

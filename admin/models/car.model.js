@@ -7,7 +7,7 @@ const carSchema = new Schema(
         ownerId: {
             type: Schema.Types.ObjectId,
             ref: "owners",
-            required: true,
+            required: false,
         },
         fullName: {
             type: String,
