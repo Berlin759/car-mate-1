@@ -38,10 +38,57 @@ import {
     postAllTransactionList,
     postTransactionDetails,
     getReviewPage,
+    postAllReviewList,
+    postReviewDetails,
+    // postDashboardKPIs,
     getSettingsPage,
     postUpdateSettings,
     postUpdatePasswords,
     postLogout,
+    postAddCoupon,
+    postCouponList,
+    postUpdateCoupon,
+    postDeleteCoupon,
+    postAssignProvider,
+    postRescheduleBooking,
+    postSuspendOwner,
+    postSuspendMechanic,
+    postRevenueReport,
+    postServicePopularityReport,
+    postProviderPerformanceReport,
+    postPeakHoursReport,
+    postCancellationTrendsReport,
+    postAddBanner,
+    postBannerList,
+    postDeleteBanner,
+    postAddFaq,
+    postFaqList,
+    postDeleteFaq,
+    postAddAnnouncement,
+    postAnnouncementList,
+    postDeleteAnnouncement,
+    postDisputeList,
+    postResolveDispute,
+    getDisputePage,
+    getBannerPage,
+    getFaqPage,
+    getAnnouncementPage,
+    getPricingPage,
+    postPricingDetails,
+    postUpdatePricing,
+    getTemplatePage,
+    postTemplateList,
+    postTemplateDetails,
+    postAddTemplate,
+    postUpdateTemplate,
+    postDeleteTemplate,
+    postToggleTemplateStatus,
+    postSeedDefaultTemplates,
+    getKYCPage,
+    postPendingKYCList,
+    postKYCDetails,
+    postApproveKYC,
+    postRejectKYC,
 } from "../controllers/admin.controller.js";
 
 const adminRouter = express.Router();
@@ -98,11 +145,79 @@ adminRouter.post("/transaction-details", authMiddleware, postTransactionDetails)
 
 // Reviews API
 adminRouter.get("/reviews", authMiddleware, getReviewPage);
+adminRouter.post("/review-list", authMiddleware, postAllReviewList);
+adminRouter.post("/review-details", authMiddleware, postReviewDetails);
+
+// KYC API
+adminRouter.get("/kyc", authMiddleware, getKYCPage);
+adminRouter.post("/kyc-list", authMiddleware, postPendingKYCList);
+adminRouter.post("/kyc-details", authMiddleware, postKYCDetails);
+adminRouter.post("/kyc-approve", authMiddleware, postApproveKYC);
+adminRouter.post("/kyc-reject", authMiddleware, postRejectKYC);
 
 // settings API
 adminRouter.get("/settings", authMiddleware, getSettingsPage);
 adminRouter.post("/update-settings", authMiddleware, postUpdateSettings);
 adminRouter.post("/update-password", authMiddleware, postUpdatePasswords);
 adminRouter.post("/logout", authMiddleware, postLogout);
+
+// Coupon API
+adminRouter.post("/add-coupon", authMiddleware, postAddCoupon);
+adminRouter.post("/coupon-list", authMiddleware, postCouponList);
+adminRouter.post("/update-coupon", authMiddleware, postUpdateCoupon);
+adminRouter.post("/delete-coupon", authMiddleware, postDeleteCoupon);
+
+// Booking Operations
+adminRouter.post("/assign-provider", authMiddleware, postAssignProvider);
+adminRouter.post("/reschedule-booking", authMiddleware, postRescheduleBooking);
+
+// User Status Management
+adminRouter.post("/suspend-owner", authMiddleware, postSuspendOwner);
+adminRouter.post("/suspend-mechanic", authMiddleware, postSuspendMechanic);
+
+// Reports & Analytics
+adminRouter.post("/revenue-report", authMiddleware, postRevenueReport);
+adminRouter.post("/service-popularity-report", authMiddleware, postServicePopularityReport);
+adminRouter.post("/provider-performance-report", authMiddleware, postProviderPerformanceReport);
+adminRouter.post("/peak-hours-report", authMiddleware, postPeakHoursReport);
+adminRouter.post("/cancellation-trends-report", authMiddleware, postCancellationTrendsReport);
+
+// CMS - Banners
+adminRouter.get("/banners", authMiddleware, getBannerPage);
+adminRouter.post("/add-banner", authMiddleware, postAddBanner);
+adminRouter.post("/banner-list", authMiddleware, postBannerList);
+adminRouter.post("/delete-banner", authMiddleware, postDeleteBanner);
+
+// CMS - FAQs
+adminRouter.get("/faqs", authMiddleware, getFaqPage);
+adminRouter.post("/add-faq", authMiddleware, postAddFaq);
+adminRouter.post("/faq-list", authMiddleware, postFaqList);
+adminRouter.post("/delete-faq", authMiddleware, postDeleteFaq);
+
+// CMS - Announcements
+adminRouter.get("/announcements", authMiddleware, getAnnouncementPage);
+adminRouter.post("/add-announcement", authMiddleware, postAddAnnouncement);
+adminRouter.post("/announcement-list", authMiddleware, postAnnouncementList);
+adminRouter.post("/delete-announcement", authMiddleware, postDeleteAnnouncement);
+
+// Dispute Resolution
+adminRouter.get("/disputes", authMiddleware, getDisputePage);
+adminRouter.post("/dispute-list", authMiddleware, postDisputeList);
+adminRouter.post("/resolve-dispute", authMiddleware, postResolveDispute);
+
+// Pricing Management
+adminRouter.get("/pricing", authMiddleware, getPricingPage);
+adminRouter.post("/pricing-details", authMiddleware, postPricingDetails);
+adminRouter.post("/update-pricing", authMiddleware, postUpdatePricing);
+
+// Template Management
+adminRouter.get("/templates", authMiddleware, getTemplatePage);
+adminRouter.post("/template-list", authMiddleware, postTemplateList);
+adminRouter.post("/template-details", authMiddleware, postTemplateDetails);
+adminRouter.post("/add-template", authMiddleware, postAddTemplate);
+adminRouter.post("/update-template", authMiddleware, postUpdateTemplate);
+adminRouter.post("/delete-template", authMiddleware, postDeleteTemplate);
+adminRouter.post("/toggle-template-status", authMiddleware, postToggleTemplateStatus);
+adminRouter.post("/seed-default-templates", authMiddleware, postSeedDefaultTemplates);
 
 export default adminRouter;

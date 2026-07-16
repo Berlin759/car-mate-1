@@ -19,7 +19,7 @@ const authMiddleware = async (req, res, next) => {
         };
         
         let mechanicData = await Mechanic.findOne({ phoneNumber: decoded.phoneNumber, loginToken: token });
-        if (!mechanicData || mechanicData.status !== Constants.OWNER_STATUS.ACTIVE) {
+        if (!mechanicData || mechanicData.status !== Constants.MECHANIC_STATUS.ACTIVE) {
             return res.status(401).json(authErrorResponse());
         };
 

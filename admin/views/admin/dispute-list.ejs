@@ -1,0 +1,64 @@
+<%
+    function formatDate(date) {
+        if(!date){ return "-"; }
+        let d=new Date(date);
+        let day=('0' + d.getDate()).slice(-2);
+        let month=('0' + (d.getMonth() + 1)).slice(-2);
+        let year=d.getFullYear();
+        return `${year}-${month}-${day}`;
+    };
+%>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Booking ID</th>
+                <th>Filed By</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Refund</th>
+                <th>Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (body?.disputeList && body.disputeList.length > 0) { body.disputeList.forEach(function(dispute, index) { %>
+                <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                <tr>
+                    <td><%= start_index %></td>
+                    <td><strong><%= dispute?.bookingId?.invoiceNo || dispute?.bookingId?._id || "-" %></strong></td>
+                    <td><%= dispute.filedByRole || "-" %></td>
+                    <td><%= dispute.reason || "-" %></td>
+                    <td>
+                        <% if (dispute.status === 1) { %>
+                            <span class="bet-status alert-pending">Open</span>
+                        <% } else if (dispute.status === 2) { %>
+                            <span class="bet-status alert-accept">Under Review</span>
+                        <% } else if (dispute.status === 3) { %>
+                            <span class="bet-status alert-end">Escalated</span>
+                        <% } else { %>
+                            <span class="bet-status alert-success">Resolved</span>
+                        <% } %>
+                    </td>
+                    <td>₹<%= dispute.refundAmount || 0 %></td>
+                    <td><%= formatDate(dispute.createdAt) %></td>
+                    <td class="text-end">
+                        <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                            <% if (dispute.status !== 4) { %>
+                                <a href="javascript:void(0);" class="resolve-dispute-btn text-primary" data-dispute-id="<%= dispute._id %>" title="Resolve">
+                                    <i class="fa-solid fa-check"></i>
+                                </a>
+                            <% } %>
+                        </div>
+                    </td>
+                </tr>
+            <% }); } else { %>
+                <tr>
+                    <td colspan="8" class="text-center">No disputes found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,99 @@
+<%- include('../header.ejs') %>
+    <div class="p-3">
+        <form id="pricing-form">
+            <div class="row g-4">
+                <!-- Base Pricing -->
+                <div class="col-lg-6">
+                    <div class="card bs-border">
+                        <div class="card-header bg-white fw-semibold fs-15">
+                            <i class="fa-solid fa-indian-rupee-sign me-2"></i> Base Pricing
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Base Price (₹)</label>
+                                <input type="number" class="form-control" id="basePrice" name="basePrice" step="0.01" min="0" value="<%= body?.pricing?.basePrice || 0 %>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Per Km Charge (₹)</label>
+                                <input type="number" class="form-control" id="perKmCharge" name="perKmCharge" step="0.01" min="0" value="<%= body?.pricing?.perKmCharge || 0 %>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Minimum Fare (₹)</label>
+                                <input type="number" class="form-control" id="minimumFare" name="minimumFare" step="0.01" min="0" value="<%= body?.pricing?.minimumFare || 0 %>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Cancellation Fee (₹)</label>
+                                <input type="number" class="form-control" id="cancellationFee" name="cancellationFee" step="0.01" min="0" value="<%= body?.pricing?.cancellationFee || 0 %>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Surcharges -->
+                <div class="col-lg-6">
+                    <div class="card bs-border">
+                        <div class="card-header bg-white fw-semibold fs-15">
+                            <i class="fa-solid fa-percent me-2"></i> Surcharges
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Peak-Hour Surcharge (%)</label>
+                                <input type="number" class="form-control" id="peakHourSurcharge" name="peakHourSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.peakHourSurcharge || 0 %>">
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label text-dark">Morning Peak Start</label>
+                                    <input type="time" class="form-control" id="peakHourStart" name="peakHourStart" value="<%= body?.pricing?.peakHourStart || '07:00' %>">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label text-dark">Morning Peak End</label>
+                                    <input type="time" class="form-control" id="peakHourEnd" name="peakHourEnd" value="<%= body?.pricing?.peakHourEnd || '10:00' %>">
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label text-dark">Evening Peak Start</label>
+                                    <input type="time" class="form-control" id="eveningPeakStart" name="eveningPeakStart" value="<%= body?.pricing?.eveningPeakStart || '17:00' %>">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label text-dark">Evening Peak End</label>
+                                    <input type="time" class="form-control" id="eveningPeakEnd" name="eveningPeakEnd" value="<%= body?.pricing?.eveningPeakEnd || '20:00' %>">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Weekend Surcharge (%)</label>
+                                <input type="number" class="form-control" id="weekendSurcharge" name="weekendSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.weekendSurcharge || 0 %>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Commission & Tax -->
+                <div class="col-lg-6">
+                    <div class="card bs-border">
+                        <div class="card-header bg-white fw-semibold fs-15">
+                            <i class="fa-solid fa-coins me-2"></i> Commission & Tax
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Platform Commission (%)</label>
+                                <input type="number" class="form-control" id="platformCommission" name="platformCommission" step="0.01" min="0" max="100" value="<%= body?.pricing?.platformCommission || 10 %>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark">GST (%)</label>
+                                <input type="number" class="form-control" id="gstPercentage" name="gstPercentage" step="0.01" min="0" max="100" value="<%= body?.pricing?.gstPercentage || 18 %>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary" id="save-pricing-btn">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Pricing
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+<%- include('../footer.ejs') %>

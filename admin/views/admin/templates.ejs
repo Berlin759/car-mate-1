@@ -1,0 +1,143 @@
+<%- include('../header.ejs') %>
+    <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
+        <div class="filter-area d-flex align-items-center gap-2 flex-wrap" id="template-filter-section">
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="type-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Template Type
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li><a class="dropdown-item template-type-filter" data-type="email" data-type-text="Email">Email</a></li>
+                    <li><a class="dropdown-item template-type-filter" data-type="push_notification" data-type-text="Push Notification">Push Notification</a></li>
+                    <li><a class="dropdown-item template-type-filter" data-type="sms" data-type-text="SMS">SMS</a></li>
+                    <button id="clear-type-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">Clear filters</button>
+                </ul>
+            </div>
+            <button type="button" id="reset-template-filters" class="d-none f-reset-btn fs-14 fw-md bg-transparent">
+                Reset <img src="/images/f-close.svg" alt="">
+            </button>
+        </div>
+        <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+            <button class="btn btn-outline-primary btn-sm" id="seed-default-templates-btn">
+                <i class="fa-solid fa-seedling me-1"></i> Seed Defaults
+            </button>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#templateModal" id="add_new_template_btn">
+                <i class="fa-solid fa-plus me-1"></i> Add Template
+            </button>
+            <div class="pagination-show d-flex align-items-center" id="pagination-div-template-list-table-data">
+                Show
+                <select id="recordPerPage-template-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/template-list', 'template-list-table-data')">
+                    <option selected="">10</option>
+                    <option value="20">20</option>
+                    <option value="40">40</option>
+                </select>
+            </div>
+            <div class="page navigation example">
+                <ul class="pagination justify-content-end mb-0 gap-0"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="admin-table template-list-table mt-30" id="template-list-table-data"></div>
+
+    <!-- Add/Edit Template Modal -->
+    <div class="modal custom-popup fade" id="templateModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center mt-3">
+                    <h5 class="modal-title" id="templateModalLabel">Add Template</h5>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <input type="hidden" id="template_id" value="">
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <label class="form-label text-dark">Template Name <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" id="template_name" placeholder="e.g. booking_confirmation">
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-label text-dark">Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="template_type">
+                                <option value="email">Email</option>
+                                <option value="push_notification">Push Notification</option>
+                                <option value="sms">SMS</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-label text-dark">Target Audience</label>
+                            <select class="form-select" id="template_audience">
+                                <option value="all">All</option>
+                                <option value="owner">Car Owners</option>
+                                <option value="mechanic">Mechanics</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-6" id="subject-field-group">
+                            <label class="form-label text-dark">Subject</label>
+                            <input class="form-control" type="text" id="template_subject" placeholder="Email subject line">
+                        </div>
+                        <div class="col-lg-12">
+                            <label class="form-label text-dark">Body <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="template_body" rows="6" placeholder="Template body text. Use {{placeholder}} for dynamic values."></textarea>
+                        </div>
+                        <div class="col-lg-12">
+                            <label class="form-label text-dark">Placeholders</label>
+                            <div class="d-flex flex-wrap gap-2 mb-2" id="placeholder-tags-container"></div>
+                            <div class="input-group">
+                                <input class="form-control" type="text" id="placeholder_input" placeholder="Enter placeholder name (e.g. ownerName)">
+                                <button class="btn btn-outline-secondary" type="button" id="add_placeholder_btn">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Placeholders in body use {{name}} format. Add names here without braces.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 d-flex justify-content-end">
+                    <button type="button" class="btn btn-primary btn-transparent" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save_template">Save Template</button>
+                    <button type="button" class="btn btn-primary d-none" id="update_template">Update Template</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Template Modal -->
+    <div class="modal custom-popup fade" id="viewTemplateModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center mt-3">
+                    <h5 class="modal-title">Template Preview</h5>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-2" id="view-template-type"></span>
+                        <span class="badge bg-secondary" id="view-template-audience"></span>
+                        <span class="badge bg-success ms-2 d-none" id="view-template-active">Active</span>
+                        <span class="badge bg-danger ms-2 d-none" id="view-template-inactive">Inactive</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Name</label>
+                        <div id="view-template-name">-</div>
+                    </div>
+                    <div class="mb-3" id="view-subject-group">
+                        <label class="form-label fw-semibold text-dark">Subject</label>
+                        <div id="view-template-subject">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Body</label>
+                        <div class="p-3 bg-light rounded" style="white-space: pre-wrap; font-family: monospace; font-size: 13px;" id="view-template-body">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark">Placeholders</label>
+                        <div id="view-template-placeholders" class="d-flex flex-wrap gap-1"></div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<%- include('../footer.ejs') %>

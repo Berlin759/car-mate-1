@@ -1,48 +1,77 @@
-$(document).ready(function () { });
-
-const bookingCtx = document.getElementById('bookingChart');
-
-new Chart(bookingCtx, {
-    type: 'line',
-    data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-        datasets: [{
-            label: 'Bookings',
-            data: [65, 78, 90, 80, 95, 110, 130],
-            borderColor: '#ff7a18',
-            backgroundColor: 'rgba(255,122,24,0.15)',
-            fill: true,
-            tension: 0.4
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { display: false }
-        }
-    }
+$(document).ready(function () {
+    initBookingChart();
+    initRevenueChart();
 });
 
+function initBookingChart() {
+    var bookingCtx = document.getElementById("bookingChart");
+    if (!bookingCtx) return;
 
-// Revenue Chart
+    var labels = (typeof bookingLabels !== "undefined" && bookingLabels.length > 0) ? bookingLabels : ["No Data"];
+    var data = (typeof bookingData !== "undefined" && bookingData.length > 0) ? bookingData : [0];
 
-const revenueCtx = document.getElementById('revenueChart');
+    new Chart(bookingCtx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Bookings",
+                    data: data,
+                    borderColor: "#ff7a18",
+                    backgroundColor: "rgba(255,122,24,0.15)",
+                    fill: true,
+                    tension: 0.4,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                    },
+                },
+            },
+        },
+    });
+}
 
-new Chart(revenueCtx, {
-    type: 'bar',
-    data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-        datasets: [{
-            label: 'Revenue',
-            data: [12000, 15000, 18000, 16000, 21000, 25000, 30000],
-            backgroundColor: '#3b82f6',
-            borderRadius: 6
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { display: false }
-        }
-    }
-});
+function initRevenueChart() {
+    var revenueCtx = document.getElementById("revenueChart");
+    if (!revenueCtx) return;
+
+    var labels = (typeof revenueLabels !== "undefined" && revenueLabels.length > 0) ? revenueLabels : ["No Data"];
+    var data = (typeof revenueData !== "undefined" && revenueData.length > 0) ? revenueData : [0];
+
+    new Chart(revenueCtx, {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Revenue",
+                    data: data,
+                    backgroundColor: "#3b82f6",
+                    borderRadius: 6,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                },
+            },
+        },
+    });
+}

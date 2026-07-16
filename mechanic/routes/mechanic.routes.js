@@ -29,6 +29,22 @@ import {
     postChatList,
     postChatMessagesList,
     postSendMessageToChat,
+    postSubmitKYC,
+    postKYCStatus,
+    postToggleAvailability,
+    postUpdateWorkingHours,
+    postAvailabilityStatus,
+    postWalletBalance,
+    postRequestWithdrawal,
+    postWithdrawalHistory,
+    postPerformanceMetrics,
+    postReviewsReceived,
+    postDashboard,
+    postIncomingRequests,
+    postUpdateServiceRadius,
+    postUpdateHolidays,
+    postUpdateLocation,
+    postBookingNavigationData,
 } from "../controllers/mechanic.controller.js";
 
 const router = express.Router();
@@ -78,5 +94,35 @@ router.post("/transaction-list", authMiddleware, postTransactionList);
 router.post("/chat-list", authMiddleware, postChatList);
 router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
 router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
+
+// KYC API
+router.post("/submit-kyc", authMiddleware, postSubmitKYC);
+router.post("/kyc-status", authMiddleware, postKYCStatus);
+
+// Availability API
+router.post("/toggle-availability", authMiddleware, postToggleAvailability);
+router.post("/update-working-hours", authMiddleware, postUpdateWorkingHours);
+router.post("/availability-status", authMiddleware, postAvailabilityStatus);
+
+// Wallet & Earnings API
+router.post("/wallet-balance", authMiddleware, postWalletBalance);
+router.post("/request-withdrawal", authMiddleware, postRequestWithdrawal);
+router.post("/withdrawal-history", authMiddleware, postWithdrawalHistory);
+
+// Performance API
+router.post("/performance-metrics", authMiddleware, postPerformanceMetrics);
+router.post("/reviews-received", authMiddleware, postReviewsReceived);
+
+// Dashboard API
+router.post("/dashboard", authMiddleware, postDashboard);
+router.post("/incoming-requests", authMiddleware, postIncomingRequests);
+
+// Availability API (service radius, holidays, location)
+router.post("/update-service-radius", authMiddleware, postUpdateServiceRadius);
+router.post("/update-holidays", authMiddleware, postUpdateHolidays);
+router.post("/update-location", authMiddleware, postUpdateLocation);
+
+// Navigation API
+router.post("/booking-navigation-data", authMiddleware, postBookingNavigationData);
 
 export default router;

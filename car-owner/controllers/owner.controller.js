@@ -33,6 +33,9 @@ import Notification from "../models/notification.model.js";
 import Car from "../models/car.model.js";
 import Service from "../models/service.model.js";
 import Mechanic from "../models/mechanic.model.js";
+import Address from "../models/address.model.js";
+import Coupon from "../models/coupon.model.js";
+import Dispute from "../models/dispute.model.js";
 
 const stripeAccount = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -965,7 +968,7 @@ export const postAddBooking = async (req, res) => {
                 mechanicId: mechanicDetails._id,
                 date: new Date(param.date),
                 time: param.time,
-                status: Constants.BOOKING_STATUS.CONFIRMED,
+                status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
             });
             log1(["postAddBooking existingBooking----->", existingBooking]);
 
@@ -996,7 +999,7 @@ export const postAddBooking = async (req, res) => {
                 },
                 date: new Date(param.date),
                 time: param.time,
-                status: Constants.BOOKING_STATUS.CONFIRMED,
+                status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
             });
 
             const availableMechanics = mechanics.filter(
@@ -1020,7 +1023,7 @@ export const postAddBooking = async (req, res) => {
             status: {
                 $in: [
                     Constants.BOOKING_STATUS.PENDING,
-                    Constants.BOOKING_STATUS.CONFIRMED
+                    Constants.BOOKING_STATUS.PROVIDER_ACCEPTED
                 ]
             },
         });
@@ -1030,7 +1033,45 @@ export const postAddBooking = async (req, res) => {
         };
 
         let invoiceNo = generateInvoiceNumber();
-        let totalPayAmount = parseFloat(param.totalAmount);
+
+        let basePrice = parseFloat(param.basePrice) || 0;
+        let distanceCharge = parseFloat(param.distanceCharge) || 0;
+        let peakHourFee = parseFloat(param.peakHourFee) || 0;
+        let materialCost = parseFloat(param.materialCost) || 0;
+        let taxAmount = parseFloat(param.taxAmount) || 0;
+        let discountAmount = 0;
+        let couponId = null;
+
+        if (param.couponId && ObjectId.isValid(param.couponId)) {
+            const coupon = await Coupon.findOne({
+                _id: new ObjectId(param.couponId),
+                isActive: true,
+                expiryDate: { $gte: new Date() },
+            });
+
+            if (coupon) {
+                const subTotal = basePrice + distanceCharge + peakHourFee + materialCost;
+
+                if (subTotal >= coupon.minOrderAmount) {
+                    if (coupon.discountType === "percentage") {
+                        discountAmount = (subTotal * coupon.discountValue) / 100;
+                        if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+                            discountAmount = coupon.maxDiscountAmount;
+                        }
+                    } else {
+                        discountAmount = coupon.discountValue;
+                    }
+
+                    if (discountAmount > subTotal) {
+                        discountAmount = subTotal;
+                    }
+
+                    couponId = coupon._id;
+                }
+            }
+        }
+
+        let totalPayAmount = parseFloat(param.totalAmount) || (basePrice + distanceCharge + peakHourFee + materialCost + taxAmount - discountAmount);
 
         let bookingPayload = {
             ownerId: new ObjectId(ownerId),
@@ -1041,9 +1082,19 @@ export const postAddBooking = async (req, res) => {
             time: param.time,
             latitude: param.latitude,
             longitude: param.longitude,
+            basePrice: basePrice,
+            distanceCharge: distanceCharge,
+            peakHourFee: peakHourFee,
+            materialCost: materialCost,
+            taxAmount: taxAmount,
+            discountAmount: discountAmount,
             totalAmount: totalPayAmount,
             invoiceNo: invoiceNo,
         };
+
+        if (couponId) {
+            bookingPayload.couponId = couponId;
+        }
 
         let newBooking = await Booking.create(bookingPayload);
         log1(["postAddBooking newBooking----->", newBooking]);
@@ -1250,8 +1301,8 @@ export const postBookingList = async (req, res) => {
                     statusMap.Pending = item.count;
                     break;
 
-                case Constants.BOOKING_STATUS.CONFIRMED:
-                    statusMap.Confirmed = item.count;
+                case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED:
+                    statusMap.Accepted = item.count;
                     break;
 
                 case Constants.BOOKING_STATUS.CANCELLED:
@@ -1527,23 +1578,29 @@ export const postCancelBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Booking Already Cancelled."));
         };
 
+        if (bookingDetails.status >= Constants.BOOKING_STATUS.SERVICE_STARTED) {
+            return res.status(400).json(errorResponse("Cancellation is not permitted after service has started. Please contact support."));
+        };
+
+        let cancellationFee = 0;
+        let refundAmount = parseFloat(bookingDetails.finalPayAmount || bookingDetails.totalAmount);
+
+        if (bookingDetails.status >= Constants.BOOKING_STATUS.PROVIDER_ACCEPTED) {
+            cancellationFee = Math.round(refundAmount * 0.10);
+            refundAmount = refundAmount - cancellationFee;
+        };
+
         if (bookingDetails.paymentMethod === Constants.PAYMENT_METHOD.WALLET) {
             await Owner.findOneAndUpdate(
-                {
-                    _id: new ObjectId(bookingDetails?.ownerId),
-                },
-                {
-                    $inc: {
-                        walletBalance: parseFloat(bookingDetails.finalPayAmount),
-                    },
-                },
+                { _id: new ObjectId(bookingDetails?.ownerId) },
+                { $inc: { walletBalance: refundAmount } },
             );
-        } else if (bookingDetails.paymentMethod === Constants.PAYMENT_METHOD.WALLET) {
+        } else if (bookingDetails.paymentMethod !== Constants.PAYMENT_METHOD.CASH) {
             const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id }).sort({ createdAt: 1 });
 
             let refundPayload = {
-                totalAmount: parseFloat(bookingDetails.finalPayAmount),
-                trxId: transactionDetails.trxId,
+                totalAmount: refundAmount,
+                trxId: transactionDetails?.trxId || "",
                 ownerId: bookingDetails?.ownerId,
             };
             log1(["postCancelBooking refundPayload----->", refundPayload]);
@@ -1555,31 +1612,25 @@ export const postCancelBooking = async (req, res) => {
             };
             let refundPayment = paymentRefund.data;
 
-            // Transaction Add
             let transactionPayload = {
                 trxId: refundPayment.paymentId,
                 ownerId: new ObjectId(bookingDetails?.ownerId),
                 serviceId: new ObjectId(bookingDetails.serviceId),
                 bookingId: bookingDetails._id,
-                stripeCardId: bookingDetails?.stripeCardId,
-                totalAmount: parseFloat(bookingDetails.finalPayAmount),
+                totalAmount: refundAmount,
                 description: "Refund For Cancelled Booking",
-                // status: refundPayment.paymentStatus,
                 status: Constants.TRANSACTION_STATUS.REFUND,
             };
 
             let transactionCreate = await Transaction.create(transactionPayload);
             log1(["postCancelBooking transactionCreate----->", transactionCreate]);
-            if (!transactionCreate) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
-            };
         };
 
         let updatePayload = {
             cancelById: new ObjectId(ownerId),
             cancelReason: param.reason,
             cancelTime: new Date(),
-            cancellationFee: 0,
+            cancellationFee: cancellationFee,
             status: Constants.BOOKING_STATUS.CANCELLED,
         };
 
@@ -1595,6 +1646,229 @@ export const postCancelBooking = async (req, res) => {
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     } finally {
         ownerLocks.delete(ownerId);
+    };
+};
+
+export const postSetDefaultCar = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { carId } = req.body;
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
+        if (!car) {
+            return res.status(400).json(errorResponse("Car not found."));
+        };
+        await Car.updateMany({ ownerId: new ObjectId(ownerId) }, { isDefault: false });
+        await Car.findByIdAndUpdate(carId, { isDefault: true });
+        return res.status(200).json(successResponse("Default car set successfully."));
+    } catch (error) {
+        log1(["Error in postSetDefaultCar ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateCar = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        log1(["postUpdateCar ownerId----->", ownerId]);
+        log1(["postUpdateCar req.body----->", req.body]);
+        const { carId, vehicleNumber, fuelType, vehicleColour } = req.body;
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
+        if (!car) {
+            return res.status(400).json(errorResponse("Car not found."));
+        };
+        let updatePayload = {};
+        if (vehicleNumber) updatePayload.vehicleNumber = vehicleNumber;
+        if (fuelType) updatePayload.fuelType = fuelType;
+        if (vehicleColour) updatePayload.vehicleColour = vehicleColour;
+        if (Object.keys(updatePayload).length === 0) {
+            return res.status(400).json(errorResponse("No fields to update."));
+        };
+        await Car.findByIdAndUpdate(carId, updatePayload);
+        return res.status(200).json(successResponse("Car updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateCar ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteCar = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { carId } = req.body;
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
+        if (!car) {
+            return res.status(400).json(errorResponse("Car not found."));
+        };
+        await Car.findByIdAndDelete(carId);
+        return res.status(200).json(successResponse("Car deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteCar ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postSearchServices = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { keyword, minPrice, maxPrice, minRating, categoryId, currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const filter = { parentId: { $ne: null }, "mechanicIds.0": { $exists: true } };
+
+        if (keyword && keyword.trim() !== "") {
+            filter.$or = [
+                { fullName: { $regex: keyword, $options: "i" } },
+                { description: { $regex: keyword, $options: "i" } },
+            ];
+        };
+
+        if (categoryId) {
+            filter.parentId = new ObjectId(categoryId);
+        };
+
+        let services = await Service.find(filter)
+            .select("_id fullName description parentId mechanicIds")
+            .populate("parentId", "fullName description")
+            .lean();
+
+        if (minPrice || maxPrice) {
+            services = services.filter(service => {
+                const price = service.mechanicIds?.[0]?.price || 0;
+                if (minPrice && price < parseFloat(minPrice)) return false;
+                if (maxPrice && price > parseFloat(maxPrice)) return false;
+                return true;
+            });
+        };
+
+        const totalCount = services.length;
+        const paginatedItems = services.slice(skip, skip + limit);
+
+        return res.status(200).json(successResponse("Services searched successfully.", {
+            page, limit, totalRecords: totalCount, items: paginatedItems,
+        }));
+    } catch (error) {
+        log1(["Error in postSearchServices ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postConfirmPayment = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId, paymentMethod } = req.body;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+        const booking = await Booking.findOne({ _id: new ObjectId(bookingId), ownerId: new ObjectId(ownerId) });
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+        if (booking.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+            return res.status(400).json(errorResponse("Payment can only be confirmed after service completion."));
+        };
+
+        let updatePayload = { status: Constants.BOOKING_STATUS.PAYMENT_COMPLETED };
+        if (paymentMethod) {
+            updatePayload.paymentMethod = parseInt(paymentMethod);
+        };
+
+        if (parseInt(paymentMethod) === Constants.PAYMENT_METHOD.WALLET) {
+            const owner = await Owner.findById(ownerId);
+            if (owner.walletBalance < booking.totalAmount) {
+                return res.status(400).json(errorResponse("Insufficient wallet balance."));
+            };
+            await Owner.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -booking.totalAmount } });
+        };
+
+        await Booking.findByIdAndUpdate(bookingId, updatePayload);
+
+        return res.status(200).json(successResponse("Payment confirmed successfully."));
+    } catch (error) {
+        log1(["Error in postConfirmPayment ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateLocation = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { latitude, longitude } = req.body;
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Latitude and longitude are required."));
+        };
+        await Owner.findByIdAndUpdate(ownerId, {
+            latitude: latitude,
+            longitude: longitude,
+            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
+        });
+        return res.status(200).json(successResponse("Location updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateLocation ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postGetProviderLocation = async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+        const booking = await Booking.findOne({ _id: new ObjectId(bookingId) }).select("mechanicId status");
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+        const mechanic = await Mechanic.findById(booking.mechanicId).select("latitude longitude fullName phoneNumber profileImage isOnline");
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Provider not found."));
+        };
+        return res.status(200).json(successResponse("Provider location fetched successfully.", {
+            latitude: mechanic.latitude,
+            longitude: mechanic.longitude,
+            fullName: mechanic.fullName,
+            phoneNumber: mechanic.phoneNumber,
+            profileImage: mechanic.profileImage,
+            isOnline: mechanic.isOnline,
+            bookingStatus: booking.status,
+        }));
+    } catch (error) {
+        log1(["Error in postGetProviderLocation ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postFileDispute = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId, reason, description } = req.body;
+
+        if (!bookingId || !ObjectId.isValid(bookingId) || !reason) {
+            return res.status(400).json(errorResponse("Booking ID and reason are required."));
+        };
+
+        const dispute = await Dispute.create({
+            bookingId: new ObjectId(bookingId),
+            filedBy: new ObjectId(ownerId),
+            filedByRole: "owner",
+            reason: reason,
+            description: description || "",
+        });
+
+        return res.status(200).json(successResponse("Dispute filed successfully.", dispute));
+    } catch (error) {
+        log1(["Error in postFileDispute ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
 
@@ -1691,8 +1965,10 @@ export const postAddRating = async (req, res) => {
         ]);
         log1(["postAddRating bookingDetails----->", bookingDetails]);
 
-        if (bookingDetails.status !== Constants.BOOKING_STATUS.CONFIRMED) {
-            return res.status(400).json(errorResponse("Booking has not confirm, So now you are not add rating."));
+        if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED &&
+            bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED &&
+            bookingDetails.status !== Constants.BOOKING_STATUS.CLOSED) {
+            return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
         };
 
         let ratingPayload = {
@@ -2465,6 +2741,567 @@ export const postSendMessageToChat = async (req, res) => {
         return res.status(200).json(successResponse("Message sent successfully.", { chatId: chat._id, document: document }));
     } catch (error) {
         log1(["Error in postSendMessageToChat ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAddAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postAddAddress ownerId----->", ownerId]);
+        log1(["postAddAddress param----->", param]);
+
+        const validate = await custom_validation(param, "owner.add_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (param.isDefault === true || param.isDefault === "true") {
+            await Address.updateMany(
+                { ownerId: new ObjectId(ownerId), isDefault: true },
+                { $set: { isDefault: false } }
+            );
+        };
+
+        let payload = {
+            ownerId: new ObjectId(ownerId),
+            label: param.label,
+            address: param.address,
+            latitude: param.latitude,
+            longitude: param.longitude,
+            isDefault: param.isDefault === true || param.isDefault === "true",
+        };
+
+        const newAddress = await Address.create(payload);
+        log1(["postAddAddress newAddress----->", newAddress]);
+
+        if (!newAddress) {
+            return res.status(400).json(errorResponse("Failed to add address."));
+        };
+
+        return res.status(200).json(successResponse("Address added successfully!", newAddress));
+    } catch (error) {
+        log1(["Error in postAddAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAddressList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postAddressList ownerId----->", ownerId]);
+        log1(["postAddressList param----->", param]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = param;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let filter = {
+            ownerId: new ObjectId(ownerId),
+        };
+
+        const [items, totalCount] = await Promise.all([
+            Address.find(filter).sort({ isDefault: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+            Address.countDocuments(filter),
+        ]);
+
+        const response = {
+            items: items,
+            page: page,
+            limit: limit,
+            totalRecords: totalCount,
+        };
+
+        return res.status(200).json(successResponse("Address list get successfully.", response));
+    } catch (error) {
+        log1(["Error in postAddressList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postUpdateAddress ownerId----->", ownerId]);
+        log1(["postUpdateAddress param----->", param]);
+
+        const validate = await custom_validation(param, "owner.update_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(param.addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const address = await Address.findOne({
+            _id: new ObjectId(param.addressId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!address) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
+
+        let updateObj = {};
+
+        if (param.label !== undefined && param.label !== null && param.label !== "") {
+            updateObj.label = param.label;
+        };
+
+        if (param.address !== undefined && param.address !== null && param.address !== "") {
+            updateObj.address = param.address;
+        };
+
+        if (param.latitude !== undefined && param.latitude !== null && param.latitude !== "") {
+            updateObj.latitude = param.latitude;
+        };
+
+        if (param.longitude !== undefined && param.longitude !== null && param.longitude !== "") {
+            updateObj.longitude = param.longitude;
+        };
+
+        if (param.isDefault === true || param.isDefault === "true") {
+            await Address.updateMany(
+                { ownerId: new ObjectId(ownerId), isDefault: true },
+                { $set: { isDefault: false } }
+            );
+            updateObj.isDefault = true;
+        };
+
+        if (Object.keys(updateObj).length > 0) {
+            await Address.findByIdAndUpdate(param.addressId, updateObj, { new: true });
+        };
+
+        const updatedAddress = await Address.findById(param.addressId);
+
+        return res.status(200).json(successResponse("Address updated successfully!", updatedAddress));
+    } catch (error) {
+        log1(["Error in postUpdateAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postDeleteAddress ownerId----->", ownerId]);
+        log1(["postDeleteAddress param----->", param]);
+
+        const validate = await custom_validation(param, "owner.delete_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(param.addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const address = await Address.findOne({
+            _id: new ObjectId(param.addressId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!address) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
+
+        await Address.findByIdAndDelete(param.addressId);
+
+        return res.status(200).json(successResponse("Address deleted successfully!"));
+    } catch (error) {
+        log1(["Error in postDeleteAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postSetDefaultAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postSetDefaultAddress ownerId----->", ownerId]);
+        log1(["postSetDefaultAddress param----->", param]);
+
+        const validate = await custom_validation(param, "owner.set_default_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(param.addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const address = await Address.findOne({
+            _id: new ObjectId(param.addressId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!address) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
+
+        await Address.updateMany(
+            { ownerId: new ObjectId(ownerId), isDefault: true },
+            { $set: { isDefault: false } }
+        );
+
+        await Address.findByIdAndUpdate(param.addressId, { $set: { isDefault: true } });
+
+        const updatedAddress = await Address.findById(param.addressId);
+
+        return res.status(200).json(successResponse("Default address set successfully!", updatedAddress));
+    } catch (error) {
+        log1(["Error in postSetDefaultAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postWalletBalance = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postWalletBalance ownerId----->", ownerId]);
+
+        const owner = await Owner.findById(ownerId).select("walletBalance");
+        if (!owner) {
+            return res.status(400).json(errorResponse("Owner not found."));
+        };
+
+        return res.status(200).json(successResponse("Wallet balance fetched successfully.", {
+            walletBalance: owner.walletBalance || 0,
+        }));
+    } catch (error) {
+        log1(["Error in postWalletBalance ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAddToWallet = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postAddToWallet ownerId----->", ownerId]);
+        log1(["postAddToWallet param----->", param]);
+
+        const { amount } = param;
+
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            return res.status(400).json(errorResponse("Please provide a valid amount."));
+        };
+
+        const addAmount = parseFloat(amount);
+
+        const updatedOwner = await Owner.findByIdAndUpdate(
+            ownerId,
+            { $inc: { walletBalance: addAmount } },
+            { new: true }
+        ).select("walletBalance");
+
+        if (!updatedOwner) {
+            return res.status(400).json(errorResponse("Owner not found."));
+        };
+
+        await Transaction.create({
+            ownerId: new ObjectId(ownerId),
+            mechanicId: new ObjectId(ownerId),
+            serviceId: new ObjectId(ownerId),
+            bookingId: new ObjectId(ownerId),
+            totalAmount: addAmount,
+            description: `Added ₹${addAmount} to wallet`,
+            status: Constants.TRANSACTION_STATUS.SUCCESS,
+        });
+
+        return res.status(200).json(successResponse("Amount added to wallet successfully.", {
+            walletBalance: updatedOwner.walletBalance,
+        }));
+    } catch (error) {
+        log1(["Error in postAddToWallet ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postWalletTransactionList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postWalletTransactionList ownerId----->", ownerId]);
+        log1(["postWalletTransactionList param----->", param]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = param;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const match = {
+            ownerId: new ObjectId(ownerId),
+            description: { $regex: "wallet", $options: "i" },
+        };
+
+        const pipeline = [
+            { $match: match },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $project: {
+                                totalAmount: 1,
+                                description: 1,
+                                status: 1,
+                                createdAt: 1,
+                            },
+                        },
+                    ],
+                    totalRecords: [
+                        { $count: "count" },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await Transaction.aggregate(pipeline).allowDiskUse(true);
+
+        const response = {
+            page,
+            limit,
+            totalRecords: result.totalRecords[0]?.count ?? 0,
+            items: result.items,
+        };
+
+        return res.status(200).json(successResponse("Wallet transaction list fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postWalletTransactionList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postApplyCoupon = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postApplyCoupon ownerId----->", ownerId]);
+        log1(["postApplyCoupon param----->", param]);
+
+        const { code, orderAmount } = param;
+
+        if (!code) {
+            return res.status(400).json(errorResponse("Please provide a coupon code."));
+        };
+
+        const coupon = await Coupon.findOne({
+            code: code.toUpperCase(),
+            isActive: true,
+        });
+
+        if (!coupon) {
+            return res.status(400).json(errorResponse("Invalid coupon code."));
+        };
+
+        if (coupon.expiryDate < new Date()) {
+            return res.status(400).json(errorResponse("This coupon has expired."));
+        };
+
+        if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
+            return res.status(400).json(errorResponse("This coupon has reached its usage limit."));
+        };
+
+        const amount = parseFloat(orderAmount) || 0;
+
+        if (amount < coupon.minOrderAmount) {
+            return res.status(400).json(errorResponse(`Minimum order amount of ₹${coupon.minOrderAmount} required for this coupon.`));
+        };
+
+        let discountAmount = 0;
+
+        if (coupon.discountType === "percentage") {
+            discountAmount = (amount * coupon.discountValue) / 100;
+            if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+                discountAmount = coupon.maxDiscountAmount;
+            }
+        } else {
+            discountAmount = coupon.discountValue;
+        }
+
+        if (discountAmount > amount) {
+            discountAmount = amount;
+        }
+
+        const finalAmount = amount - discountAmount;
+
+        return res.status(200).json(successResponse("Coupon applied successfully.", {
+            couponId: coupon._id,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            discountAmount: discountAmount,
+            orderAmount: amount,
+            finalAmount: finalAmount,
+        }));
+    } catch (error) {
+        log1(["Error in postApplyCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postCouponList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postCouponList ownerId----->", ownerId]);
+        log1(["postCouponList param----->", param]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = param;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const filter = {
+            isActive: true,
+            expiryDate: { $gte: new Date() },
+            $expr: {
+                $or: [
+                    { $eq: ["$usageLimit", 0] },
+                    { $lt: ["$usedCount", "$usageLimit"] },
+                ],
+            },
+        };
+
+        const [items, totalCount] = await Promise.all([
+            Coupon.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Coupon.countDocuments(filter),
+        ]);
+
+        const response = {
+            items,
+            page,
+            limit,
+            totalRecords: totalCount,
+        };
+
+        return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postCouponList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postNearbyMechanics = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postNearbyMechanics ownerId----->", ownerId]);
+        log1(["postNearbyMechanics param----->", param]);
+
+        const {
+            latitude,
+            longitude,
+            radius = 10,
+            serviceId,
+        } = param;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Please provide latitude and longitude."));
+        };
+
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+        const radiusInMeters = parseFloat(radius) * 1000;
+
+        if (isNaN(lat) || isNaN(lng)) {
+            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
+        };
+
+        let matchFilter = {
+            status: Constants.MECHANIC_STATUS.ACTIVE,
+            "location.coordinates": {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [lng, lat],
+                    },
+                    $maxDistance: radiusInMeters,
+                },
+            },
+        };
+
+        if (serviceId && ObjectId.isValid(serviceId)) {
+            matchFilter.serviceIds = new ObjectId(serviceId);
+        }
+
+        const mechanics = await Mechanic.find(matchFilter)
+            .select("fullName email phoneNumber profileImage latitude longitude address serviceIds")
+            .limit(50)
+            .lean();
+
+        const response = mechanics.map((mechanic) => {
+            const mLat = parseFloat(mechanic.latitude) || 0;
+            const mLng = parseFloat(mechanic.longitude) || 0;
+            const R = 6371;
+            const dLat = ((mLat - lat) * Math.PI) / 180;
+            const dLng = ((mLng - lng) * Math.PI) / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos((lat * Math.PI) / 180) *
+                Math.cos((mLat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            return {
+                _id: mechanic._id,
+                fullName: mechanic.fullName,
+                email: mechanic.email,
+                phoneNumber: mechanic.phoneNumber,
+                profileImage: mechanic.profileImage,
+                latitude: mechanic.latitude,
+                longitude: mechanic.longitude,
+                address: mechanic.address,
+                distance: Math.round(distance * 100) / 100,
+            };
+        });
+
+        response.sort((a, b) => a.distance - b.distance);
+
+        return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", {
+            items: response,
+            totalRecords: response.length,
+        }));
+    } catch (error) {
+        log1(["Error in postNearbyMechanics ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

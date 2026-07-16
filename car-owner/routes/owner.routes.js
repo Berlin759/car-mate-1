@@ -38,6 +38,25 @@ import {
     postChatList,
     postChatMessagesList,
     postSendMessageToChat,
+    postAddAddress,
+    postAddressList,
+    postUpdateAddress,
+    postDeleteAddress,
+    postSetDefaultAddress,
+    postWalletBalance,
+    postAddToWallet,
+    postWalletTransactionList,
+    postApplyCoupon,
+    postCouponList,
+    postNearbyMechanics,
+    postSetDefaultCar,
+    postDeleteCar,
+    postUpdateCar,
+    postSearchServices,
+    postConfirmPayment,
+    postUpdateLocation,
+    postGetProviderLocation,
+    postFileDispute,
 } from "../controllers/owner.controller.js";
 
 const router = express.Router();
@@ -57,6 +76,7 @@ router.get("/profile-details", authMiddleware, getProfileDetails);
 router.post("/update-profile", authMiddleware, postUpdateOwnerProfile);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
+router.post("/update-location", authMiddleware, postUpdateLocation);
 
 // Email Verify
 router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
@@ -67,12 +87,17 @@ router.post("/logout", authMiddleware, postLogout);
 // Home API
 router.post("/home-details", authMiddleware, getHomeDetails);
 
-// Car API
+// Vehicle Management
 router.post("/add-car", authMiddleware, postAddCar);
 router.post("/car-list", authMiddleware, postCarList);
+router.post("/set-default-car", authMiddleware, postSetDefaultCar);
+router.post("/update-car", authMiddleware, postUpdateCar);
+router.post("/delete-car", authMiddleware, postDeleteCar);
 
 // Service API
 router.post("/service-list", authMiddleware, postServiceList);
+router.post("/search-services", authMiddleware, postSearchServices);
+router.post("/nearby-mechanics", authMiddleware, postNearbyMechanics);
 
 // Card Payment API
 router.post("/add-card", authMiddleware, postAddCreditCard);
@@ -97,10 +122,33 @@ router.post("/rating-list", authMiddleware, postRatingList);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);
+router.post("/confirm-payment", authMiddleware, postConfirmPayment);
 
 // Chat Routes
 router.post("/chat-list", authMiddleware, postChatList);
 router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
 router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
+
+// Address API
+router.post("/add-address", authMiddleware, postAddAddress);
+router.post("/address-list", authMiddleware, postAddressList);
+router.post("/update-address", authMiddleware, postUpdateAddress);
+router.post("/delete-address", authMiddleware, postDeleteAddress);
+router.post("/set-default-address", authMiddleware, postSetDefaultAddress);
+
+// Wallet API
+router.post("/wallet-balance", authMiddleware, postWalletBalance);
+router.post("/add-to-wallet", authMiddleware, postAddToWallet);
+router.post("/wallet-transaction-list", authMiddleware, postWalletTransactionList);
+
+// Coupon API
+router.post("/apply-coupon", authMiddleware, postApplyCoupon);
+router.post("/coupon-list", authMiddleware, postCouponList);
+
+// Tracking
+router.post("/get-provider-location", authMiddleware, postGetProviderLocation);
+
+// Dispute
+router.post("/file-dispute", authMiddleware, postFileDispute);
 
 export default router;

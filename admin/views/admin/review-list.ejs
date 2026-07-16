@@ -1,0 +1,82 @@
+<%
+    function formatDate(date) {
+        if(!date){
+            return "-";
+        };
+        let d=new Date(date);
+        let day=('0' + d.getDate()).slice(-2);
+        let month=('0' + (d.getMonth() + 1)).slice(-2);
+        let year=d.getFullYear();
+        return `${year}-${month}-${day}`;
+    };
+
+    function renderStars(rating) {
+        let stars = '';
+        for(let i = 1; i <= 5; i++) {
+            if(i <= rating) {
+                stars += '<i class="fa-solid fa-star text-warning"></i>';
+            } else {
+                stars += '<i class="fa-regular fa-star text-warning"></i>';
+            }
+        }
+        return stars;
+    };
+%>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Owner</th>
+                <th>Mechanic</th>
+                <th>Service</th>
+                <th>Rating</th>
+                <th>Review</th>
+                <th>Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if(body?.reviewList !== undefined && body?.reviewList?.length > 0) { %>
+                <% body.reviewList.forEach((item, index) => { %>
+                    <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                    <tr>
+                        <td><%= start_index %></td>
+                        <td>
+                            <strong><%= item?.ownerDetails?.[0]?.fullName || "-" %></strong>
+                            <div class="text-muted fs-12"><%= item?.ownerDetails?.[0]?.phoneNumber || "" %></div>
+                        </td>
+                        <td>
+                            <strong><%= item?.mechanicDetails?.[0]?.fullName || "-" %></strong>
+                        </td>
+                        <td><%= item?.serviceDetails?.[0]?.fullName || "-" %></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-1">
+                                <%- renderStars(item?.rating || 0) %>
+                                <span class="ms-1 fs-12">(<%= item?.rating || 0 %>)</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 200px;" title="<%= item?.description || '' %>">
+                                <%= item?.description || "-" %>
+                            </div>
+                        </td>
+                        <td><%= formatDate(item?.createdAt) || "-" %></td>
+                        <td class="text-end">
+                            <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                                <a href="javascript:void(0);" class="view-review-details" data-review-id="<%= item?._id %>" title="View Details">
+                                    <i class="fa-regular fa-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="8" class="text-center">No reviews found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

@@ -17,12 +17,113 @@ import Booking from "../models/booking.model.js";
 import Transaction from "../models/transaction.model.js";
 import Car from "../models/car.model.js";
 import Service from "../models/service.model.js";
+import KYC from "../models/kyc.model.js";
+import Dispute from "../models/dispute.model.js";
+import Coupon from "../models/coupon.model.js";
+import Banner from "../models/banner.model.js";
+import FAQ from "../models/faq.model.js";
+import Announcement from "../models/announcement.model.js";
+import Pricing from "../models/pricing.model.js";
+import Template from "../models/template.model.js";
 
 const __dirname = path.resolve();
 
 export const getDashboardPage = async (req, res) => {
     try {
         const admin = req.session.admin;
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const [
+            totalOwners,
+            totalMechanics,
+            totalCars,
+            activeBookings,
+            completedBookings,
+            cancelledBookings,
+            totalBookings,
+            revenueResult,
+            monthRevenueResult,
+            pendingKYC,
+            openDisputes,
+            totalReviews,
+            avgRatingResult,
+        ] = await Promise.all([
+            Owner.countDocuments({}),
+
+            Mechanic.countDocuments({}),
+
+            Car.countDocuments({}),
+
+            Booking.countDocuments({
+                status: {
+                    $in: [
+                        Constants.BOOKING_STATUS.PENDING,
+                        Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                        Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                        Constants.BOOKING_STATUS.ARRIVED,
+                        Constants.BOOKING_STATUS.SERVICE_STARTED,
+                    ],
+                },
+            }),
+
+            Booking.countDocuments({
+                status: Constants.BOOKING_STATUS.CLOSED,
+            }),
+
+            Booking.countDocuments({
+                status: Constants.BOOKING_STATUS.CANCELLED,
+            }),
+
+            Booking.countDocuments({}),
+
+            Transaction.aggregate([
+                {
+                    $match: { status: Constants.TRANSACTION_STATUS.SUCCESS },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: "$totalAmount" },
+                    },
+                },
+            ]),
+
+            Transaction.aggregate([
+                {
+                    $match: {
+                        status: Constants.TRANSACTION_STATUS.SUCCESS,
+                        createdAt: { $gte: startOfMonth },
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        monthRevenue: { $sum: "$totalAmount" },
+                    },
+                },
+            ]),
+
+            KYC.countDocuments({
+                status: Constants.KYC_STATUS.PENDING,
+            }),
+
+            Dispute.countDocuments({
+                status: { $in: [Constants.DISPUTE_STATUS.OPEN, Constants.DISPUTE_STATUS.IN_REVIEW, Constants.DISPUTE_STATUS.ESCALATED] },
+            }),
+
+            Rating.countDocuments({}),
+
+            Rating.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        avgRating: { $avg: "$rating" },
+                    },
+                },
+            ]),
+        ]);
 
         return res.render("admin/dashboard", {
             header: {
@@ -32,9 +133,23 @@ export const getDashboardPage = async (req, res) => {
                 description: "System dashboard overview",
                 id: "dashboard",
             },
-            body: {},
+            body: {
+                totalOwners,
+                totalMechanics,
+                totalCars,
+                activeBookings,
+                completedBookings,
+                cancelledBookings,
+                totalBookings,
+                totalRevenue: revenueResult[0]?.totalRevenue || 0,
+                monthRevenue: monthRevenueResult[0]?.monthRevenue || 0,
+                pendingKYC,
+                openDisputes,
+                totalReviews,
+                avgRating: avgRatingResult[0]?.avgRating ? parseFloat(avgRatingResult[0].avgRating.toFixed(1)) : 0,
+            },
             footer: {
-                js: ["admin/dashboard.js"],
+                js: [],
             },
         });
     } catch (error) {
@@ -2173,6 +2288,86 @@ export const getReviewPage = async (req, res) => {
     try {
         const admin = req.session.admin;
 
+        const page = Constants.DEFAULT_PAGE;
+        const limit = 10;
+        const skip = 0;
+
+        const aggregatePipeline = [
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $sort: { createdAt: -1 },
+            },
+            {
+                $facet: {
+                    result: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $project: {
+                                _id: 1,
+                                rating: 1,
+                                description: 1,
+                                isRead: 1,
+                                createdAt: 1,
+                                "ownerDetails._id": 1,
+                                "ownerDetails.fullName": 1,
+                                "ownerDetails.phoneNumber": 1,
+                                "mechanicDetails._id": 1,
+                                "mechanicDetails.fullName": 1,
+                                "mechanicDetails.phoneNumber": 1,
+                                "serviceDetails._id": 1,
+                                "serviceDetails.fullName": 1,
+                            },
+                        },
+                    ],
+                    count: [{ $count: "count" }],
+                },
+            },
+        ];
+
+        const [aggregateResp] = await Rating.aggregate(aggregatePipeline);
+
         return res.render("admin/reviews", {
             header: {
                 page: "Reviews",
@@ -2181,7 +2376,10 @@ export const getReviewPage = async (req, res) => {
                 description: "System reviews overview",
                 id: "reviews",
             },
-            body: {},
+            body: {
+                reviewList: aggregateResp.result || [],
+                totalReviews: aggregateResp.count[0]?.count || 0,
+            },
             footer: {
                 js: ["admin/reviews.js"],
             },
@@ -2302,5 +2500,1712 @@ export const postLogout = async (req, res) => {
     } catch (error) {
         log1(["Error in postLogout----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAllReviewList = async (req, res) => {
+    try {
+        const param = req?.body;
+        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
+        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const skip = (page - 1) * limit;
+
+        let match = {};
+
+        if (param.rating) {
+            match.rating = Number(param.rating);
+        };
+
+        let aggregatePipeline = [
+            {
+                $match: match,
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceNo: 1,
+                                date: 1,
+                                time: 1,
+                                totalAmount: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    rating: 1,
+                    description: 1,
+                    isRead: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    serviceDetails: 1,
+                    bookingDetails: 1,
+                },
+            },
+            {
+                $facet: {
+                    result: [
+                        { $sort: { createdAt: -1 } },
+                        { $skip: skip },
+                        { $limit: limit },
+                    ],
+                    count: [{ $count: "count" }],
+                },
+            },
+        ];
+
+        let [aggregateResp] = await Rating.aggregate(aggregatePipeline);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/review-list.ejs"), {
+            body: {
+                param: param,
+                reviewList: aggregateResp.result,
+            },
+        });
+
+        response["total_record"] = aggregateResp.count[0]?.count || 0;
+        response["param"] = param;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postAllReviewList----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postReviewDetails = async (req, res) => {
+    try {
+        const param = req?.body;
+
+        if (!param?.reviewId) {
+            return res.json(errorResponse("Invalid review Id"));
+        };
+
+        let filter = {
+            _id: new ObjectId(param?.reviewId),
+        };
+
+        let reviewPipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceNo: 1,
+                                date: 1,
+                                time: 1,
+                                totalAmount: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    rating: 1,
+                    description: 1,
+                    isRead: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    serviceDetails: 1,
+                    bookingDetails: 1,
+                },
+            },
+        ];
+
+        let reviewResp = await Rating.aggregate(reviewPipeline);
+
+        if (!reviewResp || reviewResp.length === 0) {
+            return res.json(errorResponse("Review not found"));
+        };
+
+        return res.status(200).json(successResponse("Review details get successfully!", reviewResp[0]));
+    } catch (error) {
+        log1(["Error in postReviewDetails----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDashboardKPIs = async (req, res) => {
+    try {
+        const [
+            totalOwners,
+            totalMechanics,
+            activeBookings,
+            completedBookings,
+            revenueResult,
+            pendingKYC,
+            recentBookings,
+        ] = await Promise.all([
+            Owner.countDocuments({}),
+            Mechanic.countDocuments({}),
+            Booking.countDocuments({
+                status: {
+                    $in: [
+                        Constants.BOOKING_STATUS.PENDING,
+                        Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                        Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                        Constants.BOOKING_STATUS.ARRIVED,
+                        Constants.BOOKING_STATUS.SERVICE_STARTED,
+                    ],
+                },
+            }),
+            Booking.countDocuments({
+                status: Constants.BOOKING_STATUS.CLOSED,
+            }),
+            Transaction.aggregate([
+                {
+                    $match: { status: 1 },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: "$totalAmount" },
+                    },
+                },
+            ]),
+            KYC.countDocuments({
+                status: Constants.KYC_STATUS.PENDING,
+            }),
+            Booking.aggregate([
+                { $sort: { createdAt: -1 } },
+                { $limit: 5 },
+                {
+                    $lookup: {
+                        from: "owners",
+                        localField: "ownerId",
+                        foreignField: "_id",
+                        as: "ownerDetails",
+                        pipeline: [
+                            { $project: { fullName: 1, phoneNumber: 1 } },
+                        ],
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$ownerDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "mechanics",
+                        localField: "mechanicId",
+                        foreignField: "_id",
+                        as: "mechanicDetails",
+                        pipeline: [
+                            { $project: { fullName: 1, phoneNumber: 1 } },
+                        ],
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$mechanicDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "services",
+                        localField: "serviceId",
+                        foreignField: "_id",
+                        as: "serviceDetails",
+                        pipeline: [
+                            { $project: { fullName: 1 } },
+                        ],
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$serviceDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $project: {
+                        invoiceNo: 1,
+                        date: 1,
+                        time: 1,
+                        totalAmount: 1,
+                        status: 1,
+                        createdAt: 1,
+                        ownerDetails: 1,
+                        mechanicDetails: 1,
+                        "serviceDetails.fullName": 1,
+                    },
+                },
+            ]),
+        ]);
+
+        const response = {
+            totalOwners,
+            totalMechanics,
+            activeBookings,
+            completedBookings,
+            totalRevenue: revenueResult[0]?.totalRevenue || 0,
+            pendingKYC,
+            recentBookings,
+        };
+
+        return res.status(200).json(successResponse("Dashboard KPIs fetched successfully!", response));
+    } catch (error) {
+        log1(["Error in postDashboardKPIs----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getKYCPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        return res.render("admin/kyc", {
+            header: {
+                page: "KYC Review",
+                admin: admin,
+                title: "KYC Review",
+                description: "System KYC review overview",
+                id: "kyc",
+            },
+            body: {},
+            footer: {
+                js: ["admin/kyc.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getKYCPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postPendingKYCList = async (req, res) => {
+    try {
+        const param = req?.body;
+        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
+        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const skip = (page - 1) * limit;
+
+        let filter = {};
+
+        if (param.status) {
+            filter["status"] = parseInt(param.status);
+        } else {
+            filter["status"] = Constants.KYC_STATUS.PENDING;
+        }
+
+        let aggregatePipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    mechanicId: 1,
+                    aadhaarFront: 1,
+                    aadhaarBack: 1,
+                    panCard: 1,
+                    drivingLicense: 1,
+                    selfie: 1,
+                    bankAccountNumber: 1,
+                    bankIfscCode: 1,
+                    bankAccountHolderName: 1,
+                    bankName: 1,
+                    status: 1,
+                    rejectReason: 1,
+                    reviewedAt: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    mechanicDetails: 1,
+                },
+            },
+            {
+                $facet: {
+                    result: [
+                        { $sort: { createdAt: -1 } },
+                        { $skip: skip },
+                        { $limit: limit },
+                    ],
+                    count: [{ $count: "count" }],
+                },
+            },
+        ];
+
+        let [aggregateResp] = await KYC.aggregate(aggregatePipeline);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/kyc-list.ejs"), {
+            body: {
+                param: param,
+                kycList: aggregateResp.result,
+            },
+        });
+
+        response["total_record"] = aggregateResp.count[0]?.count || 0;
+        response["param"] = param;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postPendingKYCList----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postKYCDetails = async (req, res) => {
+    try {
+        const param = req?.body;
+
+        if (!param?.mechanicId) {
+            return res.json(errorResponse("Invalid mechanic Id"));
+        };
+
+        let filter = {
+            mechanicId: new ObjectId(param.mechanicId),
+        };
+
+        let kycPipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+        ];
+
+        let kycResp = await KYC.aggregate(kycPipeline);
+
+        if (!kycResp || kycResp.length === 0) {
+            return res.status(404).json(errorResponse("KYC details not found."));
+        }
+
+        return res.status(200).json(successResponse("KYC details get successfully!", kycResp[0]));
+    } catch (error) {
+        log1(["Error in postKYCDetails----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postApproveKYC = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const { mechanicId } = req.body;
+
+        log1(["postApproveKYC req.body----->", req.body]);
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
+        }
+
+        let filter = {
+            mechanicId: new ObjectId(mechanicId),
+        };
+
+        let kycDetails = await KYC.findOne(filter);
+        if (!kycDetails) {
+            return res.json(errorResponse("KYC details not found."));
+        }
+
+        if (kycDetails.status === Constants.KYC_STATUS.APPROVED) {
+            return res.status(400).json(errorResponse("KYC is already approved."));
+        }
+
+        let payload = {
+            status: Constants.KYC_STATUS.APPROVED,
+            reviewedAt: new Date(),
+        };
+
+        const updateKYC = await KYC.findOneAndUpdate(filter, payload);
+        if (!updateKYC) {
+            return res.status(400).json(errorResponse("Failed to approve KYC."));
+        }
+
+        return res.status(200).json(successResponse("KYC approved successfully!"));
+    } catch (error) {
+        log1(["Error in postApproveKYC----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postRejectKYC = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const { mechanicId, rejectReason } = req.body;
+
+        log1(["postRejectKYC req.body----->", req.body]);
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
+        }
+
+        if (!rejectReason || rejectReason.trim() === "") {
+            return res.status(400).json(errorResponse("Reject reason is required."));
+        }
+
+        let filter = {
+            mechanicId: new ObjectId(mechanicId),
+        };
+
+        let kycDetails = await KYC.findOne(filter);
+        if (!kycDetails) {
+            return res.json(errorResponse("KYC details not found."));
+        }
+
+        if (kycDetails.status === Constants.KYC_STATUS.REJECTED) {
+            return res.status(400).json(errorResponse("KYC is already rejected."));
+        }
+
+        let payload = {
+            status: Constants.KYC_STATUS.REJECTED,
+            rejectReason: rejectReason.trim(),
+            reviewedAt: new Date(),
+        };
+
+        const updateKYC = await KYC.findOneAndUpdate(filter, payload);
+        if (!updateKYC) {
+            return res.status(400).json(errorResponse("Failed to reject KYC."));
+        }
+
+        return res.status(200).json(successResponse("KYC rejected successfully!"));
+    } catch (error) {
+        log1(["Error in postRejectKYC----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAddCoupon = async (req, res) => {
+    try {
+        const { code, description, discountType, discountValue, minOrderAmount, maxDiscountAmount, usageLimit, expiryDate } = req.body;
+        if (!code || !discountValue || !expiryDate) {
+            return res.status(400).json(errorResponse("Code, discount value, and expiry date are required."));
+        };
+
+        const existing = await Coupon.findOne({ code: code.toUpperCase() });
+        if (existing) {
+            return res.status(400).json(errorResponse("Coupon code already exists."));
+        };
+
+        const coupon = await Coupon.create({
+            code: code.toUpperCase(), description: description || "", discountType: discountType || "percentage",
+            discountValue: parseFloat(discountValue), minOrderAmount: parseFloat(minOrderAmount || 0),
+            maxDiscountAmount: parseFloat(maxDiscountAmount || 0), usageLimit: parseInt(usageLimit || 0),
+            expiryDate: new Date(expiryDate),
+        });
+
+        return res.status(200).json(successResponse("Coupon created successfully.", coupon));
+    } catch (error) {
+        log1(["Error in postAddCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postCouponList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+        const [items, total] = await Promise.all([
+            Coupon.find().sort({ createdAt: -1 }).skip(skip).limit(limit), Coupon.countDocuments(),
+        ]);
+
+        return res.status(200).json(successResponse("Coupon list fetched.", { items, page, limit, totalRecords: total }));
+    } catch (error) {
+        log1(["Error in postCouponList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postUpdateCoupon = async (req, res) => {
+    try {
+        const { couponId, ...updateData } = req.body;
+
+        if (!couponId) return res.status(400).json(errorResponse("Coupon ID required."));
+
+        await Coupon.findByIdAndUpdate(couponId, updateData);
+
+        return res.status(200).json(successResponse("Coupon updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDeleteCoupon = async (req, res) => {
+    try {
+        const { couponId } = req.body;
+
+        if (!couponId) return res.status(400).json(errorResponse("Coupon ID required."));
+
+        await Coupon.findByIdAndDelete(couponId);
+
+        return res.status(200).json(successResponse("Coupon deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAssignProvider = async (req, res) => {
+    try {
+        const { bookingId, mechanicId } = req.body;
+
+        if (!bookingId || !mechanicId) {
+            return res.status(400).json(errorResponse("Booking ID and Mechanic ID required."));
+        };
+
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+
+        const mechanic = await Mechanic.findOne({ _id: new ObjectId(mechanicId), status: Constants.MECHANIC_STATUS.ACTIVE });
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found or inactive."));
+        };
+
+        await Booking.findByIdAndUpdate(bookingId, { mechanicId: new ObjectId(mechanicId) });
+
+        return res.status(200).json(successResponse("Provider assigned successfully."));
+    } catch (error) {
+        log1(["Error in postAssignProvider ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postRescheduleBooking = async (req, res) => {
+    try {
+        const { bookingId, date, time } = req.body;
+        if (!bookingId || !date || !time) return res.status(400).json(errorResponse("Booking ID, date, and time required."));
+        await Booking.findByIdAndUpdate(bookingId, { date: new Date(date), time: time });
+        return res.status(200).json(successResponse("Booking rescheduled successfully."));
+    } catch (error) {
+        log1(["Error in postRescheduleBooking ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postSuspendOwner = async (req, res) => {
+    try {
+        const { ownerId, status } = req.body;
+        if (!ownerId) return res.status(400).json(errorResponse("Owner ID required."));
+        await Owner.findByIdAndUpdate(ownerId, { status: parseInt(status) });
+        return res.status(200).json(successResponse("Owner status updated successfully."));
+    } catch (error) {
+        log1(["Error in postSuspendOwner ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postSuspendMechanic = async (req, res) => {
+    try {
+        const { mechanicId, status } = req.body;
+        if (!mechanicId) return res.status(400).json(errorResponse("Mechanic ID required."));
+        await Mechanic.findByIdAndUpdate(mechanicId, { status: parseInt(status) });
+        return res.status(200).json(successResponse("Mechanic status updated successfully."));
+    } catch (error) {
+        log1(["Error in postSuspendMechanic ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postRevenueReport = async (req, res) => {
+    try {
+        const { period } = req.body;
+        let groupBy;
+        if (period === "weekly") groupBy = { year: { $year: "$createdAt" }, week: { $isoWeek: "$createdAt" } };
+        else if (period === "monthly") groupBy = { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } };
+        else groupBy = { year: { $year: "$createdAt" }, month: { $month: "$createdAt" }, day: { $dayOfMonth: "$createdAt" } };
+
+        const report = await Transaction.aggregate([
+            { $match: { status: Constants.TRANSACTION_STATUS.SUCCESS } },
+            { $group: { _id: groupBy, revenue: { $sum: "$totalAmount" }, count: { $sum: 1 } } },
+            { $sort: { "_id.year": -1, "_id.month": -1, "_id.day": -1 } },
+            { $limit: 30 },
+        ]);
+        return res.status(200).json(successResponse("Revenue report fetched.", report));
+    } catch (error) {
+        log1(["Error in postRevenueReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postServicePopularityReport = async (req, res) => {
+    try {
+        const report = await Booking.aggregate([
+            { $group: { _id: "$serviceId", bookings: { $sum: 1 }, revenue: { $sum: "$totalAmount" } } },
+            { $lookup: { from: "services", localField: "_id", foreignField: "_id", as: "service" } },
+            { $unwind: { path: "$service", preserveNullAndEmptyArrays: true } },
+            { $project: { serviceName: "$service.fullName", bookings: 1, revenue: 1 } },
+            { $sort: { bookings: -1 } },
+            { $limit: 20 },
+        ]);
+        return res.status(200).json(successResponse("Service popularity report fetched.", report));
+    } catch (error) {
+        log1(["Error in postServicePopularityReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postProviderPerformanceReport = async (req, res) => {
+    try {
+        const report = await Booking.aggregate([
+            { $match: { status: { $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED] } } },
+            { $group: { _id: "$mechanicId", completedJobs: { $sum: 1 }, totalRevenue: { $sum: "$totalAmount" } } },
+            { $lookup: { from: "mechanics", localField: "_id", foreignField: "_id", as: "mechanic" } },
+            { $unwind: { path: "$mechanic", preserveNullAndEmptyArrays: true } },
+            { $project: { mechanicName: "$mechanic.fullName", completedJobs: 1, totalRevenue: 1 } },
+            { $sort: { completedJobs: -1 } },
+            { $limit: 20 },
+        ]);
+        return res.status(200).json(successResponse("Provider performance report fetched.", report));
+    } catch (error) {
+        log1(["Error in postProviderPerformanceReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postPeakHoursReport = async (req, res) => {
+    try {
+        const report = await Booking.aggregate([
+            { $addFields: { hour: { $hour: "$createdAt" } } },
+            { $group: { _id: "$hour", count: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+        ]);
+        return res.status(200).json(successResponse("Peak hours report fetched.", report));
+    } catch (error) {
+        log1(["Error in postPeakHoursReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postCancellationTrendsReport = async (req, res) => {
+    try {
+        const report = await Booking.aggregate([
+            { $match: { status: Constants.BOOKING_STATUS.CANCELLED } },
+            { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
+            { $sort: { _id: -1 } },
+            { $limit: 30 },
+        ]);
+        return res.status(200).json(successResponse("Cancellation trends report fetched.", report));
+    } catch (error) {
+        log1(["Error in postCancellationTrendsReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAddBanner = async (req, res) => {
+    try {
+        const { title, description, link, isActive, sortOrder } = req.body;
+
+        let imageData = "";
+
+        if (req.files?.image) {
+            const uploaded = await uploadFile(req.files.image);
+            if (uploaded.flag !== 0) {
+                imageData = uploaded.data.url;
+            };
+        };
+
+        const payload = {
+            title: title,
+            description: description,
+            image: imageData,
+            link: link,
+            isActive: isActive !== "false",
+            sortOrder: parseInt(sortOrder || 0),
+        };
+
+        const banner = await Banner.create(payload);
+
+        return res.status(200).json(successResponse("Banner created successfully.", banner));
+    } catch (error) {
+        log1(["Error in postAddBanner ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postBannerList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const [items, total] = await Promise.all([
+            Banner.find().sort({ sortOrder: 1 }).skip(skip).limit(limit),
+            Banner.countDocuments(),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/banner-list.ejs"), {
+            body: {
+                param: req.body,
+                bannerList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["param"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postBannerList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDeleteBanner = async (req, res) => {
+    try {
+        await Banner.findByIdAndDelete(req.body.bannerId);
+
+        return res.status(200).json(successResponse("Banner deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteBanner ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAddFaq = async (req, res) => {
+    try {
+        const { question, answer, category, sortOrder } = req.body;
+
+        const payload = {
+            question: question,
+            answer: answer,
+            category: category,
+            sortOrder: parseInt(sortOrder || 0),
+        };
+
+        const faq = await FAQ.create(payload);
+
+        return res.status(200).json(successResponse("FAQ created successfully.", faq));
+    } catch (error) {
+        log1(["Error in postAddFaq ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postFaqList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const [items, total] = await Promise.all([
+            FAQ.find({ isActive: true }).sort({ sortOrder: 1 }).skip(skip).limit(limit),
+            FAQ.countDocuments({ isActive: true }),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/faq-list.ejs"), {
+            body: {
+                param: req.body,
+                faqList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["param"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postFaqList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDeleteFaq = async (req, res) => {
+    try {
+        const { faqId } = req.body;
+
+        await FAQ.findByIdAndDelete(faqId);
+
+        return res.status(200).json(successResponse("FAQ deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteFaq ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAddAnnouncement = async (req, res) => {
+    try {
+        const { title, description, targetRole } = req.body;
+
+        const payload = {
+            title: title,
+            description: description,
+            targetRole: targetRole || "all",
+        };
+
+        const announcement = await Announcement.create(payload);
+
+        return res.status(200).json(successResponse("Announcement created successfully.", announcement));
+    } catch (error) {
+        log1(["Error in postAddAnnouncement ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAnnouncementList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const [items, total] = await Promise.all([
+            Announcement.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Announcement.countDocuments(),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/announcement-list.ejs"), {
+            body: {
+                param: req.body,
+                announcementList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["param"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postAnnouncementList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDeleteAnnouncement = async (req, res) => {
+    try {
+        const { announcementId } = req.body;
+
+        await Announcement.findByIdAndDelete(announcementId);
+
+        return res.status(200).json(successResponse("Announcement deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteAnnouncement ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDisputeList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            status,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let filter = {};
+        if (status) {
+            filter.status = parseInt(status);
+        };
+
+        const [items, total] = await Promise.all([
+            Dispute.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate("bookingId", "invoiceNo totalAmount"),
+            Dispute.countDocuments(filter),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/dispute-list.ejs"), {
+            body: {
+                param: req.body,
+                disputeList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["param"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postDisputeList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postResolveDispute = async (req, res) => {
+    try {
+        const { disputeId, resolution, refundAmount, penaltyAmount } = req.body;
+
+        if (!disputeId || !resolution) {
+            return res.status(400).json(errorResponse("Dispute ID and resolution required."));
+        };
+
+        const payload = {
+            status: Constants.DISPUTE_STATUS.RESOLVED,
+            resolution,
+            refundAmount: parseFloat(refundAmount || 0),
+            penaltyAmount: parseFloat(penaltyAmount || 0),
+            resolvedAt: new Date(),
+        };
+
+        await Dispute.findByIdAndUpdate(disputeId, payload);
+
+        return res.status(200).json(successResponse("Dispute resolved successfully."));
+    } catch (error) {
+        log1(["Error in postResolveDispute ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getDisputePage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        return res.render("admin/disputes", {
+            header: {
+                page: "Disputes",
+                admin: admin,
+                title: "Dispute Resolution",
+                description: "Manage customer and provider disputes",
+                id: "disputes",
+            },
+            body: {},
+            footer: {
+                js: ["admin/disputes.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getDisputePage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getBannerPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        const banners = await Banner.find().sort({ createdAt: -1 });
+
+        return res.render("admin/banners", {
+            header: {
+                page: "Banners",
+                admin: admin,
+                title: "Banner Management",
+                description: "Manage CMS banners",
+                id: "banners",
+            },
+            body: { banners },
+            footer: {
+                js: ["admin/banners.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getBannerPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getFaqPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        const faqs = await FAQ.find().sort({ createdAt: -1 });
+
+        return res.render("admin/faqs", {
+            header: {
+                page: "FAQs",
+                admin: admin,
+                title: "FAQ Management",
+                description: "Manage frequently asked questions",
+                id: "faqs",
+            },
+            body: { faqs },
+            footer: {
+                js: ["admin/faqs.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getFaqPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getAnnouncementPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        const announcements = await Announcement.find().sort({ createdAt: -1 });
+
+        return res.render("admin/announcements", {
+            header: {
+                page: "Announcements",
+                admin: admin,
+                title: "Announcement Management",
+                description: "Manage platform announcements",
+                id: "announcements",
+            },
+            body: { announcements },
+            footer: {
+                js: ["admin/announcements.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getAnnouncementPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getPricingPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        let pricing = await Pricing.findOne();
+
+        if (!pricing) {
+            pricing = await Pricing.create({});
+        };
+
+        return res.render("admin/pricing", {
+            header: {
+                page: "Pricing",
+                admin: admin,
+                title: "Pricing Management",
+                description: "Manage platform pricing, surcharges, and commission",
+                id: "pricing",
+            },
+            body: { pricing },
+            footer: {
+                js: ["admin/pricing.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getPricingPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postPricingDetails = async (req, res) => {
+    try {
+        let pricing = await Pricing.findOne();
+
+        if (!pricing) {
+            pricing = await Pricing.create({});
+        };
+
+        return res.status(200).json(successResponse("Pricing fetched.", pricing));
+    } catch (error) {
+        log1(["Error in postPricingDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postUpdatePricing = async (req, res) => {
+    try {
+        const {
+            basePrice,
+            perKmCharge,
+            peakHourSurcharge,
+            peakHourStart,
+            peakHourEnd,
+            eveningPeakStart,
+            eveningPeakEnd,
+            weekendSurcharge,
+            platformCommission,
+            minimumFare,
+            cancellationFee,
+            gstPercentage,
+        } = req.body;
+
+        let updatePayload = {};
+
+        if (basePrice !== undefined) {
+            updatePayload.basePrice = parseFloat(basePrice);
+        };
+
+        if (perKmCharge !== undefined) {
+            updatePayload.perKmCharge = parseFloat(perKmCharge);
+        };
+
+        if (peakHourSurcharge !== undefined) {
+            updatePayload.peakHourSurcharge = parseFloat(peakHourSurcharge);
+        };
+
+        if (peakHourStart) {
+            updatePayload.peakHourStart = peakHourStart;
+        };
+
+        if (peakHourEnd) {
+            updatePayload.peakHourEnd = peakHourEnd;
+        };
+
+        if (eveningPeakStart) {
+            updatePayload.eveningPeakStart = eveningPeakStart;
+        };
+
+        if (eveningPeakEnd) {
+            updatePayload.eveningPeakEnd = eveningPeakEnd;
+        };
+
+        if (weekendSurcharge !== undefined) {
+            updatePayload.weekendSurcharge = parseFloat(weekendSurcharge);
+        };
+
+        if (platformCommission !== undefined) {
+            updatePayload.platformCommission = parseFloat(platformCommission);
+        };
+
+        if (minimumFare !== undefined) {
+            updatePayload.minimumFare = parseFloat(minimumFare);
+        };
+
+        if (cancellationFee !== undefined) {
+            updatePayload.cancellationFee = parseFloat(cancellationFee);
+        };
+
+        if (gstPercentage !== undefined) {
+            updatePayload.gstPercentage = parseFloat(gstPercentage);
+        };
+
+        if (Object.keys(updatePayload).length === 0) {
+            return res.status(400).json(errorResponse("No fields to update."));
+        };
+
+        let pricing = await Pricing.findOne();
+        if (pricing) {
+            await Pricing.findByIdAndUpdate(pricing._id, updatePayload);
+        } else {
+            await Pricing.create(updatePayload);
+        };
+
+        return res.status(200).json(successResponse("Pricing updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdatePricing ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getTemplatePage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        return res.render("admin/templates", {
+            header: {
+                page: "Templates",
+                admin: admin,
+                title: "Notification & Email Templates",
+                description: "Manage email, push notification, and SMS templates",
+                id: "templates",
+            },
+            body: {},
+            footer: {
+                js: ["admin/templates.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getTemplatePage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postTemplateList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            type,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let filter = {};
+
+        if (type) {
+            filter.type = type;
+        };
+
+        const [items, total] = await Promise.all([
+            Template.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Template.countDocuments(filter),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/template-list.ejs"), {
+            body: {
+                param: req.body,
+                templateList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["param"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postTemplateList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postTemplateDetails = async (req, res) => {
+    try {
+        const { templateId } = req.body;
+
+        if (!templateId) {
+            return res.status(400).json(errorResponse("Template ID required."));
+        };
+
+        const template = await Template.findById(templateId);
+        if (!template) {
+            return res.status(400).json(errorResponse("Template not found."));
+        };
+
+        return res.status(200).json(successResponse("Template fetched.", template));
+    } catch (error) {
+        log1(["Error in postTemplateDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postAddTemplate = async (req, res) => {
+    try {
+        const { name, type, subject, body, targetAudience, placeholders } = req.body;
+
+        if (!name || !body) {
+            return res.status(400).json(errorResponse("Name and body are required."));
+        };
+
+        const existing = await Template.findOne({ name: name.trim() });
+        if (existing) {
+            return res.status(400).json(errorResponse("Template name already exists."));
+        };
+
+        const template = await Template.create({
+            name: name.trim(),
+            type: type || "email",
+            subject: subject || "",
+            body: body,
+            targetAudience: targetAudience || "all",
+            placeholders: Array.isArray(placeholders) ? placeholders : [],
+        });
+
+        return res.status(200).json(successResponse("Template created successfully.", template));
+    } catch (error) {
+        log1(["Error in postAddTemplate ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateTemplate = async (req, res) => {
+    try {
+        const { templateId, ...updateData } = req.body;
+
+        if (!templateId) {
+            return res.status(400).json(errorResponse("Template ID required."));
+        };
+
+        const template = await Template.findById(templateId);
+        if (!template) {
+            return res.status(400).json(errorResponse("Template not found."));
+        };
+
+        if (template.isDefault) {
+            return res.status(400).json(errorResponse("Default templates cannot be modified."));
+        };
+
+        if (updateData.placeholders && !Array.isArray(updateData.placeholders)) {
+            updateData.placeholders = [];
+        };
+
+        await Template.findByIdAndUpdate(templateId, updateData);
+        return res.status(200).json(successResponse("Template updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateTemplate ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postDeleteTemplate = async (req, res) => {
+    try {
+        const { templateId } = req.body;
+
+        if (!templateId) return res.status(400).json(errorResponse("Template ID required."));
+
+        const template = await Template.findById(templateId);
+        if (!template) {
+            return res.status(400).json(errorResponse("Template not found."));
+        };
+
+        if (template.isDefault) {
+            return res.status(400).json(errorResponse("Default templates cannot be deleted."));
+        };
+
+        await Template.findByIdAndDelete(templateId);
+
+        return res.status(200).json(successResponse("Template deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteTemplate ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postToggleTemplateStatus = async (req, res) => {
+    try {
+        const { templateId } = req.body;
+
+        if (!templateId) {
+            return res.status(400).json(errorResponse("Template ID required."));
+        };
+
+        const template = await Template.findById(templateId);
+        if (!template) {
+            return res.status(400).json(errorResponse("Template not found."));
+        };
+
+        await Template.findByIdAndUpdate(templateId, { isActive: !template.isActive });
+
+        return res.status(200).json(successResponse(`Template ${template.isActive ? "disabled" : "enabled"} successfully.`));
+    } catch (error) {
+        log1(["Error in postToggleTemplateStatus ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postSeedDefaultTemplates = async (req, res) => {
+    try {
+        const defaultTemplates = [
+            {
+                name: "booking_confirmation",
+                type: "email",
+                subject: "Booking Confirmed - {{bookingId}}",
+                body: "Dear {{ownerName}},\n\nYour booking #{{bookingId}} has been confirmed.\nService: {{serviceName}}\nDate: {{bookingDate}}\nTime: {{bookingTime}}\nMechanic: {{mechanicName}}\n\nThank you for choosing Car Mate!",
+                targetAudience: "owner",
+                placeholders: ["ownerName", "bookingId", "serviceName", "bookingDate", "bookingTime", "mechanicName"],
+                isDefault: true,
+            },
+            {
+                name: "booking_cancellation",
+                type: "email",
+                subject: "Booking Cancelled - {{bookingId}}",
+                body: "Dear {{ownerName}},\n\nYour booking #{{bookingId}} has been cancelled.\nReason: {{cancelReason}}\nRefund Amount: {{refundAmount}}\n\nIf you have questions, please contact support.",
+                targetAudience: "owner",
+                placeholders: ["ownerName", "bookingId", "cancelReason", "refundAmount"],
+                isDefault: true,
+            },
+            {
+                name: "payment_received",
+                type: "email",
+                subject: "Payment Received - {{bookingId}}",
+                body: "Dear {{ownerName}},\n\nWe have received your payment of {{amount}} for booking #{{bookingId}}.\nPayment Method: {{paymentMethod}}\n\nThank you!",
+                targetAudience: "owner",
+                placeholders: ["ownerName", "bookingId", "amount", "paymentMethod"],
+                isDefault: true,
+            },
+            {
+                name: "new_booking_request",
+                type: "push_notification",
+                subject: "New Booking Request",
+                body: "You have a new booking request from {{ownerName}} for {{serviceName}} on {{bookingDate}} at {{bookingTime}}.",
+                targetAudience: "mechanic",
+                placeholders: ["ownerName", "serviceName", "bookingDate", "bookingTime"],
+                isDefault: true,
+            },
+            {
+                name: "kyc_approved",
+                type: "email",
+                subject: "KYC Approved",
+                body: "Dear {{mechanicName}},\n\nYour KYC verification has been approved. You can now accept bookings.\n\nWelcome to Car Mate!",
+                targetAudience: "mechanic",
+                placeholders: ["mechanicName"],
+                isDefault: true,
+            },
+            {
+                name: "kyc_rejected",
+                type: "email",
+                subject: "KYC Rejected",
+                body: "Dear {{mechanicName}},\n\nYour KYC verification has been rejected.\nReason: {{reason}}\n\nPlease resubmit with correct documents.",
+                targetAudience: "mechanic",
+                placeholders: ["mechanicName", "reason"],
+                isDefault: true,
+            },
+            {
+                name: "wallet_credit",
+                type: "push_notification",
+                subject: "Wallet Credited",
+                body: "₹{{amount}} has been credited to your wallet. Current balance: ₹{{balance}}.",
+                targetAudience: "owner",
+                placeholders: ["amount", "balance"],
+                isDefault: true,
+            },
+            {
+                name: "service_completed",
+                type: "email",
+                subject: "Service Completed - {{bookingId}}",
+                body: "Dear {{ownerName}},\n\nYour service #{{bookingId}} has been completed.\nService: {{serviceName}}\nAmount: {{amount}}\n\nPlease rate your experience!",
+                targetAudience: "owner",
+                placeholders: ["ownerName", "bookingId", "serviceName", "amount"],
+                isDefault: true,
+            },
+        ];
+
+        let created = 0;
+        let skipped = 0;
+
+        for (const tmpl of defaultTemplates) {
+            const exists = await Template.findOne({ name: tmpl.name });
+            if (!exists) {
+                await Template.create(tmpl);
+                created++;
+            } else {
+                skipped++;
+            };
+        };
+
+        return res.status(200).json(successResponse(`Seeded ${created} templates, ${skipped} already existed.`));
+    } catch (error) {
+        log1(["Error in postSeedDefaultTemplates ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

@@ -1,0 +1,72 @@
+<%- include('../header.ejs') %>
+    <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
+        <div class="filter-area d-flex align-items-center gap-2 flex-wrap" id="dispute-filter-section">
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Dispute Status
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li><a class="dropdown-item dispute-status-filter" data-status="1" data-status-text="Open">Open</a></li>
+                    <li><a class="dropdown-item dispute-status-filter" data-status="2" data-status-text="Under Review">Under Review</a></li>
+                    <li><a class="dropdown-item dispute-status-filter" data-status="3" data-status-text="Escalated">Escalated</a></li>
+                    <li><a class="dropdown-item dispute-status-filter" data-status="4" data-status-text="Resolved">Resolved</a></li>
+                    <button id="clear-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">Clear filters</button>
+                </ul>
+            </div>
+            <button type="button" id="reset-dispute-filters" class="d-none f-reset-btn fs-14 fw-md bg-transparent">
+                Reset <img src="/images/f-close.svg" alt="">
+            </button>
+        </div>
+        <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+            <div class="pagination-show d-flex align-items-center" id="pagination-div-dispute-list-table-data">
+                Show
+                <select id="recordPerPage-dispute-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/dispute-list', 'dispute-list-table-data')">
+                    <option selected="">10</option>
+                    <option value="20">20</option>
+                    <option value="40">40</option>
+                </select>
+            </div>
+            <div class="page navigation example">
+                <ul class="pagination justify-content-end mb-0 gap-0"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="admin-table dispute-list-table mt-30" id="dispute-list-table-data"></div>
+
+    <!-- Resolve Dispute Modal -->
+    <div class="modal custom-popup fade" id="resolveDisputeModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center mt-3">
+                    <h5 class="modal-title">Resolve Dispute</h5>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <input type="hidden" id="resolve-dispute-id">
+                    <div class="mb-3">
+                        <label class="form-label text-dark">Resolution Notes</label>
+                        <textarea class="form-control" id="resolve-resolution" rows="3" placeholder="Enter resolution details"></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-dark">Refund Amount (₹)</label>
+                            <input type="number" class="form-control" id="resolve-refund" step="0.01" min="0" value="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-dark">Penalty Amount (₹)</label>
+                            <input type="number" class="form-control" id="resolve-penalty" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-success" id="confirm-resolve-dispute">Resolve</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<%- include('../footer.ejs') %>

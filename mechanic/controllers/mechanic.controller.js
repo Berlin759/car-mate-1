@@ -20,6 +20,7 @@ import {
 import { sendMail } from "../utils/mailSend.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
 import { postCollectPayment, postRefundPayment } from "./payment.controller.js";
+import { io } from "../index.js";
 import Mechanic from "../models/mechanic.model.js";
 import Chat from "../models/chat.model.js";
 import OTP from "../models/otp.model.js";
@@ -28,6 +29,9 @@ import Transaction from "../models/transaction.model.js";
 import Setting from "../models/setting.model.js";
 import Notification from "../models/notification.model.js";
 import Service from "../models/service.model.js";
+import KYC from "../models/kyc.model.js";
+import Withdrawal from "../models/withdrawal.model.js";
+import Rating from "../models/rating.model.js";
 
 const stripeAccount = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -855,8 +859,8 @@ export const postBookingList = async (req, res) => {
                     statusMap.Pending = item.count;
                     break;
 
-                case Constants.BOOKING_STATUS.CONFIRMED:
-                    statusMap.Confirmed = item.count;
+                case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED:
+                    statusMap.Accepted = item.count;
                     break;
 
                 case Constants.BOOKING_STATUS.CANCELLED:
@@ -1024,11 +1028,16 @@ export const postBookingUpdateStatus = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid booking id."));
         };
 
+        const newStatus = parseInt(param.status);
+        const validStatuses = Object.values(Constants.BOOKING_STATUS);
+        if (!validStatuses.includes(newStatus)) {
+            return res.status(400).json(errorResponse("Invalid status."));
+        };
+
         const bookingDetails = await Booking.findOne({
             _id: new ObjectId(param.bookingId),
             mechanicId: new ObjectId(mechanicId),
-            status: Constants.BOOKING_STATUS.PENDING,
-        });
+        }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" });
 
         log1(["postBookingUpdateStatus bookingDetails----->", bookingDetails]);
 
@@ -1036,31 +1045,152 @@ export const postBookingUpdateStatus = async (req, res) => {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
 
-        const alreadyBooked = await Booking.exists({
-            mechanicId: new ObjectId(mechanicId),
-            date: new Date(bookingDetails.date),
-            time: bookingDetails.time,
-            status: {
-                $in: [
-                    Constants.BOOKING_STATUS.CONFIRMED,
-                ],
-            },
-        });
+        let updatePayload = { status: newStatus };
+        let notificationTitle = "";
+        let notificationDescription = "";
 
-        if (alreadyBooked) {
-            return res.status(400).json(errorResponse("You have already accepted another booking for this time."));
-        };
+        const mechanicDetails = await Mechanic.findById(mechanicId).select("fullName");
 
-        let updatePayload = {
-            status: parseInt(param.status),
-        };
+        switch (newStatus) {
+            case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.PENDING) {
+                    return res.status(400).json(errorResponse("Booking can only be accepted from PENDING status."));
+                };
+                const alreadyBooked = await Booking.exists({
+                    mechanicId: new ObjectId(mechanicId),
+                    date: new Date(bookingDetails.date),
+                    time: bookingDetails.time,
+                    status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                });
+                if (alreadyBooked) {
+                    return res.status(400).json(errorResponse("You have already accepted another booking for this time."));
+                };
+                notificationTitle = "Booking Accepted";
+                notificationDescription = `${mechanicDetails?.fullName || "Provider"} has accepted your booking.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.CANCELLED: {
+                if (bookingDetails.status === Constants.BOOKING_STATUS.SERVICE_STARTED ||
+                    bookingDetails.status === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                    return res.status(400).json(errorResponse("Cannot cancel booking after service has started."));
+                };
+                notificationTitle = "Booking Cancelled";
+                notificationDescription = `${mechanicDetails?.fullName || "Provider"} has cancelled your booking.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_ACCEPTED) {
+                    return res.status(400).json(errorResponse("Can only mark as en route after accepting booking."));
+                };
+                notificationTitle = "Provider En Route";
+                notificationDescription = `${mechanicDetails?.fullName || "Provider"} is on the way to your location.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.ARRIVED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE) {
+                    return res.status(400).json(errorResponse("Can only mark as arrived after being en route."));
+                };
+                notificationTitle = "Provider Arrived";
+                notificationDescription = `${mechanicDetails?.fullName || "Provider"} has arrived at your location.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.SERVICE_STARTED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.ARRIVED) {
+                    return res.status(400).json(errorResponse("Can only start service after arriving."));
+                };
+                updatePayload.startTime = new Date();
+                if (param.beforePhotos && Array.isArray(param.beforePhotos)) {
+                    updatePayload.beforePhotos = param.beforePhotos;
+                };
+                notificationTitle = "Service Started";
+                notificationDescription = `Service has been started for your booking.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.SERVICE_COMPLETED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_STARTED) {
+                    return res.status(400).json(errorResponse("Can only complete service after starting."));
+                };
+                updatePayload.endTime = new Date();
+                if (param.afterPhotos && Array.isArray(param.afterPhotos)) {
+                    updatePayload.afterPhotos = param.afterPhotos;
+                };
+                if (param.materialCost) {
+                    updatePayload.materialCost = parseFloat(param.materialCost);
+                };
+                notificationTitle = "Service Completed";
+                notificationDescription = `Service has been completed for your booking. Please verify and make payment.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.PAYMENT_COMPLETED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                    return res.status(400).json(errorResponse("Can only confirm payment after service completion."));
+                };
+                if (param.paymentMethod) {
+                    updatePayload.paymentMethod = parseInt(param.paymentMethod);
+                };
+                notificationTitle = "Payment Confirmed";
+                notificationDescription = `Payment has been confirmed for your booking.`;
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.CLOSED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED) {
+                    return res.status(400).json(errorResponse("Can only close booking after payment."));
+                };
+                notificationTitle = "Booking Closed";
+                notificationDescription = `Your booking has been closed. Thank you for using our service!`;
+                break;
+            }
+
+            default: {
+                return res.status(400).json(errorResponse("Invalid status transition."));
+            }
+        }
 
         let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
         if (!updateBooking) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
-        return res.status(200).json(successResponse("Booking Status Update Successfully."));
+        if (notificationTitle && bookingDetails.ownerId) {
+            const owner = bookingDetails.ownerId;
+            if (owner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                owner.deviceToken && owner.deviceToken !== "") {
+                let notificationObject = {
+                    title: notificationTitle,
+                    description: notificationDescription,
+                    ownerId: owner._id,
+                    bookingId: bookingDetails._id,
+                    type: Constants.NOTIFICATION_TYPE.BOOKING,
+                };
+                await sendPushNotification(owner.deviceToken, notificationObject);
+
+                await Notification.create({
+                    ownerId: owner._id,
+                    mechanicId: mechanicId,
+                    title: notificationTitle,
+                    description: notificationDescription,
+                    bookingId: bookingDetails._id,
+                    type: Constants.NOTIFICATION_TYPE.BOOKING,
+                });
+            };
+        };
+
+        if (io) {
+            io.emit(Constants.SOCKET_EVENTS.CHANGE_BOOKING_STATUS, {
+                bookingId: bookingDetails._id,
+                status: newStatus,
+                mechanicId: mechanicId,
+            });
+        };
+
+        return res.status(200).json(successResponse("Booking Status Updated Successfully."));
     } catch (error) {
         log1(["Error in postBookingUpdateStatus ----->", error]);
         mechanicLocks.delete(mechanicId);
@@ -1775,6 +1905,499 @@ export const postSendMessageToChat = async (req, res) => {
         return res.status(200).json(successResponse("Message sent successfully.", { chatId: chat._id, document: document }));
     } catch (error) {
         log1(["Error in postSendMessageToChat ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postSubmitKYC = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const param = req.body;
+
+        log1(["postSubmitKYC mechanicId----->", mechanicId]);
+        log1(["postSubmitKYC param----->", param]);
+        log1(["postSubmitKYC req.files----->", req.files]);
+
+        let updateObj = {};
+
+        const fileFields = ["aadhaarFront", "aadhaarBack", "panCard", "drivingLicense", "selfie"];
+
+        for (const field of fileFields) {
+            if (req.files?.[field]) {
+                const uploadedFile = await uploadFile(req.files[field]);
+                if (uploadedFile.flag === 0) return res.status(400).json(uploadedFile);
+                updateObj[field] = uploadedFile.data.url;
+            };
+        };
+
+        const bankFields = ["bankAccountNumber", "bankIfscCode", "bankAccountHolderName", "bankName"];
+        bankFields.forEach(field => {
+            if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
+                updateObj[field] = param[field];
+            };
+        });
+
+        updateObj.status = Constants.KYC_STATUS.PENDING;
+        updateObj.rejectReason = "";
+        updateObj.reviewedAt = null;
+
+        let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
+        log1(["postSubmitKYC existingKYC----->", existingKYC]);
+
+        let kycData;
+
+        if (existingKYC) {
+            // If KYC is already APPROVED, don't allow resubmission
+            if (existingKYC.status === Constants.KYC_STATUS.APPROVED) {
+                return res.status(400).json(errorResponse("Your KYC is already approved. No changes allowed."));
+            };
+
+            kycData = await KYC.findOneAndUpdate(
+                { mechanicId: new ObjectId(mechanicId) },
+                updateObj,
+                { new: true },
+            );
+        } else {
+            updateObj.mechanicId = new ObjectId(mechanicId);
+            kycData = await KYC.create(updateObj);
+        };
+
+        log1(["postSubmitKYC kycData----->", kycData]);
+
+        return res.status(200).json(successResponse("KYC submitted successfully.", kycData));
+    } catch (error) {
+        log1(["Error in postSubmitKYC ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postKYCStatus = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        log1(["postKYCStatus mechanicId----->", mechanicId]);
+
+        const kycData = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
+        log1(["postKYCStatus kycData----->", kycData]);
+
+        return res.status(200).json(successResponse("KYC status retrieved successfully.", kycData || null));
+    } catch (error) {
+        log1(["Error in postKYCStatus ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postToggleAvailability = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        log1(["postToggleAvailability mechanicId----->", mechanicId]);
+
+        const mechanic = await Mechanic.findById(mechanicId);
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+
+        const newStatus = mechanic.isOnline === Constants.ONLINE_STATUS.TRUE
+            ? Constants.ONLINE_STATUS.FALSE
+            : Constants.ONLINE_STATUS.TRUE;
+
+        const updateMechanic = await Mechanic.findByIdAndUpdate(
+            mechanicId,
+            { isOnline: newStatus },
+            { new: true },
+        );
+
+        return res.status(200).json(successResponse("Availability updated successfully.", {
+            isOnline: updateMechanic.isOnline,
+        }));
+    } catch (error) {
+        log1(["Error in postToggleAvailability ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateWorkingHours = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const param = req.body;
+        log1(["postUpdateWorkingHours mechanicId----->", mechanicId]);
+        log1(["postUpdateWorkingHours param----->", param]);
+
+        const { workingHours } = param;
+
+        if (!workingHours || typeof workingHours !== "object") {
+            return res.status(400).json(errorResponse("Please provide valid working hours."));
+        };
+
+        const updateMechanic = await Mechanic.findByIdAndUpdate(
+            mechanicId,
+            { workingHours: workingHours },
+            { new: true },
+        );
+
+        if (!updateMechanic) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        return res.status(200).json(successResponse("Working hours updated successfully.", {
+            workingHours: updateMechanic.workingHours,
+        }));
+    } catch (error) {
+        log1(["Error in postUpdateWorkingHours ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAvailabilityStatus = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        log1(["postAvailabilityStatus mechanicId----->", mechanicId]);
+
+        const mechanic = await Mechanic.findById(mechanicId).select("isOnline workingHours").lean();
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+
+        return res.status(200).json(successResponse("Availability status retrieved successfully.", {
+            isOnline: mechanic.isOnline,
+            workingHours: mechanic.workingHours || {},
+        }));
+    } catch (error) {
+        log1(["Error in postAvailabilityStatus ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postWalletBalance = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const mechanic = await Mechanic.findById(mechanicId).select("walletBalance");
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+        return res.status(200).json(successResponse("Wallet balance fetched successfully.", {
+            walletBalance: mechanic.walletBalance || 0,
+        }));
+    } catch (error) {
+        log1(["Error in postWalletBalance ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postRequestWithdrawal = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const param = req.body;
+
+        const mechanic = await Mechanic.findById(mechanicId);
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+
+        const amount = parseFloat(param.amount);
+        if (!amount || amount <= 0) {
+            return res.status(400).json(errorResponse("Invalid withdrawal amount."));
+        };
+
+        if (amount > mechanic.walletBalance) {
+            return res.status(400).json(errorResponse("Insufficient wallet balance."));
+        };
+
+        const pendingWithdrawal = await Withdrawal.findOne({
+            mechanicId: new ObjectId(mechanicId),
+            status: 1,
+        });
+        if (pendingWithdrawal) {
+            return res.status(400).json(errorResponse("You already have a pending withdrawal request."));
+        };
+
+        await Mechanic.findByIdAndUpdate(mechanicId, {
+            $inc: { walletBalance: -amount },
+        });
+
+        const withdrawal = await Withdrawal.create({
+            mechanicId: new ObjectId(mechanicId),
+            amount: amount,
+            bankAccountNumber: param.bankAccountNumber || "",
+            bankIfscCode: param.bankIfscCode || "",
+            bankAccountHolderName: param.bankAccountHolderName || "",
+        });
+
+        return res.status(200).json(successResponse("Withdrawal request submitted successfully.", withdrawal));
+    } catch (error) {
+        log1(["Error in postRequestWithdrawal ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postWithdrawalHistory = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const filter = { mechanicId: new ObjectId(mechanicId) };
+        const [items, totalCount] = await Promise.all([
+            Withdrawal.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Withdrawal.countDocuments(filter),
+        ]);
+
+        return res.status(200).json(successResponse("Withdrawal history fetched successfully.", {
+            items, page, limit, totalRecords: totalCount,
+        }));
+    } catch (error) {
+        log1(["Error in postWithdrawalHistory ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postPerformanceMetrics = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+
+        const totalBookings = await Booking.countDocuments({ mechanicId: new ObjectId(mechanicId) });
+        const acceptedBookings = await Booking.countDocuments({
+            mechanicId: new ObjectId(mechanicId),
+            status: { $in: [Constants.BOOKING_STATUS.PROVIDER_ACCEPTED, Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE, Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
+        });
+        const completedBookings = await Booking.countDocuments({
+            mechanicId: new ObjectId(mechanicId),
+            status: { $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
+        });
+        const cancelledBookings = await Booking.countDocuments({
+            mechanicId: new ObjectId(mechanicId),
+            status: Constants.BOOKING_STATUS.CANCELLED,
+        });
+
+        const ratingStats = await Transaction.aggregate([
+            { $match: { mechanicId: new ObjectId(mechanicId) } },
+            { $group: { _id: null, totalEarnings: { $sum: "$totalAmount" }, avgEarning: { $avg: "$totalAmount" } } },
+        ]);
+
+        const monthlyEarnings = await Transaction.aggregate([
+            {
+                $match: {
+                    mechanicId: new ObjectId(mechanicId),
+                    createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+                },
+            },
+            { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+        ]);
+
+        const acceptanceRate = totalBookings > 0 ? ((acceptedBookings / totalBookings) * 100).toFixed(1) : 0;
+        const completionRate = acceptedBookings > 0 ? ((completedBookings / acceptedBookings) * 100).toFixed(1) : 0;
+        const cancellationRate = totalBookings > 0 ? ((cancelledBookings / totalBookings) * 100).toFixed(1) : 0;
+
+        return res.status(200).json(successResponse("Performance metrics fetched successfully.", {
+            totalBookings,
+            acceptedBookings,
+            completedBookings,
+            cancelledBookings,
+            acceptanceRate: parseFloat(acceptanceRate),
+            completionRate: parseFloat(completionRate),
+            cancellationRate: parseFloat(cancellationRate),
+            totalEarnings: ratingStats[0]?.totalEarnings || 0,
+            monthlyEarnings: monthlyEarnings[0]?.total || 0,
+        }));
+    } catch (error) {
+        log1(["Error in postPerformanceMetrics ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDashboard = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const [todayJobs, pendingRequests, todayEarnings, mechanic] = await Promise.all([
+            Booking.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                date: { $gte: today, $lt: tomorrow },
+                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED] },
+            }),
+            Booking.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                status: Constants.BOOKING_STATUS.PENDING,
+            }),
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: today, $lt: tomorrow },
+                    },
+                },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+            ]),
+            Mechanic.findById(mechanicId).select("walletBalance isOnline serviceRadius"),
+        ]);
+
+        return res.status(200).json(successResponse("Dashboard data fetched successfully.", {
+            todayJobs,
+            pendingRequests,
+            todayEarnings: todayEarnings[0]?.total || 0,
+            walletBalance: mechanic?.walletBalance || 0,
+            isOnline: mechanic?.isOnline,
+            serviceRadius: mechanic?.serviceRadius || 10,
+        }));
+    } catch (error) {
+        log1(["Error in postDashboard ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postIncomingRequests = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const match = { mechanicId: new ObjectId(mechanicId), status: Constants.BOOKING_STATUS.PENDING };
+        const pipeline = [
+            { $match: match },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip }, { $limit: limit },
+                        { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
+                        { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+                        { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
+                        { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+                        { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
+                        { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+                        { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
+                    ],
+                    totalRecords: [{ $count: "count" }],
+                }
+            },
+        ];
+
+        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
+        return res.status(200).json(successResponse("Incoming requests fetched successfully.", {
+            items: result.items,
+            page, limit,
+            totalRecords: result.totalRecords[0]?.count ?? 0,
+        }));
+    } catch (error) {
+        log1(["Error in postIncomingRequests ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateServiceRadius = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { serviceRadius } = req.body;
+        if (!serviceRadius || serviceRadius <= 0) {
+            return res.status(400).json(errorResponse("Invalid service radius."));
+        };
+        await Mechanic.findByIdAndUpdate(mechanicId, { serviceRadius: parseFloat(serviceRadius) });
+        return res.status(200).json(successResponse("Service radius updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateServiceRadius ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateHolidays = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { holidays } = req.body;
+        if (!Array.isArray(holidays)) {
+            return res.status(400).json(errorResponse("Holidays must be an array of dates."));
+        };
+        await Mechanic.findByIdAndUpdate(mechanicId, { holidays: holidays.map(h => new Date(h)) });
+        return res.status(200).json(successResponse("Holidays updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateHolidays ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postBookingNavigationData = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { bookingId } = req.body;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+        const booking = await Booking.findOne({ _id: new ObjectId(bookingId), mechanicId: new ObjectId(mechanicId) })
+            .select("latitude longitude address ownerId")
+            .populate("ownerId", "fullName phoneNumber latitude longitude address");
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+        return res.status(200).json(successResponse("Navigation data fetched successfully.", booking));
+    } catch (error) {
+        log1(["Error in postBookingNavigationData ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateLocation = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { latitude, longitude } = req.body;
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Latitude and longitude are required."));
+        };
+        await Mechanic.findByIdAndUpdate(mechanicId, {
+            latitude: latitude,
+            longitude: longitude,
+            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
+        });
+        return res.status(200).json(successResponse("Location updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateLocation ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postReviewsReceived = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const filter = { mechanicId: new ObjectId(mechanicId) };
+
+        const [items, totalCount] = await Promise.all([
+            Rating.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+                .populate("ownerId", "fullName profileImage")
+                .populate("serviceId", "fullName"),
+            Rating.countDocuments(filter),
+        ]);
+
+        const stats = await Rating.aggregate([
+            { $match: filter },
+            { $group: { _id: null, avgRating: { $avg: "$rating" }, totalReviews: { $sum: 1 } } },
+        ]);
+
+        const response = {
+            page,
+            limit,
+            totalRecords: totalCount,
+            totalReviews: stats[0]?.totalReviews || 0,
+            avgRating: stats[0]?.avgRating || 0,
+            items,
+        };
+
+        return res.status(200).json(successResponse("Reviews fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postReviewsReceived ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

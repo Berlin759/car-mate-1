@@ -99,10 +99,27 @@ const mechanicSchema = new Schema(
             enum: Object.values(Constants.MECHANIC_STATUS),
             default: Constants.MECHANIC_STATUS.PENDING,
         },
+        walletBalance: {
+            type: Number,
+            default: 0,
+        },
+        serviceRadius: {
+            type: Number,
+            default: 10,
+        },
+        holidays: [
+            {
+                type: Date,
+            },
+        ],
         isOnline: {
             type: Number,
             enum: Object.values(Constants.ONLINE_STATUS),
             default: Constants.ONLINE_STATUS.FALSE,
+        },
+        workingHours: {
+            type: Object,
+            default: {},
         },
     },
     {

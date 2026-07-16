@@ -19,6 +19,8 @@ const Constants = {
         MESSAGE_EVENT: "new_message",
         USER_ONLINE: "user_online",
         USER_STATUS_CHANGE: "user_status_change",
+        owner_STATUS_CHANGE: "owner_status_change",
+        mechanic_STATUS_CHANGE: "mechanic_status_change",
         IS_READ_MESSAGE: "is_read_message",
         IN_OUT_DETAILS_PAGE: "in_out_details_page",
         CHANGE_BOOKING_STATUS: "change_booking_status",
@@ -124,8 +126,21 @@ const Constants = {
     },
     BOOKING_STATUS: {
         PENDING: 1,
-        CONFIRMED: 2,
         CANCELLED: 3,
+        PROVIDER_ACCEPTED: 4,
+        PROVIDER_EN_ROUTE: 5,
+        ARRIVED: 6,
+        SERVICE_STARTED: 7,
+        SERVICE_COMPLETED: 8,
+        PAYMENT_COMPLETED: 9,
+        CLOSED: 10,
+    },
+    PAYMENT_METHOD: {
+        CASH: 1,
+        WALLET: 2,
+        CARD: 3,
+        UPI: 4,
+        NET_BANKING: 5,
     },
     CHECK_IN_OUT_STATUS: {
         BOOKED: 1,
@@ -153,6 +168,20 @@ const Constants = {
     SHIFT_TYPE: {
         DAY: 1,
         NIGHT: 2,
+    },
+    DISPUTE_STATUS: {
+        OPEN: 1,
+        IN_REVIEW: 2,
+        ESCALATED: 3,
+        RESOLVED: 4,
+    },
+    DISCOUNT_TYPE: {
+        PERCENTAGE: "percentage",
+        FIXED: "fixed",
+    },
+    USER_ROLE: {
+        OWNER: "owner",
+        MECHANIC: "mechanic",
     },
 };
 

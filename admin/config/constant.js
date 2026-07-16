@@ -94,8 +94,21 @@ const Constants = {
     },
     BOOKING_STATUS: {
         PENDING: 1,
-        CONFIRMED: 2,
         CANCELLED: 3,
+        PROVIDER_ACCEPTED: 4,
+        PROVIDER_EN_ROUTE: 5,
+        ARRIVED: 6,
+        SERVICE_STARTED: 7,
+        SERVICE_COMPLETED: 8,
+        PAYMENT_COMPLETED: 9,
+        CLOSED: 10,
+    },
+    PAYMENT_METHOD: {
+        CASH: 1,
+        WALLET: 2,
+        CARD: 3,
+        UPI: 4,
+        NET_BANKING: 5,
     },
     CHECK_IN_OUT_STATUS: {
         BOOKED: 1,
@@ -123,6 +136,35 @@ const Constants = {
     PLATFORM_STATUS: {
         DISABLED: 1,
         ENABLED: 2,
+    },
+    KYC_STATUS: {
+        PENDING: 1,
+        APPROVED: 2,
+        REJECTED: 3,
+    },
+    DISPUTE_STATUS: {
+        OPEN: 1,
+        IN_REVIEW: 2,
+        ESCALATED: 3,
+        RESOLVED: 4,
+    },
+    DISCOUNT_TYPE: {
+        PERCENTAGE: "percentage",
+        FIXED: "fixed",
+    },
+    TARGET_AUDIENCE: {
+        ALL: "all",
+        OWNER: "owner",
+        MECHANIC: "mechanic",
+    },
+    TEMPLATE_TYPE: {
+        EMAIL: "email",
+        PUSH_NOTIFICATION: "push_notification",
+        SMS: "sms",
+    },
+    USER_ROLE: {
+        OWNER: "owner",
+        MECHANIC: "mechanic",
     },
 };
 

@@ -65,6 +65,48 @@
                     Reviews
                 </a>
             </li>
+            <li class="nav-item <%= header?.page === "KYC Review" ? "active" : "" %>">
+                <a href="/kyc">
+                    <i class="fa-solid fa-id-card"></i>
+                    KYC Review
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Disputes" ? "active" : "" %>">
+                <a href="/disputes">
+                    <i class="fa-solid fa-gavel"></i>
+                    Disputes
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Banners" ? "active" : "" %>">
+                <a href="/banners">
+                    <i class="fa-solid fa-image"></i>
+                    Banners
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "FAQs" ? "active" : "" %>">
+                <a href="/faqs">
+                    <i class="fa-solid fa-circle-question"></i>
+                    FAQs
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Announcements" ? "active" : "" %>">
+                <a href="/announcements">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    Announcements
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Pricing" ? "active" : "" %>">
+                <a href="/pricing">
+                    <i class="fa-solid fa-indian-rupee-sign"></i>
+                    Pricing
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Templates" ? "active" : "" %>">
+                <a href="/templates">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    Templates
+                </a>
+            </li>
             <li class="nav-item <%= header?.page === "Settings" ? "active" : "" %>">
                 <a href="/settings">
                     <i class="fa-solid fa-gear"></i>
@@ -73,7 +115,7 @@
             </li>
         </ul>
     </div>
-    <div class="water-mark text-center">
+    <!-- <div class="water-mark text-center">
         <%= header?.admin?.name %>
-    </div>
+    </div> -->
 </nav>

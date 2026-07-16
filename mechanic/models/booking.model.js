@@ -24,20 +24,34 @@ const bookingSchema = new Schema(
             ref: "cars",
             required: false,
         },
+        addressId: {
+            type: Schema.Types.ObjectId,
+            ref: "addresses",
+            required: false,
+        },
         cancelById: {
             type: Schema.Types.ObjectId,
             ref: "owners",
             required: false,
         },
+        couponId: {
+            type: Schema.Types.ObjectId,
+            ref: "coupons",
+            required: false,
+        },
         invoiceNo: {
             type: String,
-            default: ""
+            default: "",
         },
         date: {
             type: Date,
             default: null,
         },
         time: {
+            type: String,
+            default: "",
+        },
+        address: {
             type: String,
             default: "",
         },
@@ -49,9 +63,60 @@ const bookingSchema = new Schema(
             type: String,
             default: "",
         },
+        basePrice: {
+            type: Number,
+            default: 0,
+        },
+        distanceCharge: {
+            type: Number,
+            default: 0,
+        },
+        peakHourFee: {
+            type: Number,
+            default: 0,
+        },
+        materialCost: {
+            type: Number,
+            default: 0,
+        },
+        taxAmount: {
+            type: Number,
+            default: 0,
+        },
+        discountAmount: {
+            type: Number,
+            default: 0,
+        },
+        cancelFee: {
+            type: Number,
+            default: 0,
+        },
         totalAmount: {
             type: Number,
             default: 0,
+        },
+        paymentMethod: {
+            type: Number,
+            enum: Object.values(Constants.PAYMENT_METHOD),
+            default: Constants.PAYMENT_METHOD.CASH,
+        },
+        beforePhotos: [
+            {
+                type: String,
+            },
+        ],
+        afterPhotos: [
+            {
+                type: String,
+            },
+        ],
+        startTime: {
+            type: Date,
+            default: null,
+        },
+        endTime: {
+            type: Date,
+            default: null,
         },
         cancelReason: {
             type: String,

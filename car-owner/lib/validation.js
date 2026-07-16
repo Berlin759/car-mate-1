@@ -61,6 +61,21 @@ const validate_rules = {
             bookingId: "required",
             rating: "required",
         },
+        add_address: {
+            label: "required",
+            address: "required",
+            latitude: "required",
+            longitude: "required",
+        },
+        update_address: {
+            addressId: "required",
+        },
+        delete_address: {
+            addressId: "required",
+        },
+        set_default_address: {
+            addressId: "required",
+        },
     },
 };
 

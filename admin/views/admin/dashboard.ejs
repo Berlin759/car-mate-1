@@ -1,12 +1,21 @@
+<%
+    function formatCurrency(amount) {
+        if(!amount && amount !== 0) return "₹0";
+        return "₹" + Number(amount).toLocaleString("en-IN");
+    };
+%>
+
 <%- include('../header.ejs') %>
+
+    <!-- KPI Cards -->
     <div class="static-card-group mb-30">
         <div class="row">
             <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
-                            <span class="sd-title fs-14 d-block">Total Car Owner</span>
-                            <span class="sd-data">0</span>
+                            <span class="sd-title fs-14 d-block">Total Car Owners</span>
+                            <span class="sd-data"><%= body.totalOwners || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <i class="fa-solid fa-users"></i>
@@ -19,10 +28,10 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Total Mechanics</span>
-                            <span class="sd-data">0</span>
+                            <span class="sd-data"><%= body.totalMechanics || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
-                            <i class="fa-solid fa-users"></i>
+                            <i class="fa-solid fa-screwdriver-wrench"></i>
                         </div>
                     </div>
                 </div>
@@ -32,7 +41,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Total Cars</span>
-                            <span class="sd-data">0</span>
+                            <span class="sd-data"><%= body.totalCars || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <i class="fa-solid fa-car"></i>
@@ -40,23 +49,54 @@
                     </div>
                 </div>
             </div>
-            <!-- <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Total Bookings</span>
-                            <span class="sd-data">0</span>
+                            <span class="sd-data"><%= body.totalBookings || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" class="lucide lucide-calendar-check h-5 w-5 text-primary">
-                                <path d="M8 2v4"></path>
-                                <path d="M16 2v4"></path>
-                                <rect width="18" height="18" x="3" y="4" rx="2"></rect>
-                                <path d="M3 10h18"></path>
-                                <path d="m9 16 2 2 4-4"></path>
-                            </svg>
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Active Bookings</span>
+                            <span class="sd-data"><%= body.activeBookings || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-spinner"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Completed Bookings</span>
+                            <span class="sd-data"><%= body.completedBookings || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Cancelled Bookings</span>
+                            <span class="sd-data"><%= body.cancelledBookings || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-circle-xmark"></i>
                         </div>
                     </div>
                 </div>
@@ -66,19 +106,80 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Total Revenue</span>
-                            <span class="sd-data">$0</span>
+                            <span class="sd-data"><%= formatCurrency(body.totalRevenue) %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" class="lucide lucide-dollar-sign">
-                                <line x1="12" x2="12" y1="2" y2="22"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                            </svg>
+                            <i class="fa-solid fa-indian-rupee-sign"></i>
                         </div>
                     </div>
                 </div>
-            </div> -->
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">This Month Revenue</span>
+                            <span class="sd-data"><%= formatCurrency(body.monthRevenue) %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Pending KYC</span>
+                            <span class="sd-data"><%= body.pendingKYC || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-id-card"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Open Disputes</span>
+                            <span class="sd-data"><%= body.openDisputes || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-gavel"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Avg. Rating</span>
+                            <span class="sd-data"><%= body.avgRating || 0 %> <i class="fa-solid fa-star text-warning fs-14"></i></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-star-half-stroke"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-2 col-xl-4 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Total Reviews</span>
+                            <span class="sd-data"><%= body.totalReviews || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-comments"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
 <%- include('../footer.ejs') %>

@@ -1,0 +1,66 @@
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Target</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (body?.templateList && body.templateList.length > 0) { body.templateList.forEach(function(template, index) { %>
+                <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                <tr>
+                    <td><%= start_index %></td>
+                    <td><strong><%= template.name || "-" %></strong></td>
+                    <td>
+                        <% if (template.type === "email") { %>
+                            <span class="badge bg-primary">Email</span>
+                        <% } else if (template.type === "push_notification") { %>
+                            <span class="badge bg-info">Push</span>
+                        <% } else { %>
+                            <span class="badge bg-secondary">SMS</span>
+                        <% } %>
+                    </td>
+                    <td><span class="badge bg-light text-dark"><%= template.targetAudience || "all" %></span></td>
+                    <td><%= template.subject || "-" %></td>
+                    <td>
+                        <% if (template.isActive) { %>
+                            <span class="bet-status alert-success">Active</span>
+                        <% } else { %>
+                            <span class="bet-status alert-end">Inactive</span>
+                        <% } %>
+                    </td>
+                    <td class="text-end">
+                        <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                            <a href="javascript:void(0);" class="view-template-btn text-primary" data-template-id="<%= template._id %>" title="View">
+                                <i class="fa-regular fa-eye"></i>
+                            </a>
+                            <% if (!template.isDefault) { %>
+                                <a href="javascript:void(0);" class="edit-template-btn text-warning" data-template-id="<%= template._id %>" title="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                            <% } %>
+                            <a href="javascript:void(0);" class="toggle-template-status text-info" data-template-id="<%= template._id %>" title="Toggle Status">
+                                <i class="fa-solid fa-toggle-on"></i>
+                            </a>
+                            <% if (!template.isDefault) { %>
+                                <a href="javascript:void(0);" class="delete-template-btn text-danger" data-template-id="<%= template._id %>" title="Delete">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </a>
+                            <% } %>
+                        </div>
+                    </td>
+                </tr>
+            <% }); } else { %>
+                <tr>
+                    <td colspan="7" class="text-center">No templates found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

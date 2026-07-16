@@ -43,6 +43,10 @@ const validate_rules = {
         update_service: {
             serviceId: "required",
         },
+        update_pricing: {
+            basePrice: "required",
+            platformCommission: "required",
+        },
     },
 };
 

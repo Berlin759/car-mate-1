@@ -49,6 +49,14 @@ const carSchema = new Schema(
             type: String,
             default: "",
         },
+        fuelType: {
+            type: String,
+            default: "",
+        },
+        isDefault: {
+            type: Boolean,
+            default: false,
+        },
         vehicleOwnerCount: {
             type: String,
             default: "",
