@@ -1,0 +1,202 @@
+<%- include('../header.ejs') %>
+
+<%
+    function formatDateFull(date) {
+        if (!date) return "-";
+
+        let d = new Date(date);
+        let day = ("0" + d.getDate()).slice(-2);
+        let month = ("0" + (d.getMonth() + 1)).slice(-2);
+
+        let year = d.getFullYear();
+        let hours = ("0" + d.getHours()).slice(-2);
+        let minutes = ("0" + d.getMinutes()).slice(-2);
+
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
+    };
+%>
+
+<div class="d-flex align-items-center justify-content-between mb-30">
+    <a href="/mechanic/<%= body?.kyc?.mechanicId %>" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+        <i class="fa-solid fa-arrow-left"></i> Back to Mechanic
+    </a>
+    <div class="d-flex align-items-center gap-2">
+        <% if(body?.kyc?.status === 2) { %>
+            <span class="bet-status alert-success">Approved</span>
+        <% } else if(body?.kyc?.status === 3) { %>
+            <span class="bet-status alert-end">Rejected</span>
+        <% } else { %>
+            <span class="bet-status alert-pending">Pending</span>
+        <% } %>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="bg-white rounded-2 bs-border p-4 mb-30">
+            <h6 class="mb-3">KYC Documents</h6>
+            <hr>
+            <div class="row">
+                <% if(body?.kyc?.aadhaarFront) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block mb-1">Aadhaar Front</span>
+                        <a href="<%= body.kyc.aadhaarFront %>" target="_blank" class="d-block">
+                            <img src="<%= body.kyc.aadhaarFront %>" alt="Aadhaar Front" class="img-fluid rounded" style="max-height: 150px; object-fit: cover;">
+                        </a>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.aadhaarBack) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block mb-1">Aadhaar Back</span>
+                        <a href="<%= body.kyc.aadhaarBack %>" target="_blank" class="d-block">
+                            <img src="<%= body.kyc.aadhaarBack %>" alt="Aadhaar Back" class="img-fluid rounded" style="max-height: 150px; object-fit: cover;">
+                        </a>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.panCard) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block mb-1">PAN Card</span>
+                        <a href="<%= body.kyc.panCard %>" target="_blank" class="d-block">
+                            <img src="<%= body.kyc.panCard %>" alt="PAN Card" class="img-fluid rounded" style="max-height: 150px; object-fit: cover;">
+                        </a>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.drivingLicense) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block mb-1">Driving License</span>
+                        <a href="<%= body.kyc.drivingLicense %>" target="_blank" class="d-block">
+                            <img src="<%= body.kyc.drivingLicense %>" alt="Driving License" class="img-fluid rounded" style="max-height: 150px; object-fit: cover;">
+                        </a>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.selfie) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block mb-1">Selfie</span>
+                        <a href="<%= body.kyc.selfie %>" target="_blank" class="d-block">
+                            <img src="<%= body.kyc.selfie %>" alt="Selfie" class="img-fluid rounded" style="max-height: 150px; object-fit: cover;">
+                        </a>
+                    </div>
+                <% } %>
+                <% if(!body?.kyc?.aadhaarFront && !body?.kyc?.aadhaarBack && !body?.kyc?.panCard && !body?.kyc?.drivingLicense && !body?.kyc?.selfie) { %>
+                    <div class="col-12">
+                        <span class="text-gray">No documents uploaded</span>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2 bs-border p-4">
+            <h6 class="mb-3">Bank Details</h6>
+            <hr>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Account Holder Name</span>
+                    <span class="fw-md"><%= body?.kyc?.bankAccountHolderName || "-" %></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Bank Name</span>
+                    <span class="fw-md"><%= body?.kyc?.bankName || "-" %></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Account Number</span>
+                    <span class="fw-md"><%= body?.kyc?.bankAccountNumber || "-" %></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">IFSC Code</span>
+                    <span class="fw-md"><%= body?.kyc?.bankIfscCode || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="bg-white rounded-2 bs-border p-4 mb-30">
+            <h6 class="mb-3">Mechanic Info</h6>
+            <hr>
+            <div class="d-flex flex-column gap-3">
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Name</span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.fullName || "-" %></span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Phone</span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.phoneNumber || "-" %></span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Email</span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.email || "-" %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2 bs-border p-4 mb-30">
+            <h6 class="mb-3">Review Info</h6>
+            <hr>
+            <div class="d-flex flex-column gap-3">
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Status</span>
+                    <span class="fw-md">
+                        <% if(body?.kyc?.status === 2) { %>
+                            <span class="bet-status alert-success">Approved</span>
+                        <% } else if(body?.kyc?.status === 3) { %>
+                            <span class="bet-status alert-end">Rejected</span>
+                        <% } else { %>
+                            <span class="bet-status alert-pending">Pending</span>
+                        <% } %>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Submitted</span>
+                    <span class="fw-md"><%= formatDateFull(body?.kyc?.createdAt) || "-" %></span>
+                </div>
+                <% if(body?.kyc?.reviewedAt) { %>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-gray">Reviewed At</span>
+                        <span class="fw-md"><%= formatDateFull(body?.kyc?.reviewedAt) %></span>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.status === 3 && body?.kyc?.rejectReason) { %>
+                    <div>
+                        <span class="text-gray fs-14 d-block mb-1">Rejection Reason</span>
+                        <span class="fw-md text-danger"><%= body.kyc.rejectReason %></span>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <% if(body?.kyc?.status === 1) { %>
+            <div class="bg-white rounded-2 bs-border p-4">
+                <h6 class="mb-3">Actions</h6>
+                <hr>
+                <div class="d-flex flex-column gap-2">
+                    <input type="hidden" id="kyc-mechanic-id" value="<%= body?.kyc?.mechanicId %>">
+                    <button type="button" id="kyc-approve-btn" class="btn btn-success w-100">Approve KYC</button>
+                    <button type="button" id="kyc-reject-btn" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectKycModal">Reject KYC</button>
+                </div>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<!-- Reject KYC Modal -->
+<div class="modal custom-popup fade" id="rejectKycModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="rejectKycModalLabel" aria-modal="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header justify-content-center mt-3">
+                <h5 class="modal-title" id="rejectKycModalLabel">Reject KYC</h5>
+            </div>
+            <div class="modal-body px-4 pb-4">
+                <div class="form-group">
+                    <label for="reject-reason" class="form-label text-dark">Rejection Reason</label>
+                    <textarea class="form-control" id="reject-reason" rows="3" placeholder="Enter rejection reason"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 d-flex justify-content-end">
+                <button type="button" class="btn btn btn-primary btn-transparent" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-reject-kyc">Reject</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../footer.ejs') %>

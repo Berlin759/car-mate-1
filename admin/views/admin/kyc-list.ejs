@@ -48,7 +48,7 @@
                         <td><%= formatDate(item?.createdAt) || "-" %></td>
                         <td class="text-end">
                             <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                                <a href="javascript:void(0);" class="view-kyc-details" data-kyc-id="<%= item?._id %>" data-mechanic-id="<%= item?.mechanicId %>" title="View Details">
+                                <a href="/kyc/<%= item?.mechanicId %>" class="view-kyc-details" title="View Details">
                                     <i class="fa-regular fa-eye"></i>
                                 </a>
                             </div>

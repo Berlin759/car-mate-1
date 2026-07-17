@@ -88,6 +88,7 @@ import {
     postToggleTemplateStatus,
     postSeedDefaultTemplates,
     getKYCPage,
+    getKYCDetailPage,
     postPendingKYCList,
     postKYCDetails,
     postApproveKYC,
@@ -156,6 +157,7 @@ adminRouter.post("/review-details", authMiddleware, postReviewDetails);
 
 // KYC API
 adminRouter.get("/kyc", authMiddleware, getKYCPage);
+adminRouter.get("/kyc/:id", authMiddleware, getKYCDetailPage);
 adminRouter.post("/kyc-list", authMiddleware, postPendingKYCList);
 adminRouter.post("/kyc-details", authMiddleware, postKYCDetails);
 adminRouter.post("/kyc-approve", authMiddleware, postApproveKYC);

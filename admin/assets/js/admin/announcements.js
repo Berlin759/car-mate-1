@@ -2,12 +2,6 @@ $(document).ready(function () {
     fetchAnnouncementList();
 });
 
-function fetchAnnouncementList(filterObj = {}) {
-    setFilters({ ...filterObj });
-    filterData("/announcement-list", "announcement-list-table-data");
-    toggleResetButtonVisibility("#reset-announcement-filters", "#announcement-filter-section");
-}
-
 $(document).on("click", "#save_announcement", function () {
     const title = $("#announcement_title").val().trim();
     const description = $("#announcement_description").val().trim();
@@ -42,3 +36,9 @@ $(document).on("click", ".delete-announcement", function () {
         if (response.flag === 1) { fetchAnnouncementList(); }
     });
 });
+
+function fetchAnnouncementList(filterObj = {}) {
+    setFilters({ ...filterObj });
+    filterData("/announcement-list", "announcement-list-table-data");
+    toggleResetButtonVisibility("#reset-announcement-filters", "#announcement-filter-section");
+};

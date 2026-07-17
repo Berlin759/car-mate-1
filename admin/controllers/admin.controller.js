@@ -911,6 +911,10 @@ export const getMechanicDetailPage = async (req, res) => {
             return res.redirect("/mechanic");
         };
 
+        let kyc = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) })
+            .select("status rejectReason reviewedAt createdAt")
+            .lean();
+
         return res.render("admin/mechanic-detail", {
             header: {
                 page: "Mechanic",
@@ -921,6 +925,7 @@ export const getMechanicDetailPage = async (req, res) => {
             },
             body: {
                 mechanic: mechanic,
+                kyc: kyc || null,
             },
             footer: {
                 js: ["admin/mechanic-detail.js"],
@@ -3212,6 +3217,94 @@ export const getKYCPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getKYCPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getKYCDetailPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const mechanicId = req.params.id;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.redirect("/kyc");
+        };
+
+        let kycPipeline = [
+            {
+                $match: { mechanicId: new ObjectId(mechanicId) },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    mechanicId: 1,
+                    aadhaarFront: 1,
+                    aadhaarBack: 1,
+                    panCard: 1,
+                    drivingLicense: 1,
+                    selfie: 1,
+                    bankAccountNumber: 1,
+                    bankIfscCode: 1,
+                    bankAccountHolderName: 1,
+                    bankName: 1,
+                    status: 1,
+                    rejectReason: 1,
+                    reviewedAt: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    mechanicDetails: 1,
+                },
+            },
+        ];
+
+        let kycResp = await KYC.aggregate(kycPipeline);
+        let kyc = kycResp[0];
+
+        if (!kyc) {
+            return res.redirect("/kyc");
+        };
+
+        return res.render("admin/kyc-detail", {
+            header: {
+                page: "KYC Review",
+                admin: admin,
+                title: "KYC Details",
+                description: "KYC detail view",
+                id: "kyc",
+            },
+            body: {
+                kyc: kyc,
+            },
+            footer: {
+                js: ["admin/kyc-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getKYCDetailPage----->", error]);
+        return res.redirect("/kyc");
     }
 };
 

@@ -29,12 +29,6 @@ $(document).on("click", "#reset-template-filters", function () {
     fetchTemplateList({ type: "" });
 });
 
-function fetchTemplateList(filterObj = {}) {
-    setFilters({ ...filterObj });
-    filterData("/template-list", "template-list-table-data");
-    toggleResetButtonVisibility("#reset-template-filters", "#template-filter-section");
-}
-
 // Seed Default Templates
 $(document).on("click", "#seed-default-templates-btn", function () {
     postAjaxCall("/seed-default-templates", {}, function (response) {
@@ -67,47 +61,11 @@ $(document).on("keypress", "#placeholder_input", function (e) {
     }
 });
 
-function addPlaceholder() {
-    const val = $("#placeholder_input").val().trim();
-    if (!val) return;
-    if (templatePlaceholders.includes(val)) {
-        showToast(0, "Placeholder already added.");
-        return;
-    }
-    templatePlaceholders.push(val);
-    renderPlaceholderTags();
-    $("#placeholder_input").val("");
-}
-
 $(document).on("click", ".remove-placeholder-tag", function () {
     const val = $(this).data("placeholder");
     templatePlaceholders = templatePlaceholders.filter((p) => p !== val);
     renderPlaceholderTags();
 });
-
-function renderPlaceholderTags() {
-    let html = "";
-    templatePlaceholders.forEach(function (p) {
-        html += '<span class="badge bg-secondary d-flex align-items-center gap-1">' + p + ' <i class="fa-solid fa-xmark cursor-pointer remove-placeholder-tag" data-placeholder="' + p + '"></i></span>';
-    });
-    $("#placeholder-tags-container").html(html);
-}
-
-// Reset modal
-function resetTemplateModal() {
-    $("#template_id").val("");
-    $("#template_name").val("").prop("disabled", false);
-    $("#template_type").val("email");
-    $("#template_subject").val("");
-    $("#template_body").val("");
-    $("#template_audience").val("all");
-    templatePlaceholders = [];
-    renderPlaceholderTags();
-    $("#subject-field-group").show();
-    $("#templateModalLabel").text("Add Template");
-    $("#save_template").removeClass("d-none");
-    $("#update_template").addClass("d-none");
-}
 
 $(document).on("hide.bs.modal", "#templateModal", function () {
     resetTemplateModal();
@@ -273,3 +231,54 @@ $(document).on("click", ".delete-template-btn", function () {
         }
     });
 });
+
+function fetchTemplateList(filterObj = {}) {
+    setFilters({ ...filterObj });
+    filterData("/template-list", "template-list-table-data");
+    toggleResetButtonVisibility("#reset-template-filters", "#template-filter-section");
+};
+
+function addPlaceholder() {
+    const val = $("#placeholder_input").val().trim();
+    if (!val) return;
+
+    if (templatePlaceholders.includes(val)) {
+        showToast(0, "Placeholder already added.");
+        return;
+    };
+
+    templatePlaceholders.push(val);
+
+    renderPlaceholderTags();
+
+    $("#placeholder_input").val("");
+};
+
+function renderPlaceholderTags() {
+    let html = "";
+
+    templatePlaceholders.forEach(function (p) {
+        html += '<span class="badge bg-secondary d-flex align-items-center gap-1">' + p + ' <i class="fa-solid fa-xmark cursor-pointer remove-placeholder-tag" data-placeholder="' + p + '"></i></span>';
+    });
+
+    $("#placeholder-tags-container").html(html);
+};
+
+// Reset modal
+function resetTemplateModal() {
+    $("#template_id").val("");
+    $("#template_name").val("").prop("disabled", false);
+    $("#template_type").val("email");
+    $("#template_subject").val("");
+    $("#template_body").val("");
+    $("#template_audience").val("all");
+
+    templatePlaceholders = [];
+
+    renderPlaceholderTags();
+
+    $("#subject-field-group").show();
+    $("#templateModalLabel").text("Add Template");
+    $("#save_template").removeClass("d-none");
+    $("#update_template").addClass("d-none");
+};

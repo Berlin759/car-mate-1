@@ -21,15 +21,14 @@
         <i class="fa-solid fa-arrow-left"></i> Back to List
     </a>
     <div class="d-flex align-items-center gap-2">
-        <% if(body?.owner?.status === 2) { %>
-            <span class="bet-status alert-success">Active</span>
-        <% } else if(body?.owner?.status === 3) { %>
-            <span class="bet-status alert-end">In Active</span>
-        <% } else if(body?.owner?.status === 4) { %>
-            <span class="bet-status alert-end">Suspended</span>
-        <% } else { %>
-            <span class="bet-status alert-pending">Pending</span>
-        <% } %>
+        <label class="text-gray fs-14 mb-0">Status:</label>
+        <input type="hidden" id="owner-id" value="<%= body?.owner?._id %>">
+        <select id="owner-status-select" class="form-select form-select-sm" style="width: auto;">
+            <option value="1" <%= body?.owner?.status === 1 ? "selected" : "" %>>Pending</option>
+            <option value="2" <%= body?.owner?.status === 2 ? "selected" : "" %>>Active</option>
+            <option value="4" <%= body?.owner?.status === 4 ? "selected" : "" %>>Suspended</option>
+        </select>
+        <button type="button" id="update-owner-status" class="btn btn-primary btn-sm">Update</button>
     </div>
 </div>
 

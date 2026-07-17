@@ -26,35 +26,6 @@ $(document).on("click", "#reset-kyc-filters", function () {
     fetchKYCList({ status: "" });
 });
 
-function fetchKYCList(filterObj = {}) {
-    setFilters({ ...filterObj });
-    filterData("/kyc-list", "kyc-list-table-data");
-    toggleResetButtonVisibility("#reset-kyc-filters", "#kyc-filter-section");
-}
-
-$(document).on("click", ".view-kyc-details", function () {
-    const mechanicId = $(this).data("mechanic-id");
-    if (!mechanicId) { showToast(0, "Invalid mechanic ID"); return; }
-
-    postAjaxCall("/kyc-details", { mechanicId: mechanicId }, function (response) {
-        if (response.flag !== 1) { showToast(response.flag, response.msg); return; }
-        const kyc = response.data;
-        $("#kyc-mechanic-name").text(kyc.mechanicDetails?.fullName || "-");
-        $("#kyc-doc-type").text(kyc.documentType || "-");
-        $("#kyc-status").text(kyc.status === 1 ? "Pending" : kyc.status === 2 ? "Approved" : "Rejected");
-        $("#kyc-submitted").text(kyc.createdAt ? new Date(kyc.createdAt).toLocaleDateString() : "-");
-        $("#kyc-doc-number").text(kyc.documentNumber || "-");
-        if (kyc.documentImage) {
-            $("#kyc-doc-image").html('<img src="' + kyc.documentImage + '" class="img-fluid rounded" style="max-height:200px;">');
-        } else {
-            $("#kyc-doc-image").text("No image uploaded");
-        }
-        $("#kyc-approve-btn").data("mechanic-id", mechanicId);
-        $("#kyc-reject-btn").data("mechanic-id", mechanicId);
-        $("#kycDetailModal").modal("show");
-    });
-});
-
 $(document).on("click", "#kyc-approve-btn", function () {
     const mechanicId = $(this).data("mechanic-id");
     postAjaxCall("/kyc-approve", { mechanicId: mechanicId }, function (response) {
@@ -76,3 +47,9 @@ $(document).on("click", "#kyc-reject-btn", function () {
         }
     });
 });
+
+function fetchKYCList(filterObj = {}) {
+    setFilters({ ...filterObj });
+    filterData("/kyc-list", "kyc-list-table-data");
+    toggleResetButtonVisibility("#reset-kyc-filters", "#kyc-filter-section");
+};

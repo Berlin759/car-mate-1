@@ -2,12 +2,6 @@ $(document).ready(function () {
     fetchFaqList();
 });
 
-function fetchFaqList(filterObj = {}) {
-    setFilters({ ...filterObj });
-    filterData("/faq-list", "faq-list-table-data");
-    toggleResetButtonVisibility("#reset-faq-filters", "#faq-filter-section");
-}
-
 $(document).on("click", "#save_faq", function () {
     const question = $("#faq_question").val().trim();
     const answer = $("#faq_answer").val().trim();
@@ -42,3 +36,9 @@ $(document).on("click", ".delete-faq", function () {
         if (response.flag === 1) { fetchFaqList(); }
     });
 });
+
+function fetchFaqList(filterObj = {}) {
+    setFilters({ ...filterObj });
+    filterData("/faq-list", "faq-list-table-data");
+    toggleResetButtonVisibility("#reset-faq-filters", "#faq-filter-section");
+};

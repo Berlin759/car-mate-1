@@ -2,12 +2,6 @@ $(document).ready(function () {
     fetchBannerList();
 });
 
-function fetchBannerList(filterObj = {}) {
-    setFilters({ ...filterObj });
-    filterData("/banner-list", "banner-list-table-data");
-    toggleResetButtonVisibility("#reset-banner-filters", "#banner-filter-section");
-}
-
 $(document).on("click", "#save_banner", function () {
     const title = $("#banner_title").val().trim();
     const description = $("#banner_description").val().trim();
@@ -45,3 +39,9 @@ $(document).on("click", ".delete-banner", function () {
         if (response.flag === 1) { fetchBannerList(); }
     });
 });
+
+function fetchBannerList(filterObj = {}) {
+    setFilters({ ...filterObj });
+    filterData("/banner-list", "banner-list-table-data");
+    toggleResetButtonVisibility("#reset-banner-filters", "#banner-filter-section");
+};

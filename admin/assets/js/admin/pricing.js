@@ -2,26 +2,6 @@ $(document).ready(function () {
     loadPricingDetails();
 });
 
-function loadPricingDetails() {
-    postAjaxCall("/pricing-details", {}, function (response) {
-        if (response.flag === 1 && response.data) {
-            const p = response.data;
-            $("#basePrice").val(p.basePrice || 0);
-            $("#perKmCharge").val(p.perKmCharge || 0);
-            $("#peakHourSurcharge").val(p.peakHourSurcharge || 0);
-            $("#peakHourStart").val(p.peakHourStart || "07:00");
-            $("#peakHourEnd").val(p.peakHourEnd || "10:00");
-            $("#eveningPeakStart").val(p.eveningPeakStart || "17:00");
-            $("#eveningPeakEnd").val(p.eveningPeakEnd || "20:00");
-            $("#weekendSurcharge").val(p.weekendSurcharge || 0);
-            $("#platformCommission").val(p.platformCommission || 10);
-            $("#minimumFare").val(p.minimumFare || 0);
-            $("#cancellationFee").val(p.cancellationFee || 0);
-            $("#gstPercentage").val(p.gstPercentage || 18);
-        }
-    });
-}
-
 $(document).on("submit", "#pricing-form", function (e) {
     e.preventDefault();
 
@@ -69,3 +49,23 @@ $(document).on("submit", "#pricing-form", function (e) {
         }
     });
 });
+
+function loadPricingDetails() {
+    postAjaxCall("/pricing-details", {}, function (response) {
+        if (response.flag === 1 && response.data) {
+            const p = response.data;
+            $("#basePrice").val(p.basePrice || 0);
+            $("#perKmCharge").val(p.perKmCharge || 0);
+            $("#peakHourSurcharge").val(p.peakHourSurcharge || 0);
+            $("#peakHourStart").val(p.peakHourStart || "07:00");
+            $("#peakHourEnd").val(p.peakHourEnd || "10:00");
+            $("#eveningPeakStart").val(p.eveningPeakStart || "17:00");
+            $("#eveningPeakEnd").val(p.eveningPeakEnd || "20:00");
+            $("#weekendSurcharge").val(p.weekendSurcharge || 0);
+            $("#platformCommission").val(p.platformCommission || 10);
+            $("#minimumFare").val(p.minimumFare || 0);
+            $("#cancellationFee").val(p.cancellationFee || 0);
+            $("#gstPercentage").val(p.gstPercentage || 18);
+        };
+    });
+};

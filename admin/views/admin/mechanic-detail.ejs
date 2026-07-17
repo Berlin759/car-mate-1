@@ -21,15 +21,14 @@
         <i class="fa-solid fa-arrow-left"></i> Back to List
     </a>
     <div class="d-flex align-items-center gap-2">
-        <% if(body?.mechanic?.status === 2) { %>
-            <span class="bet-status alert-success">Active</span>
-        <% } else if(body?.mechanic?.status === 3) { %>
-            <span class="bet-status alert-end">In Active</span>
-        <% } else if(body?.mechanic?.status === 4) { %>
-            <span class="bet-status alert-end">Suspended</span>
-        <% } else { %>
-            <span class="bet-status alert-pending">Pending</span>
-        <% } %>
+        <label class="text-gray fs-14 mb-0">Status:</label>
+        <input type="hidden" id="mechanic-id" value="<%= body?.mechanic?._id %>">
+        <select id="mechanic-status-select" class="form-select form-select-sm" style="width: auto;">
+            <option value="1" <%= body?.mechanic?.status === 1 ? "selected" : "" %>>Pending</option>
+            <option value="2" <%= body?.mechanic?.status === 2 ? "selected" : "" %>>Active</option>
+            <option value="4" <%= body?.mechanic?.status === 4 ? "selected" : "" %>>Suspended</option>
+        </select>
+        <button type="button" id="update-mechanic-status" class="btn btn-primary btn-sm">Update</button>
     </div>
 </div>
 
@@ -152,6 +151,50 @@
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block">Description</span>
                     <span class="fw-md"><%= body?.mechanic?.description || "-" %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2 bs-border p-4 mt-30">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="mb-0">KYC Information</h6>
+                <% if(body?.kyc) { %>
+                    <a href="/kyc/<%= body?.mechanic?._id %>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                        <i class="fa-solid fa-eye"></i> View KYC Details
+                    </a>
+                <% } %>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">KYC Status</span>
+                    <span class="fw-md">
+                        <% if(body?.kyc?.status === 2) { %>
+                            <span class="bet-status alert-success">Approved</span>
+                        <% } else if(body?.kyc?.status === 3) { %>
+                            <span class="bet-status alert-end">Rejected</span>
+                        <% } else if(body?.kyc) { %>
+                            <span class="bet-status alert-pending">Pending</span>
+                        <% } else { %>
+                            <span class="text-gray">Not Submitted</span>
+                        <% } %>
+                    </span>
+                </div>
+                <% if(body?.kyc?.status === 3 && body?.kyc?.rejectReason) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block">Rejection Reason</span>
+                        <span class="fw-md text-danger"><%= body.kyc.rejectReason %></span>
+                    </div>
+                <% } %>
+                <% if(body?.kyc?.reviewedAt) { %>
+                    <div class="col-md-6 mb-3">
+                        <span class="text-gray fs-14 d-block">Reviewed At</span>
+                        <span class="fw-md"><%= formatDateFull(body?.kyc?.reviewedAt) %></span>
+                    </div>
+                <% } %>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Submitted On</span>
+                    <span class="fw-md"><%= body?.kyc ? formatDateFull(body?.kyc?.createdAt) : "-" %></span>
                 </div>
             </div>
         </div>

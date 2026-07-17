@@ -141,26 +141,6 @@ $(document).on("click", ".remove-subcategory-row-btn", function () {
     $(this).closest(".subcategory-row").remove();
 });
 
-function addSubcategoryRow(id = "", name = "") {
-    const rowHtml = `
-        <div class="subcategory-row p-3 border rounded bg-light position-relative">
-            <input type="hidden" class="subcategory-id" value="${id}" />
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fs-12 fw-semibold text-secondary">Sub-category</span>
-                <button type="button" class="btn btn-sm text-danger remove-subcategory-row-btn p-0 border-0 bg-transparent fs-12">
-                    <i class="fa-solid fa-trash-can"></i> Remove
-                </button>
-            </div>
-            <div class="row g-2">
-                <div class="col-md-12">
-                    <input class="form-control form-control-sm subcategory-name" type="text" placeholder="Enter Sub-category Name" value="${name}">
-                </div>
-            </div>
-        </div>
-    `;
-    $("#subcategory_list_container").append(rowHtml);
-}
-
 $(document).on("click", "#add_service", function () {
     const full_name = $("#addServiceModal #service_name").val().trim();
     const description = $("#addServiceModal #service_description").val().trim();
@@ -328,4 +308,25 @@ function fetchAllServicesList(filterObj = {}) {
     setFilters({ ...filterObj });
     filterData("/service-list", "service-list-table-data");
     toggleResetButtonVisibility("#reset-service-filters", "#service-filter-section");
+};
+
+function addSubcategoryRow(id = "", name = "") {
+    const rowHtml = `
+        <div class="subcategory-row p-3 border rounded bg-light position-relative">
+            <input type="hidden" class="subcategory-id" value="${id}" />
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fs-12 fw-semibold text-secondary">Sub-category</span>
+                <button type="button" class="btn btn-sm text-danger remove-subcategory-row-btn p-0 border-0 bg-transparent fs-12">
+                    <i class="fa-solid fa-trash-can"></i> Remove
+                </button>
+            </div>
+            <div class="row g-2">
+                <div class="col-md-12">
+                    <input class="form-control form-control-sm subcategory-name" type="text" placeholder="Enter Sub-category Name" value="${name}">
+                </div>
+            </div>
+        </div>
+    `;
+
+    $("#subcategory_list_container").append(rowHtml);
 };
