@@ -667,6 +667,25 @@ export const postAllMechanicList = async (req, res) => {
                     preserveNullAndEmptyArrays: true,
                 },
             },
+        ];
+
+        if (param.kycStatus) {
+            if (param.kycStatus === "not_submitted") {
+                aggregatePipeline.push({
+                    $match: {
+                        kycDetails: null,
+                    },
+                });
+            } else {
+                aggregatePipeline.push({
+                    $match: {
+                        "kycDetails.status": parseInt(param.kycStatus),
+                    },
+                });
+            }
+        };
+
+        aggregatePipeline.push(
             {
                 $lookup: {
                     from: "bookings",
@@ -717,7 +736,7 @@ export const postAllMechanicList = async (req, res) => {
                     count: [{ $count: "count" }],
                 },
             },
-        ];
+        );
 
         let [aggregateResp] = await Mechanic.aggregate(aggregatePipeline);
 

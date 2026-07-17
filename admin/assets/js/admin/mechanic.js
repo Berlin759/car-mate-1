@@ -68,6 +68,26 @@ $(document).on("click", "#clear-status-filter", function () {
     fetchAllMechanicList({ status: "" });
 });
 
+// KYC Status Filter Object
+$(document).on("click", ".mechanic-kyc-status-filter", function () {
+    const kycStatus = $(this).data('kyc-status');
+    const kycStatusText = $(this).data('kyc-status-text');
+
+    $("#clear-kyc-status-filter").removeClass("d-none");
+    $("#kyc-status-filter-btn .filter-data").text(kycStatusText).addClass("active");
+    $("#kyc-status-filter-btn .hr-line-sm").addClass("active");
+
+    fetchAllMechanicList({ kycStatus: kycStatus });
+});
+
+$(document).on("click", "#clear-kyc-status-filter", function () {
+    $("#clear-kyc-status-filter").addClass("d-none");
+    $("#kyc-status-filter-btn .filter-data").text("").removeClass("active");
+    $("#kyc-status-filter-btn .hr-line-sm").removeClass("active");
+
+    fetchAllMechanicList({ kycStatus: "" });
+});
+
 $(document).on("click", "#reset-mechanic-filters", function () {
     $("#reset-mechanic-filters").addClass("d-none");
 
@@ -83,7 +103,12 @@ $(document).on("click", "#reset-mechanic-filters", function () {
     $("#status-filter-btn .filter-data").text("").removeClass("active");
     $("#status-filter-btn .hr-line-sm").removeClass("active");
 
-    fetchAllMechanicList({ status: "", email: "" });
+    // KYC Status
+    $("#clear-kyc-status-filter").addClass("d-none");
+    $("#kyc-status-filter-btn .filter-data").text("").removeClass("active");
+    $("#kyc-status-filter-btn .hr-line-sm").removeClass("active");
+
+    fetchAllMechanicList({ status: "", email: "", kycStatus: "" });
 });
 
 $(document).on("click", ".mechanic_delete", function () {

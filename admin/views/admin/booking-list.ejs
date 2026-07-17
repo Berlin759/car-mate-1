@@ -43,39 +43,29 @@
                     <td>
                         <% if(booking?.status === 1) { %>
                             <span class="bet-status alert-pending">Pending</span>
-                        <% } else if(booking?.status === 4) { %>
-                            <span class="bet-status alert-accept">Accepted</span>
-                        <% } else if(booking?.status === 5) { %>
-                            <span class="bet-status alert-accept">En Route</span>
-                        <% } else if(booking?.status === 6) { %>
-                            <span class="bet-status alert-accept">Arrived</span>
-                        <% } else if(booking?.status === 7) { %>
-                            <span class="bet-status alert-accept">In Progress</span>
-                        <% } else if(booking?.status === 8 || booking?.status === 9 || booking?.status === 10) { %>
-                            <span class="bet-status alert-success">Completed</span>
                         <% } else if(booking?.status === 3) { %>
+                            <span class="bet-status alert-accept">Accepted</span>
+                        <% } else if(booking?.status === 4) { %>
+                            <span class="bet-status alert-accept">En Route</span>
+                        <% } else if(booking?.status === 5) { %>
+                            <span class="bet-status alert-accept">Arrived</span>
+                        <% } else if(booking?.status === 6) { %>
+                            <span class="bet-status alert-accept">In Progress</span>
+                        <% } else if(booking?.status === 7 || booking?.status === 8 || booking?.status === 9) { %>
+                            <span class="bet-status alert-success">Completed</span>
+                        <% } else if(booking?.status === 2) { %>
                             <span class="bet-status alert-end">Cancelled</span>
                         <% } else { %>
                             <span class="bet-status alert-gray">Unknown</span>
                         <% } %>
                     </td>
                     <td class="text-center">
-                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                        <div class="d-flex flex-wrap gap-2 justify-content-center">
                             <div class="action-btn">
                                 <a href="javascript:void(0);" class="booking_details_show" data-booking-id="<%= booking?._id %>">
                                     <i class="fa-regular fa-eye"></i>
                                 </a>
                             </div>
-                            <div class="action-btn">
-                                <a href="javascript:void(0);">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </a>
-                            </div>
-                            <!-- <div class="action-btn">
-                                <a href="javascript:void(0);" class="booking_delete" data-booking-id="<%= booking?._id %>">
-                                    <i class="fa-regular fa-trash-can"></i>
-                                </a>
-                            </div> -->
                         </div>
                     </td>
                 </tr>

@@ -1,7 +1,7 @@
 <%- include('../header.ejs') %>
     <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
         <div class="filter-area" id="booking-filter-section">
-            <div class="dropdown filter-dropdown">
+            <div class="dropdown filter-dropdown booking-filter-status">
                 <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="fs-14 fw-md d-flex align-items-center gap-1">
                         <img src="/images/circle-plus.svg" alt="">
@@ -15,10 +15,28 @@
                         <a class="dropdown-item booking-status-filter" data-status="1" data-status-text="Pending">Pending</a>
                     </li>
                     <li>
-                        <a class="dropdown-item booking-status-filter" data-status="2" data-status-text="Confirmed">Confirmed</a>
+                        <a class="dropdown-item booking-status-filter" data-status="3" data-status-text="Accepted">Accepted</a>
                     </li>
                     <li>
-                        <a class="dropdown-item booking-status-filter" data-status="3" data-status-text="Cancelled">Cancelled</a>
+                        <a class="dropdown-item booking-status-filter" data-status="4" data-status-text="Provider EN Route">Provider EN Route</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="5" data-status-text="Arrived">Arrived</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="6" data-status-text="Service Started">Service Started</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="7" data-status-text="Service Completed">Service Completed</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="8" data-status-text="Payment Completed">Payment Completed</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="9" data-status-text="Closed">Closed</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item booking-status-filter" data-status="2" data-status-text="Cancelled">Cancelled</a>
                     </li>
                     <!-- <div class="cl-btn-wrapper">
                         <button class="clear-btn fs-14 fw-normal text-center w-100">

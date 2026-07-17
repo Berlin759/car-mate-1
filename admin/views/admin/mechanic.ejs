@@ -54,6 +54,33 @@
                     </button>
                 </ul>
             </div>
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="kyc-status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        KYC Status
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li>
+                        <a class="dropdown-item mechanic-kyc-status-filter" data-kyc-status="not_submitted" data-kyc-status-text="Not Submitted">Not Submitted</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item mechanic-kyc-status-filter" data-kyc-status="1" data-kyc-status-text="Pending">Pending</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item mechanic-kyc-status-filter" data-kyc-status="2" data-kyc-status-text="Approved">Approved</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item mechanic-kyc-status-filter" data-kyc-status="3" data-kyc-status-text="Rejected">Rejected</a>
+                    </li>
+                    <button id="clear-kyc-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
+                        Clear filters
+                    </button>
+                </ul>
+            </div>
             <button type="button" id="reset-mechanic-filters" class="d-none f-reset-btn fs-14 fw-md bg-transparent">
                 Reset <img src="/images/f-close.svg" alt="">
             </button>

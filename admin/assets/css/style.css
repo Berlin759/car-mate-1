@@ -1627,6 +1627,10 @@ header .ph-right .right-nav-bar {
     border-radius: 7px;
 }
 
+.booking-filter-status .filter-dropdown-menu {
+    width: 180px;
+}
+
 .filter-dropdown-menu.amount-filter {
     width: 320px;
     max-width: 320px;
