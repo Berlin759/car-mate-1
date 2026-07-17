@@ -33,54 +33,6 @@ $(document).on("click", "#reset-car-filters", function () {
     fetchAllCarsList({ status: "", email: "" });
 });
 
-$(document).on("click", ".car_details_show", function () {
-    return;
-    const carId = $(this).data("car-id");
-    if (!carId) {
-        showToast(0, "Invalid car Id");
-        return;
-    };
-
-    /* RESET OLD DATA */
-    $("#car_details_body #car_trx").text("-");
-    $("#car_details_body #car_status").text("-");
-
-    postAjaxCall("/car-details", { carId: carId }, function (response) {
-        if (response.flag !== 1) {
-            showToast(response.flag, response.msg);
-            return;
-        };
-
-        const result = response.data;
-
-        /* Car STATUS */
-        let statusText = "Active";
-        let statusClass = "alert-success";
-
-        if (parseInt(result?.status) === 1) {
-            statusText = "Pending";
-            statusClass = "alert-pending";
-        } else if (parseInt(result?.status) === 3) {
-            statusText = "In Active";
-            statusClass = "alert-gray";
-        } else if (parseInt(result?.status) === 4) {
-            statusText = "Suspended";
-            statusClass = "alert-danger";
-        };
-
-        /* SET DATA */
-        $("#car_details_body #car_trx").text(result?._id || "-");
-
-        $("#car_status")
-            .text(statusText)
-            .removeClass("alert-success alert-danger")
-            .addClass(statusClass);
-
-        /* OPEN MODAL */
-        $("#car_detail_modal").modal("show");
-    });
-});
-
 $(document).on("click", ".car_delete", function () {
     const carId = $(this).data("car-id");
     if (!carId) {

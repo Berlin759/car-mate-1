@@ -439,6 +439,98 @@ export const postUpdateOwner = async (req, res) => {
     };
 };
 
+export const getCarOwnerDetailPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const ownerId = req.params.id;
+
+        if (!ownerId || !ObjectId.isValid(ownerId)) {
+            return res.redirect("/car-owner");
+        };
+
+        let filter = {
+            _id: new ObjectId(ownerId),
+        };
+
+        let ownerPipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    let: { ownerId: "$_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ["$ownerId", "$$ownerId"] }
+                            }
+                        },
+                        {
+                            $count: "total"
+                        }
+                    ],
+                    as: "bookingCount"
+                },
+            },
+            {
+                $addFields: {
+                    totalBooking: {
+                        $ifNull: [{ $arrayElemAt: ["$bookingCount.total", 0] }, 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    fullName: 1,
+                    email: 1,
+                    phoneNumber: 1,
+                    countryCode: 1,
+                    profileImage: 1,
+                    countryName: 1,
+                    address: 1,
+                    description: 1,
+                    status: 1,
+                    totalBooking: 1,
+                    emailVerification: 1,
+                    pushNotification: 1,
+                    isOnline: 1,
+                    lastLoginAt: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                },
+            },
+        ];
+
+        let ownerResp = await Owner.aggregate(ownerPipeline);
+        let owner = ownerResp[0];
+
+        if (!owner) {
+            return res.redirect("/car-owner");
+        };
+
+        return res.render("admin/car-owner-detail", {
+            header: {
+                page: "Car-Owner",
+                admin: admin,
+                title: "Car Owner Details",
+                description: "Car owner detail view",
+                id: "carOwner",
+            },
+            body: {
+                owner: owner,
+            },
+            footer: {
+                js: ["admin/car-owner-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getCarOwnerDetailPage----->", error]);
+        return res.redirect("/car-owner");
+    }
+};
+
 export const postCarOwnerDelete = async (req, res) => {
     try {
         const param = req?.body;
@@ -519,7 +611,6 @@ export const postAddMechanic = async (req, res) => {
         let payload = {
             fullName: fullName,
             phoneNumber: phoneNumber,
-            status: Constants.MECHANIC_STATUS.ACTIVE,
         };
 
         const addNewMechanic = await Mechanic.create(payload);
@@ -747,6 +838,98 @@ export const postMechanicUpdate = async (req, res) => {
         log1(["Error in postMechanicUpdate----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
+};
+
+export const getMechanicDetailPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const mechanicId = req.params.id;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.redirect("/mechanic");
+        };
+
+        let filter = {
+            _id: new ObjectId(mechanicId),
+        };
+
+        let mechanicPipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    let: { mechanicId: "$_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ["$mechanicId", "$$mechanicId"] }
+                            }
+                        },
+                        {
+                            $count: "total"
+                        }
+                    ],
+                    as: "bookingCount"
+                },
+            },
+            {
+                $addFields: {
+                    totalBooking: {
+                        $ifNull: [{ $arrayElemAt: ["$bookingCount.total", 0] }, 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    fullName: 1,
+                    email: 1,
+                    phoneNumber: 1,
+                    countryCode: 1,
+                    profileImage: 1,
+                    countryName: 1,
+                    address: 1,
+                    description: 1,
+                    status: 1,
+                    totalBooking: 1,
+                    emailVerification: 1,
+                    pushNotification: 1,
+                    isOnline: 1,
+                    lastLoginAt: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                },
+            },
+        ];
+
+        let mechanicResp = await Mechanic.aggregate(mechanicPipeline);
+        let mechanic = mechanicResp[0];
+
+        if (!mechanic) {
+            return res.redirect("/mechanic");
+        };
+
+        return res.render("admin/mechanic-detail", {
+            header: {
+                page: "Mechanic",
+                admin: admin,
+                title: "Mechanic Details",
+                description: "Mechanic detail view",
+                id: "carMechanic",
+            },
+            body: {
+                mechanic: mechanic,
+            },
+            footer: {
+                js: ["admin/mechanic-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getMechanicDetailPage----->", error]);
+        return res.redirect("/mechanic");
+    }
 };
 
 export const postMechanicDelete = async (req, res) => {
@@ -1089,6 +1272,85 @@ export const postUpdateCar = async (req, res) => {
         log1(["Error in postUpdateCar----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
+};
+
+export const getCarDetailPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const carId = req.params.id;
+
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.redirect("/cars");
+        };
+
+        let filter = {
+            _id: new ObjectId(carId),
+        };
+
+        let carPipeline = [
+            {
+                $match: filter,
+            },
+            {
+                $project: {
+                    _id: 1,
+                    fullName: 1,
+                    vehicleNumber: 1,
+                    puccNumber: 1,
+                    model: 1,
+                    registerNumber: 1,
+                    chassis: 1,
+                    engine: 1,
+                    vehicleManufacturerName: 1,
+                    vehicleColour: 1,
+                    vehicleType: 1,
+                    vehicleOwnerCount: 1,
+                    ownerPhoneNumber: 1,
+                    rcStatus: 1,
+                    registerDate: 1,
+                    vehicleManufacturingMonthYear: 1,
+                    rcExpiryDate: 1,
+                    vehicleInsuranceCompanyName: 1,
+                    vehicleInsuranceEndDate: 1,
+                    vehicleInsurancePolicyNo: 1,
+                    rcFinancer: 1,
+                    presentAddress: 1,
+                    challanDetails: 1,
+                    nocDetails: 1,
+                    ownerId: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                },
+            },
+        ];
+
+        let carResp = await Car.aggregate(carPipeline);
+        let car = carResp[0];
+
+        if (!car) {
+            return res.redirect("/cars");
+        };
+
+        return res.render("admin/cars-detail", {
+            header: {
+                page: "Cars",
+                admin: admin,
+                title: "Car Details",
+                description: "Car detail view",
+                id: "cars",
+            },
+            body: {
+                car: car,
+            },
+            footer: {
+                js: ["admin/cars-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getCarDetailPage----->", error]);
+        return res.redirect("/cars");
+    }
 };
 
 export const postCarDelete = async (req, res) => {

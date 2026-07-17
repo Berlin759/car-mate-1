@@ -1,0 +1,161 @@
+<%- include('../header.ejs') %>
+
+<%
+    function formatDateFull(date) {
+        if (!date) return "-";
+
+        let d = new Date(date);
+        let day = ("0" + d.getDate()).slice(-2);
+        let month = ("0" + (d.getMonth() + 1)).slice(-2);
+
+        let year = d.getFullYear();
+        let hours = ("0" + d.getHours()).slice(-2);
+        let minutes = ("0" + d.getMinutes()).slice(-2);
+
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
+    };
+%>
+
+<div class="d-flex align-items-center justify-content-between mb-30">
+    <a href="/car-owner" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+        <i class="fa-solid fa-arrow-left"></i> Back to List
+    </a>
+    <div class="d-flex align-items-center gap-2">
+        <% if(body?.owner?.status === 2) { %>
+            <span class="bet-status alert-success">Active</span>
+        <% } else if(body?.owner?.status === 3) { %>
+            <span class="bet-status alert-end">In Active</span>
+        <% } else if(body?.owner?.status === 4) { %>
+            <span class="bet-status alert-end">Suspended</span>
+        <% } else { %>
+            <span class="bet-status alert-pending">Pending</span>
+        <% } %>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="bg-white rounded-2 bs-border p-4 mb-30">
+            <div class="d-flex flex-column align-items-center text-center">
+                <div class="user-avatar-lg text-white mb-3">
+                    <% if(body?.owner?.profileImage) { %>
+                        <img src="<%= body.owner.profileImage %>" alt="Profile" class="rounded-circle" width="80" height="80">
+                    <% } else { %>
+                        <img src="<%= process.env.SERVER_URL + '/images/profile.png' %>" alt="Profile" class="rounded-circle" height="80">
+                    <% } %>
+                </div>
+                <h5 class="mb-1"><%= body?.owner?.fullName || "-" %></h5>
+                <p class="text-gray mb-0"><%= body?.owner?.email || "No email" %></p>
+            </div>
+            <hr>
+            <div class="d-flex flex-column gap-3">
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Phone</span>
+                    <span class="fw-md">
+                        <% if(body?.owner?.phoneNumber) { %>
+                            <%= body?.owner?.countryCode || "+91" %> <%= body?.owner?.phoneNumber %>
+                        <% } else { %>
+                            -
+                        <% } %>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Address</span>
+                    <span class="fw-md text-end" style="max-width: 200px;"><%= body?.owner?.address || "-" %></span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-gray">Country</span>
+                    <span class="fw-md"><%= body?.owner?.countryName || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="bg-white rounded-2 bs-border p-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e8f5e9; width: 48px; height: 48px;">
+                            <i class="fa-solid fa-calendar-check text-success"></i>
+                        </div>
+                        <div>
+                            <span class="fs-14 text-gray d-block">Total Bookings</span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.totalBooking || 0 %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="bg-white rounded-2 bs-border p-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e3f2fd; width: 48px; height: 48px;">
+                            <i class="fa-solid fa-shield-halved text-primary"></i>
+                        </div>
+                        <div>
+                            <span class="fs-14 text-gray d-block">Email Verified</span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.emailVerification === 1 ? "Yes" : "No" %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="bg-white rounded-2 bs-border p-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #fff3e0; width: 48px; height: 48px;">
+                            <i class="fa-solid fa-bell text-warning"></i>
+                        </div>
+                        <div>
+                            <span class="fs-14 text-gray d-block">Push Notifications</span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.pushNotification === 1 ? "Enabled" : "Disabled" %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="bg-white rounded-2 bs-border p-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #f3e5f5; width: 48px; height: 48px;">
+                            <i class="fa-solid fa-wifi text-purple"></i>
+                        </div>
+                        <div>
+                            <span class="fs-14 text-gray d-block">Online Status</span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.isOnline === 1 ? "Online" : "Offline" %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2 bs-border p-4 mt-30">
+            <h6 class="mb-3">Account Information</h6>
+            <hr>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Joined Date</span>
+                    <span class="fw-md">
+                        <%= formatDateFull(body?.owner?.createdAt) || "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Last Updated</span>
+                    <span class="fw-md">
+                        <%= formatDateFull(body?.owner?.updatedAt) || "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Last Login</span>
+                    <span class="fw-md">
+                        <%= body?.owner?.lastLoginAt ? formatDateFull(body?.owner?.lastLoginAt) : "Never" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block">Description</span>
+                    <span class="fw-md"><%= body?.owner?.description || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../footer.ejs') %>

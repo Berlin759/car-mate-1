@@ -1,0 +1,214 @@
+<%- include('../header.ejs') %>
+
+<%
+    function formatDateFull(date) {
+        if (!date) return "-";
+
+        let d = new Date(date);
+        let day = ("0" + d.getDate()).slice(-2);
+        let month = ("0" + (d.getMonth() + 1)).slice(-2);
+
+        let year = d.getFullYear();
+        let hours = ("0" + d.getHours()).slice(-2);
+        let minutes = ("0" + d.getMinutes()).slice(-2);
+
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
+    };
+%>
+
+<div class="d-flex align-items-center justify-content-between mb-30">
+    <a href="/cars" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+        <i class="fa-solid fa-arrow-left"></i> Back to List
+    </a>
+    <div class="d-flex align-items-center gap-2">
+        <% if(body?.car?.status === 1) { %>
+            <span class="bet-status alert-success">Valid</span>
+        <% } else { %>
+            <span class="bet-status alert-end">InValid</span>
+        <% } %>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="bg-white rounded-2 bs-border p-4 mb-30">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e3f2fd; width: 56px; height: 56px;">
+                    <i class="fa-solid fa-car text-primary fs-5"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0"><%= body?.car?.vehicleNumber || "-" %></h5>
+                    <span class="text-gray"><%= body?.car?.model || "-" %> | <%= body?.car?.vehicleManufacturerName || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e8f5e9; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-user text-success"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Owner Name</span>
+                    <span class="fw-md"><%= body?.car?.fullName || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #fff3e0; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-phone text-warning"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Owner Phone</span>
+                    <span class="fw-md"><%= body?.car?.ownerPhoneNumber || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #f3e5f5; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-palette text-purple"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Colour</span>
+                    <span class="fw-md"><%= body?.car?.vehicleColour || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e3f2fd; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-car-side text-primary"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Vehicle Type</span>
+                    <span class="fw-md"><%= body?.car?.vehicleType || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e8f5e9; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-hashtag text-success"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Register Number</span>
+                    <span class="fw-md"><%= body?.car?.registerNumber || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="bg-white rounded-2 bs-border p-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #fff3e0; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-users text-warning"></i>
+                </div>
+                <div>
+                    <span class="fs-14 text-gray d-block">Owner Count</span>
+                    <span class="fw-md"><%= body?.car?.vehicleOwnerCount || "-" %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2 bs-border p-4 mt-30">
+    <h6 class="mb-3">Vehicle Details</h6>
+    <hr>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Chassis Number</span>
+            <span class="fw-md"><%= body?.car?.chassis || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Engine Number</span>
+            <span class="fw-md"><%= body?.car?.engine || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">PUCC Number</span>
+            <span class="fw-md"><%= body?.car?.puccNumber || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Manufacturing Date</span>
+            <span class="fw-md"><%= body?.car?.vehicleManufacturingMonthYear || "-" %></span>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2 bs-border p-4 mt-30">
+    <h6 class="mb-3">RC & Insurance Details</h6>
+    <hr>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">RC Status</span>
+            <span class="fw-md"><%= body?.car?.rcStatus || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">RC Expiry Date</span>
+            <span class="fw-md"><%= body?.car?.rcExpiryDate || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">RC Financer</span>
+            <span class="fw-md"><%= body?.car?.rcFinancer || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Register Date</span>
+            <span class="fw-md"><%= body?.car?.registerDate || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Insurance Company</span>
+            <span class="fw-md"><%= body?.car?.vehicleInsuranceCompanyName || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Insurance End Date</span>
+            <span class="fw-md"><%= body?.car?.vehicleInsuranceEndDate || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Insurance Policy No</span>
+            <span class="fw-md"><%= body?.car?.vehicleInsurancePolicyNo || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">NOC Details</span>
+            <span class="fw-md"><%= body?.car?.nocDetails || "-" %></span>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2 bs-border p-4 mt-30">
+    <h6 class="mb-3">Address & Other Details</h6>
+    <hr>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Present Address</span>
+            <span class="fw-md"><%= body?.car?.presentAddress || "-" %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Created Date</span>
+            <span class="fw-md">
+                <%= formatDateFull(body?.car?.createdAt) || "-" %>
+            </span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Last Updated</span>
+            <span class="fw-md">
+                <%= formatDateFull(body?.car?.updatedAt) || "-" %>
+            </span>
+        </div>
+    </div>
+</div>
+
+<%- include('../footer.ejs') %>

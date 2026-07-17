@@ -7,18 +7,21 @@ import {
 import {
     getDashboardPage,
     getCarOwnerPage,
+    getCarOwnerDetailPage,
     postAddOwner,
     postAllCarOwnerList,
     postCarOwnerDetails,
     postUpdateOwner,
     postCarOwnerDelete,
     getMechanicPage,
+    getMechanicDetailPage,
     postAddMechanic,
     postAllMechanicList,
     postMechanicDetails,
     postMechanicUpdate,
     postMechanicDelete,
     getCarsPage,
+    getCarDetailPage,
     postAddCar,
     postAllCarsList,
     postCarDetails,
@@ -102,6 +105,7 @@ adminRouter.get("/dashboard", authMiddleware, getDashboardPage);
 
 // Car Owner API
 adminRouter.get("/car-owner", authMiddleware, getCarOwnerPage);
+adminRouter.get("/car-owner/:id", authMiddleware, getCarOwnerDetailPage);
 adminRouter.post("/add-owner", authMiddleware, postAddOwner);
 adminRouter.post("/car-owner-list", authMiddleware, postAllCarOwnerList);
 adminRouter.post("/car-owner-details", authMiddleware, postCarOwnerDetails);
@@ -110,6 +114,7 @@ adminRouter.post("/car-owner-delete", authMiddleware, postCarOwnerDelete);
 
 // Mechanic API
 adminRouter.get("/mechanic", authMiddleware, getMechanicPage);
+adminRouter.get("/mechanic/:id", authMiddleware, getMechanicDetailPage);
 adminRouter.post("/add-mechanic", authMiddleware, postAddMechanic);
 adminRouter.post("/mechanic-list", authMiddleware, postAllMechanicList);
 adminRouter.post("/mechanic-details", authMiddleware, postMechanicDetails);
@@ -118,6 +123,7 @@ adminRouter.post("/mechanic-delete", authMiddleware, postMechanicDelete);
 
 // Car API
 adminRouter.get("/cars", authMiddleware, getCarsPage);
+adminRouter.get("/cars/:id", authMiddleware, getCarDetailPage);
 adminRouter.post("/add-car", authMiddleware, postAddCar);
 adminRouter.post("/car-list", authMiddleware, postAllCarsList);
 adminRouter.post("/car-details", authMiddleware, postCarDetails);
