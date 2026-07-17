@@ -126,6 +126,20 @@
     </div>
 </div>
 
+<% if (body?.car?.images && body.car.images.length > 0) { %>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">Car Images</h6>
+        <hr>
+        <div class="d-flex flex-wrap gap-3">
+            <% body.car.images.forEach(function(image) { %>
+                <div>
+                    <img src="<%= image %>" alt="Car Image" class="rounded" style="max-width: 200px; max-height: 200px; object-fit: cover;">
+                </div>
+            <% }); %>
+        </div>
+    </div>
+<% } %>
+
 <div class="bg-white rounded-2 bs-border p-4 mt-30">
     <h6 class="mb-3">Vehicle Details</h6>
     <hr>

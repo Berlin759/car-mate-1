@@ -561,6 +561,27 @@ export const postAddCar = async (req, res) => {
             ownerId: new ObjectId(ownerId._id),
         };
 
+        if (req.files && req.files.images) {
+            let images = req.files.images;
+            if (!Array.isArray(images)) {
+                images = [images];
+            };
+
+            if (images.length > 4) {
+                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
+            };
+
+            let uploadedImages = [];
+            for (const image of images) {
+                const uploadResp = await uploadFile(image);
+                if (uploadResp.flag !== 1) {
+                    return res.status(400).json(uploadResp);
+                };
+                uploadedImages.push(uploadResp.data.url);
+            };
+            payload.images = uploadedImages;
+        };
+
         const addNewCar = await Car.create(payload);
         if (!addNewCar) {
             return res.status(400).json(errorResponse("Failed to add Car."));
@@ -582,10 +603,39 @@ export const postCarList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            startDate,
+            endDate,
+            serviceId,
         } = req.body;
 
         let filter = {
             ownerId: new ObjectId(ownerId),
+        };
+
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) {
+                filter.createdAt.$gte = new Date(startDate);
+            };
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                filter.createdAt.$lte = end;
+            };
+        };
+
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+
+            const carIdsWithService = await Booking.distinct("carId", {
+                ownerId: new ObjectId(ownerId),
+                serviceId: new ObjectId(serviceId),
+                carId: { $ne: null },
+            });
+
+            filter._id = { $in: carIdsWithService };
         };
 
         const skip = (Number(currentPage) - 1) * Number(itemPerPage);
@@ -645,6 +695,7 @@ export const postCarList = async (req, res) => {
                     presentAddress: 1,
                     challanDetails: 1,
                     nocDetails: 1,
+                    images: 1,
                     ownerId: 1,
                     status: 1,
                     createdAt: 1,
@@ -1686,6 +1737,39 @@ export const postUpdateCar = async (req, res) => {
         if (vehicleNumber) updatePayload.vehicleNumber = vehicleNumber;
         if (fuelType) updatePayload.fuelType = fuelType;
         if (vehicleColour) updatePayload.vehicleColour = vehicleColour;
+
+        if (req.files && req.files.images) {
+            let images = req.files.images;
+            if (!Array.isArray(images)) {
+                images = [images];
+            };
+
+            if (images.length > 4) {
+                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
+            };
+
+            if (car.images && car.images.length > 0) {
+                for (const oldImage of car.images) {
+                    const parts = oldImage.split("/");
+                    if (parts.length >= 2) {
+                        const folder = parts[1];
+                        const fileName = parts[2];
+                        await removeFile(folder, fileName);
+                    };
+                };
+            };
+
+            let uploadedImages = [];
+            for (const image of images) {
+                const uploadResp = await uploadFile(image);
+                if (uploadResp.flag !== 1) {
+                    return res.status(400).json(uploadResp);
+                };
+                uploadedImages.push(uploadResp.data.url);
+            };
+            updatePayload.images = uploadedImages;
+        };
+
         if (Object.keys(updatePayload).length === 0) {
             return res.status(400).json(errorResponse("No fields to update."));
         };

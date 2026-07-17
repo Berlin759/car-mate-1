@@ -1086,6 +1086,27 @@ export const postAddCar = async (req, res) => {
             status: vehicleDetails.status === "VALID" ? Constants.CAR_STATUS.VALID : Constants.CAR_STATUS.INVALID,
         };
 
+        if (req.files && req.files.images) {
+            let images = req.files.images;
+            if (!Array.isArray(images)) {
+                images = [images];
+            };
+
+            if (images.length > 4) {
+                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
+            };
+
+            let uploadedImages = [];
+            for (const image of images) {
+                const uploadResp = await uploadFile(image);
+                if (uploadResp.flag !== 1) {
+                    return res.status(400).json(uploadResp);
+                };
+                uploadedImages.push(uploadResp.data.url);
+            };
+            payload.images = uploadedImages;
+        };
+
         const addNewCar = await Car.create(payload);
         if (!addNewCar) {
             return res.status(400).json(errorResponse("Failed to add Car."));
@@ -1308,6 +1329,38 @@ export const postUpdateCar = async (req, res) => {
             status: vehicleDetails.status === "VALID" ? Constants.CAR_STATUS.VALID : Constants.CAR_STATUS.INVALID,
         };
 
+        if (req.files && req.files.images) {
+            let images = req.files.images;
+            if (!Array.isArray(images)) {
+                images = [images];
+            };
+
+            if (images.length > 4) {
+                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
+            };
+
+            if (carDetails.images && carDetails.images.length > 0) {
+                for (const oldImage of carDetails.images) {
+                    const parts = oldImage.split("/");
+                    if (parts.length >= 2) {
+                        const folder = parts[1];
+                        const fileName = parts[2];
+                        await removeFile(folder, fileName);
+                    };
+                };
+            };
+
+            let uploadedImages = [];
+            for (const image of images) {
+                const uploadResp = await uploadFile(image);
+                if (uploadResp.flag !== 1) {
+                    return res.status(400).json(uploadResp);
+                };
+                uploadedImages.push(uploadResp.data.url);
+            };
+            payload.images = uploadedImages;
+        };
+
         const updateCar = await Car.findOneAndUpdate(filter, payload);
         if (!updateCar) {
             return res.status(400).json(errorResponse("Failed to update vehicle number."));
@@ -1363,6 +1416,7 @@ export const getCarDetailPage = async (req, res) => {
                     presentAddress: 1,
                     challanDetails: 1,
                     nocDetails: 1,
+                    images: 1,
                     ownerId: 1,
                     status: 1,
                     createdAt: 1,

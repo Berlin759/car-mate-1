@@ -73,11 +73,15 @@ $(document).on("click", "#add_car", function () {
         return;
     };
 
-    const payload = {
-        vehicle_number: vehicle_number,
+    const formData = new FormData();
+    formData.append("vehicle_number", vehicle_number);
+
+    const files = $("#addCarModal #car_images")[0].files;
+    for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
     };
 
-    postAjaxCall("/add-car", payload, function (response) {
+    postFileCall("/add-car", formData, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -133,12 +137,16 @@ $(document).on("click", "#update_car", function () {
         return;
     };
 
-    const payload = {
-        carId: carId,
-        vehicle_number: vehicle_number,
+    const formData = new FormData();
+    formData.append("carId", carId);
+    formData.append("vehicle_number", vehicle_number);
+
+    const files = $("#addCarModal #car_images")[0].files;
+    for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
     };
 
-    postAjaxCall("/car-update", payload, function (response) {
+    postFileCall("/car-update", formData, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -154,6 +162,7 @@ $(document).on("click", "#update_car", function () {
 function resetAddCarModal() {
     $("#addCarModal #car_id").val("");
     $("#addCarModal #vehicle_number").val("");
+    $("#addCarModal #car_images").val("");
 };
 
 function fetchAllCarsList(filterObj = {}) {

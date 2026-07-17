@@ -109,6 +109,11 @@ const carSchema = new Schema(
             type: String,
             default: "",
         },
+        images: [
+            {
+                type: String,
+            },
+        ],
         status: {
             type: Number,
             enum: Object.values(Constants.CAR_STATUS),
