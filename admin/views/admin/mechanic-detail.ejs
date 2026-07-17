@@ -131,25 +131,25 @@
             <hr>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">Joined Date</span>
+                    <span class="text-gray fs-14 d-block mb-2">Joined Date</span>
                     <span class="fw-md">
                         <%= formatDateFull(body?.mechanic?.createdAt) || "-" %>
                     </span>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">Last Updated</span>
+                    <span class="text-gray fs-14 d-block mb-2">Last Updated</span>
                     <span class="fw-md">
                         <%= formatDateFull(body?.mechanic?.updatedAt) || "-" %>
                     </span>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">Last Login</span>
+                    <span class="text-gray fs-14 d-block mb-2">Last Login</span>
                     <span class="fw-md">
                         <%= body?.mechanic?.lastLoginAt ? formatDateFull(body?.mechanic?.lastLoginAt) : "Never" %>
                     </span>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">Description</span>
+                    <span class="text-gray fs-14 d-block mb-2">Description</span>
                     <span class="fw-md"><%= body?.mechanic?.description || "-" %></span>
                 </div>
             </div>
@@ -158,16 +158,22 @@
         <div class="bg-white rounded-2 bs-border p-4 mt-30">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h6 class="mb-0">KYC Information</h6>
-                <% if(body?.kyc) { %>
-                    <a href="/kyc/<%= body?.mechanic?._id %>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
-                        <i class="fa-solid fa-eye"></i> View KYC Details
-                    </a>
-                <% } %>
+                <div class="d-flex align-items-center gap-2">
+                    <% if(!body?.kyc) { %>
+                        <a href="/kyc/add/<%= body?.mechanic?._id %>" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Submit KYC
+                        </a>
+                    <% } else { %>
+                        <a href="/kyc/<%= body?.mechanic?._id %>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-eye"></i> View KYC Details
+                        </a>
+                    <% } %>
+                </div>
             </div>
             <hr>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">KYC Status</span>
+                    <span class="text-gray fs-14 d-block mb-2">KYC Status</span>
                     <span class="fw-md">
                         <% if(body?.kyc?.status === 2) { %>
                             <span class="bet-status alert-success">Approved</span>
@@ -182,18 +188,18 @@
                 </div>
                 <% if(body?.kyc?.status === 3 && body?.kyc?.rejectReason) { %>
                     <div class="col-md-6 mb-3">
-                        <span class="text-gray fs-14 d-block">Rejection Reason</span>
+                        <span class="text-gray fs-14 d-block mb-2">Rejection Reason</span>
                         <span class="fw-md text-danger"><%= body.kyc.rejectReason %></span>
                     </div>
                 <% } %>
                 <% if(body?.kyc?.reviewedAt) { %>
                     <div class="col-md-6 mb-3">
-                        <span class="text-gray fs-14 d-block">Reviewed At</span>
+                        <span class="text-gray fs-14 d-block mb-2">Reviewed At</span>
                         <span class="fw-md"><%= formatDateFull(body?.kyc?.reviewedAt) %></span>
                     </div>
                 <% } %>
                 <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block">Submitted On</span>
+                    <span class="text-gray fs-14 d-block mb-2">Submitted On</span>
                     <span class="fw-md"><%= body?.kyc ? formatDateFull(body?.kyc?.createdAt) : "-" %></span>
                 </div>
             </div>

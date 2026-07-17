@@ -23,6 +23,7 @@
                 <th>Phone</th>
                 <th>Bookings</th>
                 <th>Joined</th>
+                <th>KYC Status</th>
                 <th>Status</th>
                 <th>Action</th>
             </tr>
@@ -44,6 +45,17 @@
                         </td>
                         <td><%= item?.totalBooking || 0 %></td>
                         <td><%= formatDate(item?.createdAt) || "-" %></td>
+                        <td>
+                            <% if(item?.kycDetails?.status === 2) { %>
+                                <span class="bet-status alert-success">Approved</span>
+                            <% } else if(item?.kycDetails?.status === 3) { %>
+                                <span class="bet-status alert-end">Rejected</span>
+                            <% } else if(item?.kycDetails) { %>
+                                <span class="bet-status alert-pending">Pending</span>
+                            <% } else { %>
+                                <span class="bet-status alert-gray">Not Submitted</span>
+                            <% } %>
+                        </td>
                         <td>
                             <% if(item?.status === 2) { %>
                                 <span class="bet-status alert-success">Active</span>

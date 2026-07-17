@@ -885,7 +885,8 @@ span.bet-status {
 }
 
 .bet-status.alert-gray {
-    color: #707070;
+    /* color: #707070; */
+    color: #000000;
     background-color: #F3F3F3;
     border-color: #d6d8db;
 }

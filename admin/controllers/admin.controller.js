@@ -648,6 +648,27 @@ export const postAllMechanicList = async (req, res) => {
             },
             {
                 $lookup: {
+                    from: "kycs",
+                    localField: "_id",
+                    foreignField: "mechanicId",
+                    as: "kycDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$kycDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
                     from: "bookings",
                     let: { mechanicId: "$_id" },
                     pipeline: [
@@ -681,6 +702,7 @@ export const postAllMechanicList = async (req, res) => {
                     address: 1,
                     status: 1,
                     totalBooking: 1,
+                    kycDetails: 1,
                     createdAt: 1,
                     updatedAt: 1,
                 },
@@ -3305,6 +3327,124 @@ export const getKYCDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getKYCDetailPage----->", error]);
         return res.redirect("/kyc");
+    }
+};
+
+export const getAddKYCPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const mechanicId = req.params.id;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.redirect("/mechanic");
+        };
+
+        let mechanic = await Mechanic.findById(mechanicId)
+            .select("fullName email phoneNumber countryCode profileImage")
+            .lean();
+
+        if (!mechanic) {
+            return res.redirect("/mechanic");
+        };
+
+        let existingKyc = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
+        if (existingKyc) {
+            return res.redirect("/kyc/" + mechanicId);
+        };
+
+        return res.render("admin/kyc-add", {
+            header: {
+                page: "KYC Review",
+                admin: admin,
+                title: "Submit KYC",
+                description: "Submit KYC for mechanic",
+                id: "kyc",
+            },
+            body: {
+                mechanic: mechanic,
+            },
+            footer: {
+                js: ["admin/kyc-add.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getAddKYCPage----->", error]);
+        return res.redirect("/mechanic");
+    }
+};
+
+export const postSubmitKYC = async (req, res) => {
+    try {
+        const { mechanicId, bankAccountHolderName, bankName, bankAccountNumber, bankIfscCode } = req.body;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic Id."));
+        };
+
+        let mechanic = await Mechanic.findById(mechanicId);
+        if (!mechanic) {
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+
+        let existingKyc = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
+        if (existingKyc) {
+            return res.status(400).json(errorResponse("KYC already submitted for this mechanic."));
+        };
+
+        let aadhaarFrontUrl = "";
+        let aadhaarBackUrl = "";
+        let panCardUrl = "";
+        let drivingLicenseUrl = "";
+        let selfieUrl = "";
+
+        if (req.files?.aadhaarFront) {
+            const uploaded = await uploadFile(req.files.aadhaarFront);
+            if (uploaded.flag !== 0) aadhaarFrontUrl = uploaded.data.url;
+        };
+
+        if (req.files?.aadhaarBack) {
+            const uploaded = await uploadFile(req.files.aadhaarBack);
+            if (uploaded.flag !== 0) aadhaarBackUrl = uploaded.data.url;
+        };
+
+        if (req.files?.panCard) {
+            const uploaded = await uploadFile(req.files.panCard);
+            if (uploaded.flag !== 0) panCardUrl = uploaded.data.url;
+        };
+
+        if (req.files?.drivingLicense) {
+            const uploaded = await uploadFile(req.files.drivingLicense);
+            if (uploaded.flag !== 0) drivingLicenseUrl = uploaded.data.url;
+        };
+
+        if (req.files?.selfie) {
+            const uploaded = await uploadFile(req.files.selfie);
+            if (uploaded.flag !== 0) selfieUrl = uploaded.data.url;
+        };
+
+        let payload = {
+            mechanicId: new ObjectId(mechanicId),
+            aadhaarFront: aadhaarFrontUrl,
+            aadhaarBack: aadhaarBackUrl,
+            panCard: panCardUrl,
+            drivingLicense: drivingLicenseUrl,
+            selfie: selfieUrl,
+            bankAccountHolderName: bankAccountHolderName || "",
+            bankName: bankName || "",
+            bankAccountNumber: bankAccountNumber || "",
+            bankIfscCode: bankIfscCode || "",
+            status: Constants.KYC_STATUS.PENDING,
+        };
+
+        let newKyc = await KYC.create(payload);
+        if (!newKyc) {
+            return res.status(400).json(errorResponse("Failed to submit KYC."));
+        };
+
+        return res.status(200).json(successResponse("KYC submitted successfully!"));
+    } catch (error) {
+        log1(["Error in postSubmitKYC----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
     }
 };
 
