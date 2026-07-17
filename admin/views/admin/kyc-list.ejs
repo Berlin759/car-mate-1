@@ -17,8 +17,10 @@
             <tr>
                 <th>#</th>
                 <th>Mechanic Name</th>
-                <th>Document Type</th>
-                <th>Document Number</th>
+                <th>Account Holder Name</th>
+                <th>Bank Name</th>
+                <th>Account Number</th>
+                <th>IFSC Code</th>
                 <th>Status</th>
                 <th>Submitted</th>
                 <th>Action</th>
@@ -31,11 +33,13 @@
                     <tr>
                         <td><%= start_index %></td>
                         <td>
-                            <strong><%= item?.mechanicDetails?.[0]?.fullName || "-" %></strong>
-                            <div class="text-muted fs-12"><%= item?.mechanicDetails?.[0]?.phoneNumber || "" %></div>
+                            <strong><%= item?.mechanicDetails?.fullName || "-" %></strong>
+                            <div class="text-muted fs-12"><%= item?.mechanicDetails?.phoneNumber || "" %></div>
                         </td>
-                        <td><%= item?.documentType || "-" %></td>
-                        <td><%= item?.documentNumber || "-" %></td>
+                        <td><%= item?.bankAccountHolderName || "-" %></td>
+                        <td><%= item?.bankName || "-" %></td>
+                        <td><%= item?.bankAccountNumber || "-" %></td>
+                        <td><%= item?.bankIfscCode || "-" %></td>
                         <td>
                             <% if(item?.status === 2) { %>
                                 <span class="bet-status alert-success">Approved</span>
@@ -48,7 +52,7 @@
                         <td><%= formatDate(item?.createdAt) || "-" %></td>
                         <td class="text-end">
                             <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                                <a href="/kyc/<%= item?.mechanicId %>" class="view-kyc-details" title="View Details">
+                                <a href="/kyc/<%= item?._id %>" class="view-kyc-details" title="View Details">
                                     <i class="fa-regular fa-eye"></i>
                                 </a>
                             </div>

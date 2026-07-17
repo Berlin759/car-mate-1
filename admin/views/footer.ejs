@@ -168,7 +168,7 @@
                 <div class="modal-header border-0">
                     <div class="modal-text">
                         <h5 class="modal-title mb-1">Review Details</h5>
-                        <p class="text-gray mb-0">Review by Alice Brown</p>
+                        <p class="text-gray mb-0" id="review_owner_name">-</p>
                     </div>
                     <div class="modal-cl">
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
@@ -185,34 +185,26 @@
                     <div class="divider"></div>
                     <div class="info-grid d-flex flex-wrap">
                         <div class="in-grd-item">
-                            <p class="mb-1 text-gray">Guest</p>
-                            <div class="value">Alice Brown</div>
+                            <p class="mb-1 text-gray">Mechanic</p>
+                            <div class="value" id="review_mechanic_name">-</div>
+                        </div>
+                        <div class="in-grd-item">
+                            <p class="mb-1 text-gray">Service</p>
+                            <div class="value" id="review_service_name">-</div>
                         </div>
                         <div class="in-grd-item">
                             <p class="mb-1 text-gray">Rating</p>
-                            <div class="d-flex align-items-center">
-                                <img src="/images/star.svg" alt="">
-                                <img src="/images/star.svg" alt="">
-                                <img src="/images/star.svg" alt="">
-                                <img src="/images/star.svg" alt="">
-                                <img src="/images/star.svg" alt="">
-                            </div>
-                        </div>
-                        <div class="in-grd-item">
-                            <p class="mb-1 text-gray">Status</p>
-                            <span class="bet-status alert-accept">Approved</span>
+                            <div class="d-flex align-items-center" id="review_rating"></div>
                         </div>
                         <div class="in-grd-item">
                             <p class="mb-1 text-gray">Date</p>
-                            <div class="value">2026-03-09</div>
+                            <div class="value" id="review_date">-</div>
                         </div>
                     </div>
                     <div class="divider"></div>
                     <div class="address mt-20">
                         <p class="mb-1 text-gray">Comment</p>
-                        <div class="value">
-                            Exceptional stay! The service was impeccable and the slot was spotless.
-                        </div>
+                        <div class="value" id="review_description">-</div>
                     </div>
                 </div>
             </div>

@@ -6,7 +6,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Total Reviews</span>
-                            <span class="sd-data">3</span>
+                            <span class="sd-data"><%= body?.totalReviews || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
@@ -23,7 +23,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
                             <span class="sd-title fs-14 d-block">Avg. Rating</span>
-                            <span class="sd-data">3.8</span>
+                            <span class="sd-data"><%= body?.avgRating || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
@@ -39,8 +39,8 @@
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
-                            <span class="sd-title fs-14 d-block">Pending</span>
-                            <span class="sd-data">1</span>
+                            <span class="sd-title fs-14 d-block">5 Star Reviews</span>
+                            <span class="sd-data"><%= body?.fiveStarCount || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
@@ -56,8 +56,8 @@
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
-                            <span class="sd-title fs-14 d-block">Approved</span>
-                            <span class="sd-data">2</span>
+                            <span class="sd-title fs-14 d-block">1 Star Reviews</span>
+                            <span class="sd-data"><%= body?.oneStarCount || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
@@ -71,95 +71,61 @@
             </div>
         </div>
     </div>
-    <div class="card latest-reviews">
-        <div class="review-item">
-            <div class="review-text">
-                <div class="d-flex gap-3">
-                    <h4>Alice Brown</h4>
-                    <span class="bet-status alert-gray">Pending</span>
-                </div>
-                <p class="parking mb-1">Grand Palace</p>
-                <p class="feedback mb-1">Exceptional stay! The service was impeccable.</p>
-                <p class="feedback">2026-03-09</p>
-                <div class="stars">
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                </div>
+    <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
+        <div class="filter-area" id="review-filter-section">
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="rating-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Rating
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li>
+                        <a class="dropdown-item review-rating-filter" data-rating="5" data-rating-text="5 Star">5 Star</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item review-rating-filter" data-rating="4" data-rating-text="4 Star">4 Star</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item review-rating-filter" data-rating="3" data-rating-text="3 Star">3 Star</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item review-rating-filter" data-rating="2" data-rating-text="2 Star">2 Star</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item review-rating-filter" data-rating="1" data-rating-text="1 Star">1 Star</a>
+                    </li>
+                    <button id="clear-rating-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
+                        Clear filters
+                    </button>
+                </ul>
             </div>
-            <div class="d-flex gap-1">
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#reviews-modal">
-                        <i class="fa-regular fa-eye"></i>
-                    </a>
-                </div>
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);"><i class="fa-regular fa-trash-can"></i></a>
-                </div>
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);"><i class="fa-solid fa-check"></i></i></a>
-                </div>
-            </div>
+            <button type="button" id="reset-review-filters" class="d-none f-reset-btn fs-14 fw-md bg-transparent">
+                Reset <img src="/images/f-close.svg" alt="">
+            </button>
         </div>
-        <div class="divider"></div>
-        <div class="review-item">
-            <div class="review-text">
-                <div class="d-flex gap-3">
-                    <h4>Alice Brown</h4>
-                    <span class="bet-status alert-accept">Approved</span>
-                </div>
-                <p class="parking mb-1">Grand Palace</p>
-                <p class="feedback mb-1">Exceptional stay! The service was impeccable.</p>
-                <p class="feedback">2026-03-09</p>
-                <div class="stars">
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                </div>
+        <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+            <div class="pagination-show d-flex align-items-center" id="pagination-div-review-list-table-data">
+                Show
+                <select
+                    id="recordPerPage-review-list-table-data"
+                    class="form-select form-select-sm w-auto"
+                    onchange="changeRecordPerPage('/review-list', 'review-list-table-data')"
+                >
+                    <option selected="">10</option>
+                    <option value="20">20</option>
+                    <option value="40">40</option>
+                    <option value="60">60</option>
+                </select>
             </div>
-            <div class="d-flex gap-1">
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#reviews-modal">
-                        <i class="fa-regular fa-eye"></i>
-                    </a>
-                </div>
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);"><i class="fa-regular fa-trash-can"></i></a>
-                </div>
-            </div>
-        </div>
-        <div class="divider"></div>
-        <div class="review-item">
-            <div class="review-text">
-                <div class="d-flex gap-3">
-                    <h4>Alice Brown</h4>
-                    <span class="bet-status alert-accept">Approved</span>
-                </div>
-                <p class="parking mb-1">Grand Palace</p>
-                <p class="feedback mb-1">Exceptional stay! The service was impeccable.</p>
-                <p class="feedback">2026-03-09</p>
-                <div class="stars">
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                    <i class="fa-solid fa-star"></i>
-                </div>
-            </div>
-            <div class="d-flex gap-1">
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#reviews-modal">
-                        <i class="fa-regular fa-eye"></i>
-                    </a>
-                </div>
-                <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
-                    <a href="javascript:void(0);"><i class="fa-regular fa-trash-can"></i></a>
-                </div>
+            <div class="page navigation example">
+                <ul class="pagination justify-content-end mb-0 gap-0"></ul>
             </div>
         </div>
     </div>
+    <div class="admin-table review-list-table mt-30" id="review-list-table-data"></div>
+
 <%- include('../footer.ejs') %>

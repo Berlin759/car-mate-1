@@ -2592,42 +2592,18 @@ export const postTransactionDetails = async (req, res) => {
     }
 };
 
-export const getReviewPage = async (req, res) => {
+export const getBookingDetailPage = async (req, res) => {
     try {
         const admin = req.session.admin;
+        const bookingId = req.params.id;
 
-        const page = Constants.DEFAULT_PAGE;
-        const limit = 10;
-        const skip = 0;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.redirect("/bookings");
+        };
 
-        const aggregatePipeline = [
+        const pipeline = [
             {
-                $lookup: {
-                    from: "owners",
-                    localField: "ownerId",
-                    foreignField: "_id",
-                    as: "ownerDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$ownerDetails",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "mechanics",
-                    localField: "mechanicId",
-                    foreignField: "_id",
-                    as: "mechanicDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$mechanicDetails",
-                    preserveNullAndEmptyArrays: true,
-                },
+                $match: { _id: new ObjectId(bookingId) },
             },
             {
                 $lookup: {
@@ -2644,37 +2620,329 @@ export const getReviewPage = async (req, res) => {
                 },
             },
             {
-                $sort: { createdAt: -1 },
-            },
-            {
-                $facet: {
-                    result: [
-                        { $skip: skip },
-                        { $limit: limit },
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
                         {
                             $project: {
-                                _id: 1,
-                                rating: 1,
-                                description: 1,
-                                isRead: 1,
-                                createdAt: 1,
-                                "ownerDetails._id": 1,
-                                "ownerDetails.fullName": 1,
-                                "ownerDetails.phoneNumber": 1,
-                                "mechanicDetails._id": 1,
-                                "mechanicDetails.fullName": 1,
-                                "mechanicDetails.phoneNumber": 1,
-                                "serviceDetails._id": 1,
-                                "serviceDetails.fullName": 1,
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
                             },
                         },
                     ],
-                    count: [{ $count: "count" }],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                                vehicleManufacturerName: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    invoiceNo: 1,
+                    date: 1,
+                    time: 1,
+                    address: 1,
+                    latitude: 1,
+                    longitude: 1,
+                    basePrice: 1,
+                    distanceCharge: 1,
+                    peakHourFee: 1,
+                    materialCost: 1,
+                    taxAmount: 1,
+                    discountAmount: 1,
+                    cancelFee: 1,
+                    totalAmount: 1,
+                    paymentMethod: 1,
+                    beforePhotos: 1,
+                    afterPhotos: 1,
+                    startTime: 1,
+                    endTime: 1,
+                    cancelReason: 1,
+                    cancelTime: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
                 },
             },
         ];
 
-        const [aggregateResp] = await Rating.aggregate(aggregatePipeline);
+        const [booking] = await Booking.aggregate(pipeline);
+
+        if (!booking) {
+            return res.redirect("/bookings");
+        };
+
+        return res.render("admin/booking-detail", {
+            header: {
+                page: "Bookings",
+                admin: admin,
+                title: "Booking Details",
+                description: "Booking detail view",
+                id: "bookings",
+            },
+            body: {
+                booking: booking,
+            },
+            footer: {
+                js: ["admin/booking-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getBookingDetailPage----->", error]);
+        return res.redirect("/bookings");
+    }
+};
+
+export const getTransactionDetailPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const transactionId = req.params.id;
+
+        if (!transactionId || !ObjectId.isValid(transactionId)) {
+            return res.redirect("/transactions");
+        };
+
+        const pipeline = [
+            {
+                $match: { _id: new ObjectId(transactionId) },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceNo: 1,
+                                date: 1,
+                                time: 1,
+                                totalAmount: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    invoiceId: 1,
+                    trxId: 1,
+                    totalAmount: 1,
+                    adminCharge: 1,
+                    description: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
+                    bookingDetails: 1,
+                },
+            },
+        ];
+
+        const [transaction] = await Transaction.aggregate(pipeline);
+
+        if (!transaction) {
+            return res.redirect("/transactions");
+        };
+
+        return res.render("admin/transaction-detail", {
+            header: {
+                page: "Transactions",
+                admin: admin,
+                title: "Transaction Details",
+                description: "Transaction detail view",
+                id: "transactions",
+            },
+            body: {
+                transaction: transaction,
+            },
+            footer: {
+                js: ["admin/transaction-detail.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getTransactionDetailPage----->", error]);
+        return res.redirect("/transactions");
+    }
+};
+
+export const getReviewPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        const [statsResult] = await Rating.aggregate([
+            {
+                $facet: {
+                    totalReviews: [{ $count: "count" }],
+                    avgRating: [{ $group: { _id: null, avg: { $avg: "$rating" } } }],
+                    fiveStarCount: [{ $match: { rating: 5 } }, { $count: "count" }],
+                    oneStarCount: [{ $match: { rating: 1 } }, { $count: "count" }],
+                },
+            },
+        ]);
 
         return res.render("admin/reviews", {
             header: {
@@ -2685,8 +2953,10 @@ export const getReviewPage = async (req, res) => {
                 id: "reviews",
             },
             body: {
-                reviewList: aggregateResp.result || [],
-                totalReviews: aggregateResp.count[0]?.count || 0,
+                totalReviews: statsResult.totalReviews[0]?.count || 0,
+                avgRating: statsResult.avgRating[0]?.avg ? statsResult.avgRating[0].avg.toFixed(1) : "0.0",
+                fiveStarCount: statsResult.fiveStarCount[0]?.count || 0,
+                oneStarCount: statsResult.oneStarCount[0]?.count || 0,
             },
             footer: {
                 js: ["admin/reviews.js"],
@@ -3264,15 +3534,32 @@ export const getKYCPage = async (req, res) => {
 export const getKYCDetailPage = async (req, res) => {
     try {
         const admin = req.session.admin;
-        const mechanicId = req.params.id;
+        const paramId = req.params.id;
 
-        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+        if (!paramId || !ObjectId.isValid(paramId)) {
             return res.redirect("/kyc");
+        };
+
+        let filter = {};
+        let text = "";
+
+        let mechanicDetails = await Mechanic.findById(paramId);
+        if (mechanicDetails) {
+            filter["mechanicId"] = new ObjectId(paramId);
+            text = "Mechanic";
+        } else {
+            let kycDetails = await KYC.findById(paramId);
+            if (kycDetails) {
+                filter["_id"] = new ObjectId(paramId);
+                text = "KYC";
+            } else {
+                return res.redirect("/kyc");
+            };
         };
 
         let kycPipeline = [
             {
-                $match: { mechanicId: new ObjectId(mechanicId) },
+                $match: filter,
             },
             {
                 $lookup: {
@@ -3338,6 +3625,7 @@ export const getKYCDetailPage = async (req, res) => {
             },
             body: {
                 kyc: kyc,
+                text: text,
             },
             footer: {
                 js: ["admin/kyc-detail.js"],
@@ -3561,62 +3849,6 @@ export const postPendingKYCList = async (req, res) => {
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postPendingKYCList----->", error]);
-        return res.json(errorResponse(messages.unexpectedDataError));
-    }
-};
-
-export const postKYCDetails = async (req, res) => {
-    try {
-        const param = req?.body;
-
-        if (!param?.mechanicId) {
-            return res.json(errorResponse("Invalid mechanic Id"));
-        };
-
-        let filter = {
-            mechanicId: new ObjectId(param.mechanicId),
-        };
-
-        let kycPipeline = [
-            {
-                $match: filter,
-            },
-            {
-                $lookup: {
-                    from: "mechanics",
-                    localField: "mechanicId",
-                    foreignField: "_id",
-                    as: "mechanicDetails",
-                    pipeline: [
-                        {
-                            $project: {
-                                fullName: 1,
-                                email: 1,
-                                phoneNumber: 1,
-                                profileImage: 1,
-                                status: 1,
-                            },
-                        },
-                    ],
-                },
-            },
-            {
-                $unwind: {
-                    path: "$mechanicDetails",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-        ];
-
-        let kycResp = await KYC.aggregate(kycPipeline);
-
-        if (!kycResp || kycResp.length === 0) {
-            return res.status(404).json(errorResponse("KYC details not found."));
-        }
-
-        return res.status(200).json(successResponse("KYC details get successfully!", kycResp[0]));
-    } catch (error) {
-        log1(["Error in postKYCDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
     }
 };

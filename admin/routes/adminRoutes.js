@@ -34,10 +34,12 @@ import {
     postServiceUpdate,
     postServiceDelete,
     getBookingPage,
+    getBookingDetailPage,
     postAllBookingList,
     postBookingDetails,
     postDeleteBooking,
     getTransactionPage,
+    getTransactionDetailPage,
     postAllTransactionList,
     postTransactionDetails,
     getReviewPage,
@@ -92,7 +94,6 @@ import {
     getAddKYCPage,
     postSubmitKYC,
     postPendingKYCList,
-    postKYCDetails,
     postApproveKYC,
     postRejectKYC,
 } from "../controllers/admin.controller.js";
@@ -143,12 +144,14 @@ adminRouter.post("/service-delete", authMiddleware, postServiceDelete);
 
 // Booking API
 adminRouter.get("/bookings", authMiddleware, getBookingPage);
+adminRouter.get("/booking/:id", authMiddleware, getBookingDetailPage);
 adminRouter.post("/booking-list", authMiddleware, postAllBookingList);
 adminRouter.post("/booking-details", authMiddleware, postBookingDetails);
 adminRouter.post("/booking-delete", authMiddleware, postDeleteBooking);
 
 // Transaction API
 adminRouter.get("/transactions", authMiddleware, getTransactionPage);
+adminRouter.get("/transaction/:id", authMiddleware, getTransactionDetailPage);
 adminRouter.post("/transaction-list", authMiddleware, postAllTransactionList);
 adminRouter.post("/transaction-details", authMiddleware, postTransactionDetails);
 
@@ -163,7 +166,6 @@ adminRouter.get("/kyc/add/:id", authMiddleware, getAddKYCPage);
 adminRouter.get("/kyc/:id", authMiddleware, getKYCDetailPage);
 adminRouter.post("/kyc/submit", authMiddleware, postSubmitKYC);
 adminRouter.post("/kyc-list", authMiddleware, postPendingKYCList);
-adminRouter.post("/kyc-details", authMiddleware, postKYCDetails);
 adminRouter.post("/kyc-approve", authMiddleware, postApproveKYC);
 adminRouter.post("/kyc-reject", authMiddleware, postRejectKYC);
 
