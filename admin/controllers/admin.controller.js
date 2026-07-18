@@ -4712,10 +4712,22 @@ export const postAddFaq = async (req, res) => {
     try {
         const { question, answer, category, sortOrder } = req.body;
 
+        if (!question || question.trim() === "") {
+            return res.status(400).json(errorResponse("Question is required."));
+        };
+
+        if (!answer || answer.trim() === "") {
+            return res.status(400).json(errorResponse("Answer is required."));
+        };
+
+        if (!category || category.trim() === "") {
+            return res.status(400).json(errorResponse("Category is required."));
+        };
+
         const payload = {
-            question: question,
-            answer: answer,
-            category: category,
+            question: question.trim(),
+            answer: answer.trim(),
+            category: category.trim(),
             sortOrder: parseInt(sortOrder || 0),
         };
 
@@ -4776,14 +4788,70 @@ export const postDeleteFaq = async (req, res) => {
     }
 };
 
+export const postToggleFaqStatus = async (req, res) => {
+    try {
+        const { faqId, isActive } = req.body;
+
+        if (!faqId) {
+            return res.status(400).json(errorResponse("FAQ ID required."));
+        };
+
+        const faq = await FAQ.findById(faqId);
+        if (!faq) {
+            return res.status(400).json(errorResponse("FAQ not found."));
+        };
+
+        await FAQ.findByIdAndUpdate(faqId, { isActive: isActive === "true" || isActive === true });
+
+        return res.status(200).json(successResponse(`FAQ ${isActive === "true" || isActive === true ? "activated" : "deactivated"} successfully.`));
+    } catch (error) {
+        log1(["Error in postToggleFaqStatus ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
 export const postAddAnnouncement = async (req, res) => {
     try {
         const { title, description, targetRole } = req.body;
 
+        const trimmedTitle = (title || "").trim();
+        const trimmedDescription = (description || "").trim();
+        const trimmedTargetRole = (targetRole || "").trim().toLowerCase();
+
+        const nameRegex = /^[a-zA-Z\s]+$/;
+
+        if (!trimmedTitle) {
+            return res.status(400).json(errorResponse("Title is required."));
+        } else if (!nameRegex.test(trimmedTitle)) {
+            return res.status(400).json(errorResponse("Title must contain only alphabetic characters and spaces."));
+        } else if (trimmedTitle.replace(/\s/g, "").length > 50) {
+            return res.status(400).json(errorResponse("Title must not exceed 50 characters (excluding spaces)."));
+        };
+
+        const existingTitle = await Announcement.findOne({ title: trimmedTitle });
+        if (existingTitle) {
+            return res.status(400).json(errorResponse("This announcement title already exists. Please use a different title."));
+        };
+
+        if (!trimmedDescription) {
+            return res.status(400).json(errorResponse("Description is required."));
+        } else if (trimmedDescription.replace(/\s/g, "").length > 200) {
+            return res.status(400).json(errorResponse("Description must not exceed 200 characters (excluding spaces)."));
+        };
+
+        if (!trimmedTargetRole) {
+            return res.status(400).json(errorResponse("Target Audience is required."));
+        };
+
+        const validTargetRoles = Object.values(Constants.TARGET_AUDIENCE);
+        if (!validTargetRoles.includes(trimmedTargetRole)) {
+            return res.status(400).json(errorResponse("Invalid Target Audience value."));
+        };
+
         const payload = {
-            title: title,
-            description: description,
-            targetRole: targetRole || "all",
+            title: trimmedTitle,
+            description: trimmedDescription,
+            targetRole: trimmedTargetRole,
         };
 
         const announcement = await Announcement.create(payload);
@@ -4834,11 +4902,42 @@ export const postDeleteAnnouncement = async (req, res) => {
     try {
         const { announcementId } = req.body;
 
+        const announcement = await Announcement.findById(announcementId);
+        if (!announcement) {
+            return res.status(400).json(errorResponse("Announcement not found."));
+        };
+
+        if (announcement.isActive) {
+            return res.status(400).json(errorResponse("Cannot delete an active announcement. Please deactivate it first."));
+        };
+
         await Announcement.findByIdAndDelete(announcementId);
 
         return res.status(200).json(successResponse("Announcement deleted successfully."));
     } catch (error) {
         log1(["Error in postDeleteAnnouncement ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const postToggleAnnouncementStatus = async (req, res) => {
+    try {
+        const { announcementId, isActive } = req.body;
+
+        if (!announcementId) {
+            return res.status(400).json(errorResponse("Announcement ID required."));
+        };
+
+        const announcement = await Announcement.findById(announcementId);
+        if (!announcement) {
+            return res.status(400).json(errorResponse("Announcement not found."));
+        };
+
+        await Announcement.findByIdAndUpdate(announcementId, { isActive: isActive === "true" || isActive === true });
+
+        return res.status(200).json(successResponse(`Announcement ${isActive === "true" || isActive === true ? "activated" : "deactivated"} successfully.`));
+    } catch (error) {
+        log1(["Error in postToggleAnnouncementStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     }
 };

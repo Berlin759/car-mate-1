@@ -14,15 +14,14 @@
             <% if (body?.faqList && body.faqList.length > 0) { body.faqList.forEach(function(faq, index) { %>
                 <tr>
                     <td><%= index + 1 %></td>
-                    <td><strong><%= faq.question || "-" %></strong></td>
-                    <td><%= faq.answer || "-" %></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 250px;"><strong><%= faq.question || "-" %></strong></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 250px;"><%= faq.answer || "-" %></td>
                     <td><%= faq.category || "-" %></td>
                     <td>
-                        <% if (faq.isActive) { %>
-                            <span class="bet-status alert-success">Active</span>
-                        <% } else { %>
-                            <span class="bet-status alert-end">Inactive</span>
-                        <% } %>
+                        <select class="form-select form-select-sm faq-status-select text-border text-space" data-faq-id="<%= faq._id %>" style="width: auto;">
+                            <option value="true" <%= faq.isActive ? "selected" : "" %>>Active</option>
+                            <option value="false" <%= !faq.isActive ? "selected" : "" %>>Inactive</option>
+                        </select>
                     </td>
                     <td class="text-end">
                         <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">

@@ -14,15 +14,22 @@
             <% if (body?.announcementList && body.announcementList.length > 0) { body.announcementList.forEach(function(item, index) { %>
                 <tr>
                     <td><%= index + 1 %></td>
-                    <td><strong><%= item.title || "-" %></strong></td>
-                    <td><%= item.description || "-" %></td>
-                    <td><span class="badge bg-primary"><%= item.targetRole || "all" %></span></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 200px;">
+                        <strong><%= item.title || "-" %></strong>
+                    </td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 250px;">
+                        <%= item.description || "-" %>
+                    </td>
                     <td>
-                        <% if (item.isActive) { %>
-                            <span class="bet-status alert-success">Active</span>
-                        <% } else { %>
-                            <span class="bet-status alert-end">Inactive</span>
-                        <% } %>
+                        <span class="">
+                            <%= item.targetRole === "all" ? "All" : item.targetRole === "owner" ? "Car Owners" : item.targetRole === "mechanic" ? "Mechanics" : item.targetRole || "All" %>
+                        </span>
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm announcement-status-select text-border text-space" data-announcement-id="<%= item._id %>" style="width: auto;">
+                            <option value="true" <%= item.isActive ? "selected" : "" %>>Active</option>
+                            <option value="false" <%= !item.isActive ? "selected" : "" %>>Inactive</option>
+                        </select>
                     </td>
                     <td class="text-end">
                         <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">

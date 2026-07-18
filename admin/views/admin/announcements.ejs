@@ -32,16 +32,18 @@
                 <div class="modal-body px-4 pb-4">
                     <div class="row g-3">
                         <div class="col-lg-12">
-                            <label class="form-label text-dark">Title</label>
-                            <input class="form-control" type="text" id="announcement_title" placeholder="Enter title">
+                            <label class="form-label text-dark">Title <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" id="announcement_title" placeholder="Enter title" pattern="[a-zA-Z\s]+" maxlength="50" required>
+                            <small class="text-muted"><span id="announcement_title_counter">0/50</span> characters</small>
                         </div>
                         <div class="col-lg-12">
-                            <label class="form-label text-dark">Description</label>
-                            <textarea class="form-control" id="announcement_description" rows="3" placeholder="Enter description"></textarea>
+                            <label class="form-label text-dark">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="announcement_description" rows="3" placeholder="Enter description" maxlength="250" required></textarea>
+                            <small class="text-muted"><span id="announcement_desc_counter">0/200</span> characters</small>
                         </div>
                         <div class="col-lg-12">
-                            <label class="form-label text-dark">Target Audience</label>
-                            <select class="form-select" id="announcement_target">
+                            <label class="form-label text-dark">Target Audience <span class="text-danger">*</span></label>
+                            <select class="form-select" id="announcement_target" required>
                                 <option value="all">All</option>
                                 <option value="owner">Car Owners</option>
                                 <option value="mechanic">Mechanics</option>

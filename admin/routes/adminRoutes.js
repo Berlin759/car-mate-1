@@ -71,9 +71,11 @@ import {
     postAddFaq,
     postFaqList,
     postDeleteFaq,
+    postToggleFaqStatus,
     postAddAnnouncement,
     postAnnouncementList,
     postDeleteAnnouncement,
+    postToggleAnnouncementStatus,
     postDisputeList,
     postResolveDispute,
     getDisputePage,
@@ -211,12 +213,14 @@ adminRouter.get("/faqs", authMiddleware, getFaqPage);
 adminRouter.post("/add-faq", authMiddleware, postAddFaq);
 adminRouter.post("/faq-list", authMiddleware, postFaqList);
 adminRouter.post("/delete-faq", authMiddleware, postDeleteFaq);
+adminRouter.post("/toggle-faq-status", authMiddleware, postToggleFaqStatus);
 
 // CMS - Announcements
 adminRouter.get("/announcements", authMiddleware, getAnnouncementPage);
 adminRouter.post("/add-announcement", authMiddleware, postAddAnnouncement);
 adminRouter.post("/announcement-list", authMiddleware, postAnnouncementList);
 adminRouter.post("/delete-announcement", authMiddleware, postDeleteAnnouncement);
+adminRouter.post("/toggle-announcement-status", authMiddleware, postToggleAnnouncementStatus);
 
 // Dispute Resolution
 adminRouter.get("/disputes", authMiddleware, getDisputePage);
