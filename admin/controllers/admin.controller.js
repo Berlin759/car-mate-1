@@ -25,6 +25,7 @@ import FAQ from "../models/faq.model.js";
 import Announcement from "../models/announcement.model.js";
 import Pricing from "../models/pricing.model.js";
 import Template from "../models/template.model.js";
+import { generateTransactionPDF, generateAllTransactionsPDF } from "../utils/pdf.helper.js";
 
 const __dirname = path.resolve();
 
@@ -186,17 +187,28 @@ export const postAddOwner = async (req, res) => {
         const admin = req.session.admin;
 
         log1(["postAddOwner req.body----->", req.body]);
-        const { fullName, phoneNumber } = req.body;
+        const { fullName, phoneCode, phoneNumber } = req.body;
 
         const validate = await custom_validation(req.body, "admin.add_owner");
         if (validate.flag !== 1) {
             return res.status(400).json(validate);
         };
 
+        const trimmedName = fullName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Full name must contain only alphabetic characters and spaces."));
+        };
+
         const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
         let check_phone_number = regex.test(phoneNumber);
         if (!check_phone_number) {
             return res.status(400).json(errorResponse("Please enter a valid phone number. Ensure it follows the correct format."));
+        };
+
+        const existingName = await Owner.findOne({ fullName: trimmedName });
+        if (existingName) {
+            return res.status(400).json(errorResponse("This owner name already exists. Please use a different name."));
         };
 
         const owner = await Owner.findOne({ phoneNumber: phoneNumber });
@@ -207,7 +219,8 @@ export const postAddOwner = async (req, res) => {
         };
 
         let payload = {
-            fullName: fullName,
+            fullName: trimmedName,
+            phoneCode: phoneCode || "+91",
             phoneNumber: phoneNumber,
             status: Constants.OWNER_STATUS.ACTIVE,
         };
@@ -276,6 +289,7 @@ export const postAllCarOwnerList = async (req, res) => {
                     email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
+                    phoneCode: 1,
                     profileImage: 1,
                     address: 1,
                     status: 1,
@@ -386,7 +400,7 @@ export const postUpdateOwner = async (req, res) => {
         const admin = req.session.admin;
 
         log1(["postUpdateOwner req.body----->", req.body]);
-        const { ownerId, fullName, phoneNumber, status } = req.body;
+        const { ownerId, fullName, phoneCode, phoneNumber, status } = req.body;
 
         const validate = await custom_validation(req.body, "admin.update_owner");
         if (validate.flag !== 1) {
@@ -409,10 +423,27 @@ export const postUpdateOwner = async (req, res) => {
         let payload = {};
 
         if (fullName) {
-            payload["fullName"] = fullName;
+            const trimmedName = fullName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Full name must contain only alphabetic characters and spaces."));
+            };
+            const existingName = await Owner.findOne({ fullName: trimmedName, _id: { $ne: new ObjectId(ownerId) } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This owner name already exists. Please use a different name."));
+            };
+            payload["fullName"] = trimmedName;
+        };
+
+        if (phoneCode) {
+            payload["phoneCode"] = phoneCode;
         };
 
         if (phoneNumber) {
+            const existingPhone = await Owner.findOne({ phoneNumber: phoneNumber, _id: { $ne: new ObjectId(ownerId) } });
+            if (existingPhone) {
+                return res.status(400).json(errorResponse("Already added this phone number, Please use different phone number."));
+            };
             payload["phoneNumber"] = phoneNumber;
         };
 
@@ -588,17 +619,28 @@ export const postAddMechanic = async (req, res) => {
         const admin = req.session.admin;
 
         log1(["postAddMechanic req.body----->", req.body]);
-        const { fullName, phoneNumber } = req.body;
+        const { fullName, phoneCode, phoneNumber } = req.body;
 
         const validate = await custom_validation(req.body, "admin.add_mechanic");
         if (validate.flag !== 1) {
             return res.status(400).json(validate);
         };
 
+        const trimmedName = fullName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Full name must contain only alphabetic characters and spaces."));
+        };
+
         const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
         let check_phone_number = regex.test(phoneNumber);
         if (!check_phone_number) {
             return res.status(400).json(errorResponse("Please enter a valid phone number. Ensure it follows the correct format."));
+        };
+
+        const existingName = await Mechanic.findOne({ fullName: trimmedName });
+        if (existingName) {
+            return res.status(400).json(errorResponse("This mechanic name already exists. Please use a different name."));
         };
 
         const mechanic = await Mechanic.findOne({ phoneNumber: phoneNumber });
@@ -609,7 +651,8 @@ export const postAddMechanic = async (req, res) => {
         };
 
         let payload = {
-            fullName: fullName,
+            fullName: trimmedName,
+            phoneCode: phoneCode || "+91",
             phoneNumber: phoneNumber,
         };
 
@@ -828,7 +871,7 @@ export const postMechanicUpdate = async (req, res) => {
         const admin = req.session.admin;
 
         log1(["postMechanicUpdate req.body----->", req.body]);
-        const { mechanicId, fullName, phoneNumber, status } = req.body;
+        const { mechanicId, fullName, phoneCode, phoneNumber, status } = req.body;
 
         const validate = await custom_validation(req.body, "admin.update_mechanic");
         if (validate.flag !== 1) {
@@ -851,10 +894,27 @@ export const postMechanicUpdate = async (req, res) => {
         let payload = {};
 
         if (fullName) {
-            payload["fullName"] = fullName;
+            const trimmedName = fullName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Full name must contain only alphabetic characters and spaces."));
+            };
+            const existingName = await Mechanic.findOne({ fullName: trimmedName, _id: { $ne: new ObjectId(mechanicId) } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This mechanic name already exists. Please use a different name."));
+            };
+            payload["fullName"] = trimmedName;
+        };
+
+        if (phoneCode) {
+            payload["phoneCode"] = phoneCode;
         };
 
         if (phoneNumber) {
+            const existingPhone = await Mechanic.findOne({ phoneNumber: phoneNumber, _id: { $ne: new ObjectId(mechanicId) } });
+            if (existingPhone) {
+                return res.status(400).json(errorResponse("Already added this phone number, Please use different phone number."));
+            };
             payload["phoneNumber"] = phoneNumber;
         };
 
@@ -2643,6 +2703,182 @@ export const postTransactionDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postTransactionDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const getTransactionDownload = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id || !ObjectId.isValid(id)) {
+            return res.redirect("/transactions");
+        };
+
+        const pipeline = [
+            { $match: { _id: new ObjectId(id) } },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [{ $project: { fullName: 1, description: 1, status: 1 } }],
+                },
+            },
+            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [{ $project: { fullName: 1, email: 1, phoneNumber: 1 } }],
+                },
+            },
+            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [{ $project: { fullName: 1, email: 1, phoneNumber: 1 } }],
+                },
+            },
+            { $unwind: { path: "$mechanicDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [{ $project: { fullName: 1, vehicleNumber: 1, model: 1 } }],
+                },
+            },
+            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                },
+            },
+            { $unwind: { path: "$bookingDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    invoiceId: 1,
+                    trxId: 1,
+                    totalAmount: 1,
+                    adminCharge: 1,
+                    description: 1,
+                    status: 1,
+                    createdAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
+                    bookingDetails: {
+                        _id: "$bookingDetails._id",
+                        invoiceNo: "$bookingDetails.invoiceNo",
+                        date: "$bookingDetails.date",
+                        time: "$bookingDetails.time",
+                        status: "$bookingDetails.status",
+                    },
+                },
+            },
+        ];
+
+        const [transaction] = await Transaction.aggregate(pipeline);
+
+        if (!transaction) {
+            return res.redirect("/transactions");
+        };
+
+        return generateTransactionPDF(transaction, res);
+    } catch (error) {
+        log1(["Error in getTransactionDownload----->", error]);
+        return res.redirect("/transactions");
+    }
+};
+
+export const getAllTransactionsDownload = async (req, res) => {
+    try {
+        const pipeline = [
+            { $match: {} },
+            { $sort: { createdAt: -1 } },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [{ $project: { fullName: 1 } }],
+                },
+            },
+            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [{ $project: { fullName: 1 } }],
+                },
+            },
+            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [{ $project: { fullName: 1 } }],
+                },
+            },
+            { $unwind: { path: "$mechanicDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [{ $project: { fullName: 1 } }],
+                },
+            },
+            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                },
+            },
+            { $unwind: { path: "$bookingDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    totalAmount: 1,
+                    adminCharge: 1,
+                    status: 1,
+                    createdAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
+                    bookingDetails: {
+                        _id: "$bookingDetails._id",
+                    },
+                },
+            },
+        ];
+
+        const transactions = await Transaction.aggregate(pipeline).allowDiskUse(true);
+
+        return generateAllTransactionsPDF(transactions, res);
+    } catch (error) {
+        log1(["Error in getAllTransactionsDownload----->", error]);
+        return res.redirect("/transactions");
     }
 };
 

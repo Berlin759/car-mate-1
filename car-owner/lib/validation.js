@@ -76,6 +76,9 @@ const validate_rules = {
         set_default_address: {
             addressId: "required",
         },
+        update_profile: {
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+        },
     },
 };
 

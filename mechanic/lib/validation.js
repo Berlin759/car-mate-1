@@ -39,6 +39,9 @@ const validate_rules = {
             latitude: "required",
             longitude: "required",
         },
+        update_profile: {
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+        },
     },
 };
 

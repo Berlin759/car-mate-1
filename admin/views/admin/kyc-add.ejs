@@ -96,7 +96,7 @@
                     <span class="text-gray">Phone</span>
                     <span class="fw-md">
                         <% if(body?.mechanic?.phoneNumber) { %>
-                            <%= body?.mechanic?.countryCode || "+91" %> <%= body?.mechanic?.phoneNumber %>
+                            <%= body?.mechanic?.phoneCode || "+91" %> <%= body?.mechanic?.phoneNumber %>
                         <% } else { %>
                             -
                         <% } %>

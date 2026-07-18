@@ -1,6 +1,46 @@
 $(document).ready(function () {
     fetchAllMechanicList();
+    initMechanicPhoneValidation();
 });
+
+$(document).on("keypress", "#addMechanicModal input, #addMechanicModal select", function (e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        if (!$("#addMechanicModal #add_mechanic").hasClass("d-none")) {
+            $("#addMechanicModal #add_mechanic").trigger("click");
+        } else if (!$("#addMechanicModal #update_mechanic").hasClass("d-none")) {
+            $("#addMechanicModal #update_mechanic").trigger("click");
+        };
+    };
+});
+
+function initMechanicPhoneValidation() {
+    const $phoneCode = $("#addMechanicModal #phone_code");
+    const $phoneNumber = $("#addMechanicModal #phone_number");
+
+    function updatePhoneMaxLength() {
+        const maxLen = $phoneCode.find(":selected").data("max-length") || 10;
+        $phoneNumber.attr("maxlength", maxLen);
+        if ($phoneNumber.val().length > maxLen) {
+            $phoneNumber.val($phoneNumber.val().slice(0, maxLen));
+        };
+    };
+
+    $phoneCode.on("change", updatePhoneMaxLength);
+    updatePhoneMaxLength();
+
+    $phoneNumber.on("input", function () {
+        this.value = this.value.replace(/[^0-9]/g, "");
+        const maxLen = $phoneCode.find(":selected").data("max-length") || 10;
+        if (this.value.length > maxLen) {
+            this.value = this.value.slice(0, maxLen);
+        };
+    });
+
+    $("#addMechanicModal #full_name").on("input", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+    });
+};
 
 // Email Filter Object
 $(document).on("input", "#email-filter-input", function () {
@@ -138,15 +178,20 @@ $(document).on("click", "#add_new_mechanic", function () {
 
 $(document).on("click", "#add_mechanic", function () {
     const full_name = $("#addMechanicModal #full_name").val();
+    const phone_code = $("#addMechanicModal #phone_code").val();
     const phone_number = $("#addMechanicModal #phone_number").val();
 
     const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
 
+    const nameRegex = /^[a-zA-Z\s]+$/;
+
     let validationMessage = "";
     if (!full_name) {
         validationMessage = "Mechanic name is required. Please enter mechanic name.";
-    } else if (full_name && full_name.length < 3) {
-        validationMessage = "Mechanic name minimum 3 character.";
+    } else if (full_name && full_name.trim().length < 2) {
+        validationMessage = "Mechanic name minimum 2 characters.";
+    } else if (full_name && !nameRegex.test(full_name.trim())) {
+        validationMessage = "Mechanic name must contain only alphabetic characters and spaces.";
     } else if (!phone_number) {
         validationMessage = "Phone number is required. Please enter phone number.";
     } else if (phone_number && !regex.test(phone_number)) {
@@ -159,7 +204,8 @@ $(document).on("click", "#add_mechanic", function () {
     };
 
     const payload = {
-        fullName: full_name,
+        fullName: full_name.trim(),
+        phoneCode: phone_code,
         phoneNumber: phone_number,
     };
 
@@ -192,6 +238,9 @@ $(document).on("click", ".edit-mechanic-button", function () {
 
             $("#addMechanicModal #mechanic_id").val(mechanicDetails._id);
             $("#addMechanicModal #full_name").val(mechanicDetails.fullName);
+            if (mechanicDetails.phoneCode) {
+                $("#addMechanicModal #phone_code").val(mechanicDetails.phoneCode);
+            };
             $("#addMechanicModal #phone_number").val(mechanicDetails.phoneNumber);
         } else if (response.flag === 8) {
             window.location.reload();
@@ -205,15 +254,21 @@ $(document).on("click", ".edit-mechanic-button", function () {
 $(document).on("click", "#update_mechanic", function () {
     const mechanicId = $("#addMechanicModal #mechanic_id").val();
     const full_name = $("#addMechanicModal #full_name").val();
+    const phone_code = $("#addMechanicModal #phone_code").val();
     const phone_number = $("#addMechanicModal #phone_number").val();
+
+    const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
+    const nameRegex = /^[a-zA-Z\s]+$/;
 
     let validationMessage = "";
     if (!mechanicId) {
         validationMessage = "Invalid mechanic id.";
-    } else if (!full_name && full_name.length < 3) {
+    } else if (!full_name) {
         validationMessage = "Mechanic name is required. Please enter mechanic name.";
-    } else if (full_name && full_name.length < 3) {
-        validationMessage = "Mechanic name minimum 3 character.";
+    } else if (full_name && full_name.trim().length < 2) {
+        validationMessage = "Mechanic name minimum 2 characters.";
+    } else if (full_name && !nameRegex.test(full_name.trim())) {
+        validationMessage = "Mechanic name must contain only alphabetic characters and spaces.";
     } else if (!phone_number) {
         validationMessage = "Phone number is required. Please enter phone number.";
     } else if (phone_number && !regex.test(phone_number)) {
@@ -227,7 +282,8 @@ $(document).on("click", "#update_mechanic", function () {
 
     const payload = {
         mechanicId: mechanicId,
-        fullName: full_name,
+        fullName: full_name.trim(),
+        phoneCode: phone_code,
         phoneNumber: phone_number,
     };
 
@@ -247,7 +303,9 @@ $(document).on("click", "#update_mechanic", function () {
 function resetAddMechanicModal() {
     $("#addMechanicModal #mechanic_id").val("");
     $("#addMechanicModal #full_name").val("");
+    $("#addMechanicModal #phone_code").val("+91");
     $("#addMechanicModal #phone_number").val("");
+    $("#addMechanicModal #phone_number").attr("maxlength", "10");
 };
 
 function fetchAllMechanicList(filterObj = {}) {

@@ -42,6 +42,8 @@ import {
     getTransactionDetailPage,
     postAllTransactionList,
     postTransactionDetails,
+    getTransactionDownload,
+    getAllTransactionsDownload,
     getReviewPage,
     postAllReviewList,
     postReviewDetails,
@@ -154,6 +156,8 @@ adminRouter.get("/transactions", authMiddleware, getTransactionPage);
 adminRouter.get("/transaction/:id", authMiddleware, getTransactionDetailPage);
 adminRouter.post("/transaction-list", authMiddleware, postAllTransactionList);
 adminRouter.post("/transaction-details", authMiddleware, postTransactionDetails);
+adminRouter.get("/transaction/:id/download", authMiddleware, getTransactionDownload);
+adminRouter.get("/transactions/download-all", authMiddleware, getAllTransactionsDownload);
 
 // Reviews API
 adminRouter.get("/reviews", authMiddleware, getReviewPage);

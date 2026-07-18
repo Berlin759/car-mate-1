@@ -16,6 +16,10 @@ const mechanicSchema = new Schema(
             type: String,
             default: "",
         },
+        phoneCode: {
+            type: String,
+            default: "+91",
+        },
         profileImage: {
             type: String,
             default: "",

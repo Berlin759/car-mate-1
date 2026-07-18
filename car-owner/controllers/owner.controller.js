@@ -187,12 +187,28 @@ export const postUpdateOwnerProfile = async (req, res) => {
         let updateObj = {};
 
         // Simple string/number updates
-        const simpleFields = ["fullName", "email", "latitude", "longitude", "address", "description"];
+        const simpleFields = ["fullName", "phoneCode", "email", "latitude", "longitude", "address", "description"];
         simpleFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
                 updateObj[field] = param[field];
             };
         });
+
+        if (updateObj.fullName) {
+            const trimmedName = updateObj.fullName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Full name must contain only alphabetic characters and spaces."));
+            };
+            if (trimmedName.length < 2 || trimmedName.length > 50) {
+                return res.status(400).json(errorResponse("Full name must be between 2 and 50 characters."));
+            };
+            const existingName = await Owner.findOne({ fullName: trimmedName, _id: { $ne: new ObjectId(ownerId) } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This name already exists. Please use a different name."));
+            };
+            updateObj.fullName = trimmedName;
+        };
 
         if (
             param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&

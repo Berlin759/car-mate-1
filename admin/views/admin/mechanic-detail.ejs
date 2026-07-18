@@ -52,7 +52,7 @@
                     <span class="text-gray">Phone</span>
                     <span class="fw-md">
                         <% if(body?.mechanic?.phoneNumber) { %>
-                            <%= body?.mechanic?.countryCode || "+91" %> <%= body?.mechanic?.phoneNumber %>
+                            <%= body?.mechanic?.phoneCode || "+91" %> <%= body?.mechanic?.phoneNumber %>
                         <% } else { %>
                             -
                         <% } %>
@@ -93,7 +93,7 @@
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Email Verified</span>
-                            <span class="fs-20 fw-bold"><%= body?.mechanic?.emailVerification === 1 ? "Yes" : "No" %></span>
+                            <span class="fs-20 fw-bold"><%= body?.mechanic?.emailVerification === 2 ? "Yes" : "No" %></span>
                         </div>
                     </div>
                 </div>

@@ -52,7 +52,7 @@
                     <span class="text-gray">Phone</span>
                     <span class="fw-md">
                         <% if(body?.owner?.phoneNumber) { %>
-                            <%= body?.owner?.countryCode || "+91" %> <%= body?.owner?.phoneNumber %>
+                            <%= body?.owner?.phoneCode || "+91" %> <%= body?.owner?.phoneNumber %>
                         <% } else { %>
                             -
                         <% } %>
@@ -93,7 +93,7 @@
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Email Verified</span>
-                            <span class="fs-20 fw-bold"><%= body?.owner?.emailVerification === 1 ? "No" : "Yes" %></span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.emailVerification === 2 ? "Yes" : "No" %></span>
                         </div>
                     </div>
                 </div>

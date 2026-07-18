@@ -16,18 +16,24 @@ const validate_rules = {
             new_password: "required|min:6",
         },
         add_owner: {
-            fullName: "required",
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            phoneCode: "required",
             phoneNumber: "required",
         },
         update_owner: {
             ownerId: "required",
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            phoneCode: "required",
         },
         add_mechanic: {
-            fullName: "required",
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            phoneCode: "required",
             phoneNumber: "required",
         },
         update_mechanic: {
             mechanicId: "required",
+            fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            phoneCode: "required",
         },
         add_car: {
             vehicle_number: "required",
