@@ -545,6 +545,12 @@ export const postAddService = async (req, res) => {
             if (service.price === undefined || service.price === null || service.price < 0) {
                 return res.status(400).json(errorResponse("Valid price is required for each service."));
             };
+            if (service.description) {
+                const descNoSpace = service.description.replace(/\s/g, "");
+                if (descNoSpace.length > 200) {
+                    return res.status(400).json(errorResponse("Service description must not exceed 200 characters (excluding spaces)."));
+                };
+            };
         };
 
         const serviceIds = services.map(s => new mongoose.Types.ObjectId(s.serviceId));

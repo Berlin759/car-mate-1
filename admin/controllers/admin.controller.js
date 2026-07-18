@@ -1584,8 +1584,29 @@ export const postAddService = async (req, res) => {
             return res.status(400).json(validate);
         };
 
+        const trimmedName = fullName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Category name must contain only alphabetic characters and spaces."));
+        };
+
+        const nameNoSpace = trimmedName.replace(/\s/g, "");
+        if (nameNoSpace.length > 50) {
+            return res.status(400).json(errorResponse("Category name must not exceed 50 characters (excluding spaces)."));
+        };
+
+        const descNoSpace = (description || "").replace(/\s/g, "");
+        if (descNoSpace.length > 200) {
+            return res.status(400).json(errorResponse("Category description must not exceed 200 characters (excluding spaces)."));
+        };
+
+        const existingCategory = await Service.findOne({ fullName: trimmedName, parentId: null });
+        if (existingCategory) {
+            return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
+        };
+
         let payload = {
-            fullName: fullName,
+            fullName: trimmedName,
             description: description,
             parentId: null,
         };
@@ -1596,10 +1617,36 @@ export const postAddService = async (req, res) => {
         };
 
         if (subCategories && Array.isArray(subCategories) && subCategories.length > 0) {
+            const subNames = [];
+            for (const sub of subCategories) {
+                if (!sub.fullName || sub.fullName.trim() === "") continue;
+
+                const subTrimmedName = sub.fullName.trim();
+                if (!nameRegex.test(subTrimmedName)) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must contain only alphabetic characters and spaces.`));
+                };
+
+                const subNameNoSpace = subTrimmedName.replace(/\s/g, "");
+                if (subNameNoSpace.length > 50) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must not exceed 50 characters (excluding spaces).`));
+                };
+
+                const subDescNoSpace = (sub.description || "").replace(/\s/g, "");
+                if (subDescNoSpace.length > 200) {
+                    return res.status(400).json(errorResponse(`Sub-category description for "${subTrimmedName}" must not exceed 200 characters (excluding spaces).`));
+                };
+
+                if (subNames.includes(subTrimmedName.toLowerCase())) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" is duplicated. Please use unique sub-category names.`));
+                };
+                subNames.push(subTrimmedName.toLowerCase());
+            };
+
             const subCategoryPayloads = subCategories
                 .filter(sub => sub.fullName && sub.fullName.trim() !== "")
                 .map(sub => ({
                     fullName: sub.fullName.trim(),
+                    description: sub.description ? sub.description.trim() : "",
                     parentId: addNewService._id,
                 }));
 
@@ -1790,10 +1837,27 @@ export const postServiceUpdate = async (req, res) => {
         let payload = {};
 
         if (fullName) {
-            payload["fullName"] = fullName;
+            const trimmedName = fullName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Category name must contain only alphabetic characters and spaces."));
+            };
+            const nameNoSpace = trimmedName.replace(/\s/g, "");
+            if (nameNoSpace.length > 50) {
+                return res.status(400).json(errorResponse("Category name must not exceed 50 characters (excluding spaces)."));
+            };
+            const existingCategory = await Service.findOne({ fullName: trimmedName, parentId: null, _id: { $ne: new ObjectId(serviceId) } });
+            if (existingCategory) {
+                return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
+            };
+            payload["fullName"] = trimmedName;
         };
 
         if (description) {
+            const descNoSpace = description.replace(/\s/g, "");
+            if (descNoSpace.length > 200) {
+                return res.status(400).json(errorResponse("Category description must not exceed 200 characters (excluding spaces)."));
+            };
             payload["description"] = description;
         };
 
@@ -1811,22 +1875,47 @@ export const postServiceUpdate = async (req, res) => {
         };
 
         if (subCategories && Array.isArray(subCategories)) {
+            const nameRegex = /^[a-zA-Z\s]+$/;
             const existingSubcategories = await Service.find({ parentId: serviceDetails._id });
             const existingSubIds = existingSubcategories.map(sub => sub._id.toString());
 
             const incomingSubIds = [];
+            const subNames = [];
 
             for (const sub of subCategories) {
                 if (!sub.fullName || sub.fullName.trim() === "") continue;
 
+                const subTrimmedName = sub.fullName.trim();
+                if (!nameRegex.test(subTrimmedName)) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must contain only alphabetic characters and spaces.`));
+                };
+
+                const subNameNoSpace = subTrimmedName.replace(/\s/g, "");
+                if (subNameNoSpace.length > 50) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must not exceed 50 characters (excluding spaces).`));
+                };
+
+                const subDesc = sub.description ? sub.description.trim() : "";
+                const subDescNoSpace = subDesc.replace(/\s/g, "");
+                if (subDescNoSpace.length > 200) {
+                    return res.status(400).json(errorResponse(`Sub-category description for "${subTrimmedName}" must not exceed 200 characters (excluding spaces).`));
+                };
+
+                if (subNames.includes(subTrimmedName.toLowerCase())) {
+                    return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" is duplicated. Please use unique sub-category names.`));
+                };
+                subNames.push(subTrimmedName.toLowerCase());
+
                 if (sub._id && ObjectId.isValid(sub._id)) {
                     incomingSubIds.push(sub._id.toString());
                     await Service.findByIdAndUpdate(sub._id, {
-                        fullName: sub.fullName.trim(),
+                        fullName: subTrimmedName,
+                        description: subDesc,
                     });
                 } else {
                     const newSub = await Service.create({
-                        fullName: sub.fullName.trim(),
+                        fullName: subTrimmedName,
+                        description: subDesc,
                         parentId: serviceDetails._id,
                         status: serviceDetails.status,
                     });
@@ -3832,16 +3921,19 @@ export const getKYCDetailPage = async (req, res) => {
 
         let filter = {};
         let text = "";
+        let backUrl = "/kyc";
 
         let mechanicDetails = await Mechanic.findById(paramId);
         if (mechanicDetails) {
             filter["mechanicId"] = new ObjectId(paramId);
             text = "Mechanic";
+            backUrl = `/mechanic/${paramId}`;
         } else {
             let kycDetails = await KYC.findById(paramId);
             if (kycDetails) {
                 filter["_id"] = new ObjectId(paramId);
                 text = "KYC";
+                backUrl = `/kyc`;
             } else {
                 return res.redirect("/kyc");
             };
@@ -3916,6 +4008,7 @@ export const getKYCDetailPage = async (req, res) => {
             body: {
                 kyc: kyc,
                 text: text,
+                backUrl: backUrl,
             },
             footer: {
                 js: ["admin/kyc-detail.js"],
@@ -4056,9 +4149,7 @@ export const postPendingKYCList = async (req, res) => {
 
         if (param.status) {
             filter["status"] = parseInt(param.status);
-        } else {
-            filter["status"] = Constants.KYC_STATUS.PENDING;
-        }
+        };
 
         let aggregatePipeline = [
             {

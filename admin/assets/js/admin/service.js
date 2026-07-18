@@ -1,6 +1,57 @@
 $(document).ready(function () {
     fetchAllServicesList();
+    initServiceNameValidation();
 });
+
+function initServiceNameValidation() {
+    $(document).on("input", "#addServiceModal #service_name", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        const nameNoSpace = this.value.replace(/\s/g, "");
+        $("#service_name_counter").text(`${nameNoSpace.length}/50`);
+        if (nameNoSpace.length > 50) {
+            this.value = this.value.slice(0, this.value.length - (nameNoSpace.length - 50));
+            $("#service_name_counter").text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#addServiceModal #service_description", function () {
+        const descNoSpace = this.value.replace(/\s/g, "");
+        $("#service_description_counter").text(`${descNoSpace.length}/200`);
+        if (descNoSpace.length > 200) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 200) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $("#service_description_counter").text(`200/200`);
+        };
+    });
+
+    $(document).on("input", "#addServiceModal .subcategory-name", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        const nameNoSpace = this.value.replace(/\s/g, "");
+        const $counter = $(this).closest(".subcategory-row").find(".sub-name-counter");
+        $counter.text(`${nameNoSpace.length}/50`);
+        if (nameNoSpace.length > 50) {
+            this.value = this.value.slice(0, this.value.length - (nameNoSpace.length - 50));
+            $counter.text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#addServiceModal .subcategory-description", function () {
+        const descNoSpace = this.value.replace(/\s/g, "");
+        const $counter = $(this).closest(".subcategory-row").find(".sub-desc-counter");
+        $counter.text(`${descNoSpace.length}/200`);
+        if (descNoSpace.length > 200) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 200) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $counter.text(`200/200`);
+        };
+    });
+};
 
 // Status Filter Object
 $(document).on("click", ".service-status-filter", function () {
@@ -133,6 +184,17 @@ $(document).on("click", "#add_new_service", function () {
     addSubcategoryRow();
 });
 
+$(document).on("keypress", "#addServiceModal input, #addServiceModal textarea", function (e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        if (!$("#addServiceModal #add_service").hasClass("d-none")) {
+            $("#addServiceModal #add_service").trigger("click");
+        } else if (!$("#addServiceModal #update_service").hasClass("d-none")) {
+            $("#addServiceModal #update_service").trigger("click");
+        };
+    };
+});
+
 $(document).on("click", "#add_subcategory_row_btn", function () {
     addSubcategoryRow();
 });
@@ -145,13 +207,23 @@ $(document).on("click", "#add_service", function () {
     const full_name = $("#addServiceModal #service_name").val().trim();
     const description = $("#addServiceModal #service_description").val().trim();
 
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    const nameNoSpace = full_name.replace(/\s/g, "");
+    const descNoSpace = description.replace(/\s/g, "");
+
     let validationMessage = "";
     if (!full_name) {
         validationMessage = "Category name is required.";
     } else if (full_name.length < 3) {
         validationMessage = "Category name must be at least 3 characters.";
+    } else if (!nameRegex.test(full_name)) {
+        validationMessage = "Category name must contain only alphabetic characters and spaces.";
+    } else if (nameNoSpace.length > 50) {
+        validationMessage = "Category name must not exceed 50 characters (excluding spaces).";
     } else if (!description) {
         validationMessage = "Category description is required.";
+    } else if (descNoSpace.length > 200) {
+        validationMessage = "Category description must not exceed 200 characters (excluding spaces).";
     }
 
     if (validationMessage !== "") {
@@ -160,15 +232,37 @@ $(document).on("click", "#add_service", function () {
     }
 
     const subCategories = [];
+    const subNames = [];
     let subValidationMessage = "";
     $("#subcategory_list_container .subcategory-row").each(function (index) {
         const name = $(this).find(".subcategory-name").val().trim();
+        const subDesc = $(this).find(".subcategory-description").val().trim();
+        const subNameNoSpace = name.replace(/\s/g, "");
+        const subDescNoSpace = subDesc.replace(/\s/g, "");
 
         if (!name) {
             subValidationMessage = `Sub-category #${index + 1} Name is required.`;
             return false;
+        } else if (name.length < 3) {
+            subValidationMessage = `Sub-category #${index + 1} Name must be at least 3 characters.`;
+            return false;
+        } else if (!nameRegex.test(name)) {
+            subValidationMessage = `Sub-category #${index + 1} Name must contain only alphabetic characters and spaces.`;
+            return false;
+        } else if (subNameNoSpace.length > 50) {
+            subValidationMessage = `Sub-category #${index + 1} Name must not exceed 50 characters (excluding spaces).`;
+            return false;
+        } else if (subDesc && subDescNoSpace.length > 200) {
+            subValidationMessage = `Sub-category #${index + 1} Description must not exceed 200 characters (excluding spaces).`;
+            return false;
         }
-        subCategories.push({ fullName: name });
+
+        if (subNames.includes(name.toLowerCase())) {
+            subValidationMessage = `Sub-category #${index + 1} Name "${name}" is duplicated. Please use unique sub-category names.`;
+            return false;
+        }
+        subNames.push(name.toLowerCase());
+        subCategories.push({ fullName: name, description: subDesc });
     });
 
     if (subValidationMessage !== "") {
@@ -220,7 +314,7 @@ $(document).on("click", ".edit-service-button", function () {
             $("#subcategory_list_container").empty();
             if (subCategories.length > 0) {
                 subCategories.forEach(sub => {
-                    addSubcategoryRow(sub._id, sub.fullName);
+                    addSubcategoryRow(sub._id, sub.fullName, sub.description || "");
                 });
             } else {
                 addSubcategoryRow();
@@ -239,6 +333,10 @@ $(document).on("click", "#update_service", function () {
     const full_name = $("#addServiceModal #service_name").val().trim();
     const description = $("#addServiceModal #service_description").val().trim();
 
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    const nameNoSpace = full_name.replace(/\s/g, "");
+    const descNoSpace = description.replace(/\s/g, "");
+
     let validationMessage = "";
     if (!serviceId) {
         validationMessage = "Invalid service id.";
@@ -246,8 +344,14 @@ $(document).on("click", "#update_service", function () {
         validationMessage = "Category name is required.";
     } else if (full_name.length < 3) {
         validationMessage = "Category name must be at least 3 characters.";
+    } else if (!nameRegex.test(full_name)) {
+        validationMessage = "Category name must contain only alphabetic characters and spaces.";
+    } else if (nameNoSpace.length > 50) {
+        validationMessage = "Category name must not exceed 50 characters (excluding spaces).";
     } else if (!description) {
         validationMessage = "Category description is required.";
+    } else if (descNoSpace.length > 200) {
+        validationMessage = "Category description must not exceed 200 characters (excluding spaces).";
     }
 
     if (validationMessage !== "") {
@@ -256,16 +360,38 @@ $(document).on("click", "#update_service", function () {
     }
 
     const subCategories = [];
+    const subNames = [];
     let subValidationMessage = "";
     $("#subcategory_list_container .subcategory-row").each(function (index) {
         const id = $(this).find(".subcategory-id").val();
         const name = $(this).find(".subcategory-name").val().trim();
+        const subDesc = $(this).find(".subcategory-description").val().trim();
+        const subNameNoSpace = name.replace(/\s/g, "");
+        const subDescNoSpace = subDesc.replace(/\s/g, "");
 
         if (!name) {
             subValidationMessage = `Sub-category #${index + 1} Name is required.`;
             return false;
+        } else if (name.length < 3) {
+            subValidationMessage = `Sub-category #${index + 1} Name must be at least 3 characters.`;
+            return false;
+        } else if (!nameRegex.test(name)) {
+            subValidationMessage = `Sub-category #${index + 1} Name must contain only alphabetic characters and spaces.`;
+            return false;
+        } else if (subNameNoSpace.length > 50) {
+            subValidationMessage = `Sub-category #${index + 1} Name must not exceed 50 characters (excluding spaces).`;
+            return false;
+        } else if (subDesc && subDescNoSpace.length > 200) {
+            subValidationMessage = `Sub-category #${index + 1} Description must not exceed 200 characters (excluding spaces).`;
+            return false;
         }
-        subCategories.push({ _id: id || undefined, fullName: name });
+
+        if (subNames.includes(name.toLowerCase())) {
+            subValidationMessage = `Sub-category #${index + 1} Name "${name}" is duplicated. Please use unique sub-category names.`;
+            return false;
+        }
+        subNames.push(name.toLowerCase());
+        subCategories.push({ _id: id || undefined, fullName: name, description: subDesc });
     });
 
     if (subValidationMessage !== "") {
@@ -310,7 +436,9 @@ function fetchAllServicesList(filterObj = {}) {
     toggleResetButtonVisibility("#reset-service-filters", "#service-filter-section");
 };
 
-function addSubcategoryRow(id = "", name = "") {
+function addSubcategoryRow(id = "", name = "", description = "") {
+    const nameNoSpace = name.replace(/\s/g, "");
+    const descNoSpace = description.replace(/\s/g, "");
     const rowHtml = `
         <div class="subcategory-row p-3 border rounded bg-light position-relative">
             <input type="hidden" class="subcategory-id" value="${id}" />
@@ -322,7 +450,14 @@ function addSubcategoryRow(id = "", name = "") {
             </div>
             <div class="row g-2">
                 <div class="col-md-12">
-                    <input class="form-control form-control-sm subcategory-name" type="text" placeholder="Enter Sub-category Name" value="${name}">
+                    <label class="form-label fs-12 text-dark">Name</label>
+                    <input class="form-control form-control-sm subcategory-name" type="text" placeholder="Enter Sub-category Name" value="${name}" maxlength="60" pattern="[a-zA-Z\s]+" minlength="3" title="Sub-category name must contain only alphabetic characters and spaces (min 3 characters)">
+                    <div class="text-end fs-11 text-muted sub-name-counter">${nameNoSpace.length}/50</div>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label fs-12 text-dark">Description</label>
+                    <textarea class="form-control form-control-sm subcategory-description" rows="2" placeholder="Enter Sub-category Description" maxlength="250">${description}</textarea>
+                    <div class="text-end fs-11 text-muted sub-desc-counter">${descNoSpace.length}/200</div>
                 </div>
             </div>
         </div>

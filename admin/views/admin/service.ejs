@@ -109,11 +109,13 @@
                         <div class="row g-3">
                             <div class="col-lg-12">
                                 <label for="fullName" class="form-label text-dark">Category Name</label>
-                                <input class="form-control" type="text" name="fullName" id="service_name" placeholder="Enter Category Name">
+                                <input class="form-control" type="text" name="fullName" id="service_name" placeholder="Enter Category Name" maxlength="60" pattern="[a-zA-Z\s]+" minlength="3" title="Category name must contain only alphabetic characters and spaces (min 3 characters)">
+                                <div class="text-end fs-11 text-muted" id="service_name_counter">0/50</div>
                             </div>
                             <div class="col-lg-12">
                                 <label for="description" class="form-label text-dark">Category Description</label>
-                                <textarea class="form-control" type="text" name="description" id="service_description" rows="3" placeholder="Enter Category Description"></textarea>
+                                <textarea class="form-control" type="text" name="description" id="service_description" rows="3" placeholder="Enter Category Description" maxlength="250"></textarea>
+                                <div class="text-end fs-11 text-muted" id="service_description_counter">0/200</div>
                             </div>
                             
                             <!-- Sub-categories Section -->

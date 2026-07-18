@@ -39,7 +39,7 @@
                                 <% } %>
                                 <td><%= sub.subCategoryName %></td>
                                 <td><%= sub.price %></td>
-                                <td><%= sub.description || "-" %></td>
+                                <td style="white-space: normal; word-wrap: break-word; max-width: 250px;"><%= sub.description || "-" %></td>
                             </tr>
                             <% rowIndex++; %>
                         <% }); %>
@@ -94,7 +94,7 @@
                                     </div>
                                 <% } %>
                             </td>
-                            <td><%= item?.description || "-" %></td>
+                            <td style="white-space: normal; word-wrap: break-word; max-width: 250px;"><%= item?.description || "-" %></td>
                             <td>
                                 <% if(item?.status === 1) { %>
                                     <span class="bet-status alert-success">Active</span>
