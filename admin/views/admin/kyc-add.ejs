@@ -50,7 +50,7 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label for="bankAccountHolderName" class="form-label text-dark">Account Holder Name</label>
-                        <input class="form-control" type="text" id="bankAccountHolderName" name="bankAccountHolderName" placeholder="Enter account holder name">
+                        <input class="form-control" type="text" id="bankAccountHolderName" name="bankAccountHolderName" placeholder="Enter account holder name" pattern="[a-zA-Z\s]+" minlength="2" maxlength="100" title="Account Holder Name must contain only alphabetic characters and spaces (2-100 characters)">
                     </div>
                     <div class="col-md-6">
                         <label for="bankName" class="form-label text-dark">Bank Name</label>
@@ -58,11 +58,11 @@
                     </div>
                     <div class="col-md-6">
                         <label for="bankAccountNumber" class="form-label text-dark">Account Number</label>
-                        <input class="form-control" type="text" id="bankAccountNumber" name="bankAccountNumber" placeholder="Enter account number">
+                        <input class="form-control" type="text" id="bankAccountNumber" name="bankAccountNumber" placeholder="Enter account number" pattern="[0-9]+" minlength="6" maxlength="20" title="Account Number must contain only digits (6-20 digits)">
                     </div>
                     <div class="col-md-6">
                         <label for="bankIfscCode" class="form-label text-dark">IFSC Code</label>
-                        <input class="form-control" type="text" id="bankIfscCode" name="bankIfscCode" placeholder="Enter IFSC code">
+                        <input class="form-control" type="text" id="bankIfscCode" name="bankIfscCode" placeholder="e.g., SBIN0001234" pattern="[A-Z]{4}[0-9]{6}" maxlength="11" title="Please enter a valid IFSC code (4 letters followed by 6 digits, e.g., SBIN0001234)">
                     </div>
                 </div>
             </div>

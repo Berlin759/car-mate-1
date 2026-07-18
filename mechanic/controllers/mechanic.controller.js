@@ -1940,6 +1940,38 @@ export const postSubmitKYC = async (req, res) => {
         log1(["postSubmitKYC param----->", param]);
         log1(["postSubmitKYC req.files----->", req.files]);
 
+        if (param.bankAccountHolderName && param.bankAccountHolderName.trim() !== "") {
+            const trimmedName = param.bankAccountHolderName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
+            };
+            if (trimmedName.length < 2 || trimmedName.length > 100) {
+                return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
+            };
+        };
+
+        if (param.bankIfscCode && param.bankIfscCode.trim() !== "") {
+            const trimmedIfsc = param.bankIfscCode.trim().toUpperCase();
+            const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+            if (!ifscRegex.test(trimmedIfsc)) {
+                return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
+            };
+            param.bankIfscCode = trimmedIfsc;
+        };
+
+        if (param.bankAccountNumber && param.bankAccountNumber.trim() !== "") {
+            const trimmedAccNo = param.bankAccountNumber.trim();
+            const accNoRegex = /^[0-9]+$/;
+            if (!accNoRegex.test(trimmedAccNo)) {
+                return res.status(400).json(errorResponse("Account Number must contain only digits."));
+            };
+            if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
+                return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
+            };
+            param.bankAccountNumber = trimmedAccNo;
+        };
+
         let updateObj = {};
 
         const fileFields = ["aadhaarFront", "aadhaarBack", "panCard", "drivingLicense", "selfie"];
@@ -1955,7 +1987,7 @@ export const postSubmitKYC = async (req, res) => {
         const bankFields = ["bankAccountNumber", "bankIfscCode", "bankAccountHolderName", "bankName"];
         bankFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
-                updateObj[field] = param[field];
+                updateObj[field] = field === "bankAccountHolderName" ? param[field].trim() : param[field];
             };
         });
 
@@ -1965,6 +1997,27 @@ export const postSubmitKYC = async (req, res) => {
 
         let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
         log1(["postSubmitKYC existingKYC----->", existingKYC]);
+
+        if (updateObj.bankAccountHolderName) {
+            const existingName = await KYC.findOne({ bankAccountHolderName: updateObj.bankAccountHolderName, _id: { $ne: existingKYC?._id } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
+            };
+        };
+
+        if (updateObj.bankIfscCode) {
+            const existingIfsc = await KYC.findOne({ bankIfscCode: updateObj.bankIfscCode, _id: { $ne: existingKYC?._id } });
+            if (existingIfsc) {
+                return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
+            };
+        };
+
+        if (updateObj.bankAccountNumber) {
+            const existingAccNo = await KYC.findOne({ bankAccountNumber: updateObj.bankAccountNumber, _id: { $ne: existingKYC?._id } });
+            if (existingAccNo) {
+                return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
+            };
+        };
 
         let kycData;
 

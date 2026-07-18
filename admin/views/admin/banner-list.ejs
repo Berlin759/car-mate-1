@@ -15,8 +15,8 @@
             <% if (body?.bannerList && body.bannerList.length > 0) { body.bannerList.forEach(function(banner, index) { %>
                 <tr>
                     <td><%= index + 1 %></td>
-                    <td><strong><%= banner.title || "-" %></strong></td>
-                    <td><%= banner.description || "-" %></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 200px;"><strong><%= banner.title || "-" %></strong></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 250px;"><%= banner.description || "-" %></td>
                     <td><%= banner.link || "-" %></td>
                     <td>
                         <% if (banner.isActive) { %>

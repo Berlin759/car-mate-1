@@ -15,6 +15,21 @@ $(document).ready(function () {
         }
     });
 
+    // Strip non-alpha from account holder name
+    $(document).on("input", "#bankAccountHolderName", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+    });
+
+    // Strip non-numeric from account number
+    $(document).on("input", "#bankAccountNumber", function () {
+        this.value = this.value.replace(/[^0-9]/g, "").slice(0, 20);
+    });
+
+    // Auto-uppercase IFSC code and strip invalid chars
+    $(document).on("input", "#bankIfscCode", function () {
+        this.value = this.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 11);
+    });
+
     // Submit KYC Form
     $(document).on("submit", "#kyc-submit-form", function (e) {
         e.preventDefault();
@@ -22,6 +37,9 @@ $(document).ready(function () {
         const mechanicId = $("#mechanic-id").val();
         const aadhaarFront = $("#aadhaarFront")[0].files[0];
         const aadhaarBack = $("#aadhaarBack")[0].files[0];
+        const bankAccountHolderName = $("#bankAccountHolderName").val().trim();
+        const bankIfscCode = $("#bankIfscCode").val().trim().toUpperCase();
+        const bankAccountNumber = $("#bankAccountNumber").val().trim();
 
         if (!mechanicId) {
             showToast(0, "Invalid mechanic Id");
@@ -36,6 +54,38 @@ $(document).ready(function () {
         if (!aadhaarBack) {
             showToast(0, "Please upload Aadhaar back image.");
             return;
+        };
+
+        if (bankAccountHolderName) {
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(bankAccountHolderName)) {
+                showToast(0, "Account Holder Name must contain only alphabetic characters and spaces.");
+                return;
+            };
+            if (bankAccountHolderName.length < 2 || bankAccountHolderName.length > 100) {
+                showToast(0, "Account Holder Name must be between 2 and 100 characters.");
+                return;
+            };
+        };
+
+        if (bankIfscCode) {
+            const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+            if (!ifscRegex.test(bankIfscCode)) {
+                showToast(0, "Please enter a valid IFSC code (e.g., SBIN0001234).");
+                return;
+            };
+        };
+
+        if (bankAccountNumber) {
+            const accNoRegex = /^[0-9]+$/;
+            if (!accNoRegex.test(bankAccountNumber)) {
+                showToast(0, "Account Number must contain only digits.");
+                return;
+            };
+            if (bankAccountNumber.length < 6 || bankAccountNumber.length > 20) {
+                showToast(0, "Account Number must be between 6 and 20 digits.");
+                return;
+            };
         };
 
         const formData = new FormData();
@@ -53,10 +103,10 @@ $(document).ready(function () {
         const selfie = $("#selfie")[0].files[0];
         if (selfie) formData.append("selfie", selfie);
 
-        formData.append("bankAccountHolderName", $("#bankAccountHolderName").val() || "");
+        formData.append("bankAccountHolderName", bankAccountHolderName);
         formData.append("bankName", $("#bankName").val() || "");
         formData.append("bankAccountNumber", $("#bankAccountNumber").val() || "");
-        formData.append("bankIfscCode", $("#bankIfscCode").val() || "");
+        formData.append("bankIfscCode", bankIfscCode);
 
         $("#submit-kyc-btn").prop("disabled", true).text("Submitting...");
 
@@ -73,29 +123,5 @@ $(document).ready(function () {
                 $("#submit-kyc-btn").prop("disabled", false).text("Submit KYC");
             };
         });
-
-        // $.ajax({
-        //     url: "/kyc/submit",
-        //     type: "POST",
-        //     data: formData,
-        //     processData: false,
-        //     contentType: false,
-        //     success: function (response) {
-        //         showToast(response.flag, response.msg);
-        //         if (response.flag === 1) {
-        //             setTimeout(function () {
-        //                 window.location.href = "/mechanic/" + mechanicId;
-        //             }, 1000);
-        //         } else if (response.flag === 8) {
-        //             window.location.reload();
-        //         } else {
-        //             $("#submit-kyc-btn").prop("disabled", false).text("Submit KYC");
-        //         }
-        //     },
-        //     error: function () {
-        //         showToast(0, "Something went wrong. Please try again.");
-        //         $("#submit-kyc-btn").prop("disabled", false).text("Submit KYC");
-        //     }
-        // });
     });
 });

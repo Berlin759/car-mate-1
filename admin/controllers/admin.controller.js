@@ -4081,6 +4081,48 @@ export const postSubmitKYC = async (req, res) => {
             return res.status(400).json(errorResponse("KYC already submitted for this mechanic."));
         };
 
+        if (bankAccountHolderName && bankAccountHolderName.trim() !== "") {
+            const trimmedName = bankAccountHolderName.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameRegex.test(trimmedName)) {
+                return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
+            };
+            if (trimmedName.length < 2 || trimmedName.length > 100) {
+                return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
+            };
+            const existingName = await KYC.findOne({ bankAccountHolderName: trimmedName, _id: { $ne: existingKyc?._id } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
+            };
+        };
+
+        if (bankIfscCode && bankIfscCode.trim() !== "") {
+            const trimmedIfsc = bankIfscCode.trim().toUpperCase();
+            const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+            if (!ifscRegex.test(trimmedIfsc)) {
+                return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
+            };
+            const existingIfsc = await KYC.findOne({ bankIfscCode: trimmedIfsc, _id: { $ne: existingKyc?._id } });
+            if (existingIfsc) {
+                return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
+            };
+        };
+
+        if (bankAccountNumber && bankAccountNumber.trim() !== "") {
+            const trimmedAccNo = bankAccountNumber.trim();
+            const accNoRegex = /^[0-9]+$/;
+            if (!accNoRegex.test(trimmedAccNo)) {
+                return res.status(400).json(errorResponse("Account Number must contain only digits."));
+            };
+            if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
+                return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
+            };
+            const existingAccNo = await KYC.findOne({ bankAccountNumber: trimmedAccNo, _id: { $ne: existingKyc?._id } });
+            if (existingAccNo) {
+                return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
+            };
+        };
+
         let aadhaarFrontUrl = "";
         let aadhaarBackUrl = "";
         let panCardUrl = "";
@@ -4119,10 +4161,10 @@ export const postSubmitKYC = async (req, res) => {
             panCard: panCardUrl,
             drivingLicense: drivingLicenseUrl,
             selfie: selfieUrl,
-            bankAccountHolderName: bankAccountHolderName || "",
+            bankAccountHolderName: bankAccountHolderName ? bankAccountHolderName.trim() : "",
             bankName: bankName || "",
             bankAccountNumber: bankAccountNumber || "",
-            bankIfscCode: bankIfscCode || "",
+            bankIfscCode: bankIfscCode ? bankIfscCode.trim().toUpperCase() : "",
             status: Constants.KYC_STATUS.PENDING,
         };
 
@@ -4550,6 +4592,49 @@ export const postAddBanner = async (req, res) => {
     try {
         const { title, description, link, isActive, sortOrder } = req.body;
 
+        if (!title || title.trim() === "") {
+            return res.status(400).json(errorResponse("Title is required."));
+        };
+
+        const trimmedTitle = title.trim();
+        const titleNoSpace = trimmedTitle.replace(/\s/g, "");
+        if (titleNoSpace.length > 50) {
+            return res.status(400).json(errorResponse("Title must not exceed 50 characters (excluding spaces)."));
+        };
+
+        const existingTitle = await Banner.findOne({ title: trimmedTitle });
+        if (existingTitle) {
+            return res.status(400).json(errorResponse("Title already exists. Please choose a different title."));
+        };
+
+        if (description && description.trim() !== "") {
+            const descNoSpace = description.replace(/\s/g, "");
+            if (descNoSpace.length > 200) {
+                return res.status(400).json(errorResponse("Description must not exceed 200 characters (excluding spaces)."));
+            };
+        };
+
+        if (link && link.trim() !== "") {
+            try {
+                const url = new URL(link.trim());
+                if (!["http:", "https:"].includes(url.protocol)) {
+                    return res.status(400).json(errorResponse("Please enter a valid URL starting with http:// or https://."));
+                };
+            } catch (e) {
+                return res.status(400).json(errorResponse("Please enter a valid URL (e.g., https://example.com)."));
+            };
+        };
+
+        const parsedSortOrder = parseInt(sortOrder || 1);
+        if (isNaN(parsedSortOrder) || parsedSortOrder < 1) {
+            return res.status(400).json(errorResponse("Sort Order must be greater than 0."));
+        };
+
+        const existingSortOrder = await Banner.findOne({ sortOrder: parsedSortOrder });
+        if (existingSortOrder) {
+            return res.status(400).json(errorResponse("Sort Order already exists. Please choose a different order."));
+        };
+
         let imageData = "";
 
         if (req.files?.image) {
@@ -4560,12 +4645,12 @@ export const postAddBanner = async (req, res) => {
         };
 
         const payload = {
-            title: title,
-            description: description,
+            title: trimmedTitle,
+            description: description ? description.trim() : "",
             image: imageData,
-            link: link,
+            link: link ? link.trim() : "",
             isActive: isActive !== "false",
-            sortOrder: parseInt(sortOrder || 0),
+            sortOrder: parsedSortOrder,
         };
 
         const banner = await Banner.create(payload);
