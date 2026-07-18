@@ -2957,6 +2957,10 @@ input:checked+.slider .t-line::before {
     border: 1px solid var(--border-color);
 }
 
+.text-space {
+    padding: 14px 35px 14px 15px;
+}
+
 .form-control:focus,
 .form-select:focus {
     border-color: var(--border-color);

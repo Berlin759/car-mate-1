@@ -23,10 +23,10 @@
     <div class="d-flex align-items-center gap-2">
         <label class="text-gray fs-14 mb-0">Status:</label>
         <input type="hidden" id="mechanic-id" value="<%= body?.mechanic?._id %>">
-        <select id="mechanic-status-select" class="form-select form-select-sm" style="width: auto;">
+        <select id="mechanic-status-select" class="form-select form-select-sm text-space" style="width: auto;">
             <option value="1" <%= body?.mechanic?.status === 1 ? "selected" : "" %>>Pending</option>
             <option value="2" <%= body?.mechanic?.status === 2 ? "selected" : "" %>>Active</option>
-            <option value="4" <%= body?.mechanic?.status === 4 ? "selected" : "" %>>Suspended</option>
+            <option value="4" <%= body?.mechanic?.status === 4 ? "selected" : "" %>>Suspend</option>
         </select>
         <button type="button" id="update-mechanic-status" class="btn btn-primary btn-sm">Update</button>
     </div>
