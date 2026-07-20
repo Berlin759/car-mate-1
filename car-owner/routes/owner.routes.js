@@ -21,9 +21,6 @@ import {
     postAddCar,
     postCarList,
     postServiceList,
-    postAddCreditCard,
-    postCardList,
-    postDeleteCard,
     postAddBooking,
     postBookingList,
     postBookingDetails,
@@ -53,7 +50,9 @@ import {
     postDeleteCar,
     postUpdateCar,
     postSearchServices,
-    postConfirmPayment,
+    postVerifyRazorpayPayment,
+    postGuestBooking,
+    postRazorpayWebhook,
     postUpdateLocation,
     postGetProviderLocation,
     postFileDispute,
@@ -84,8 +83,8 @@ router.post("/verify-email", authMiddleware, postVerifyEmail);
 
 router.post("/logout", authMiddleware, postLogout);
 
-// Home API
-router.post("/home-details", authMiddleware, getHomeDetails);
+// Home API (Public - no auth required)
+router.post("/home-details", getHomeDetails);
 
 // Vehicle Management
 router.post("/add-car", authMiddleware, postAddCar);
@@ -94,17 +93,13 @@ router.post("/set-default-car", authMiddleware, postSetDefaultCar);
 router.post("/update-car", authMiddleware, postUpdateCar);
 router.post("/delete-car", authMiddleware, postDeleteCar);
 
-// Service API
-router.post("/service-list", authMiddleware, postServiceList);
-router.post("/search-services", authMiddleware, postSearchServices);
-router.post("/nearby-mechanics", authMiddleware, postNearbyMechanics);
-
-// Card Payment API
-router.post("/add-card", authMiddleware, postAddCreditCard);
-router.post("/card-list", authMiddleware, postCardList);
-router.post("/delete-card", authMiddleware, postDeleteCard);
+// Service API (Public - no auth required)
+router.post("/service-list", postServiceList);
+router.post("/search-services", postSearchServices);
+router.post("/nearby-mechanics", postNearbyMechanics);
 
 // Booking API
+router.post("/guest-booking", postGuestBooking);
 router.post("/add-booking", authMiddleware, postAddBooking);
 router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
@@ -122,7 +117,10 @@ router.post("/rating-list", authMiddleware, postRatingList);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);
-router.post("/confirm-payment", authMiddleware, postConfirmPayment);
+router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
+
+// Razorpay Webhook (Public - called by Razorpay)
+router.post("/razorpay-webhook", postRazorpayWebhook);
 
 // Chat Routes
 router.post("/chat-list", authMiddleware, postChatList);

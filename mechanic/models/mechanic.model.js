@@ -76,14 +76,6 @@ const mechanicSchema = new Schema(
             type: Date,
             default: null,
         },
-        stripeCustomerId: {
-            type: String,
-            default: "",
-        },
-        stripeCardId: {
-            type: String,
-            default: "",
-        },
         timezone: {
             type: String,
             default: "",

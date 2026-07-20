@@ -44,18 +44,9 @@ const transactionSchema = new Schema(
             type: Number,
             default: 0,
         },
-        stripeCardId: {
-            type: String,
-            default: "",
-        },
         description: {
             type: String,
             default: "",
-        },
-        paymentMethod: {
-            type: Number,
-            enum: Object.values(Constants.PAYMENT_METHOD),
-            default: Constants.PAYMENT_METHOD.CASH,
         },
         status: {
             type: Number,

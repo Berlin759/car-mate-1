@@ -23,6 +23,7 @@ import {
     postBookingList,
     postBookingDetails,
     postBookingUpdateStatus,
+    postVerifyRazorpayPayment,
     postNotificationList,
     postTransactionList,
     postUpdateNotification,
@@ -89,6 +90,7 @@ router.post("/notification-update", authMiddleware, postUpdateNotification);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);
+router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
 
 // Chat Routes
 router.post("/chat-list", authMiddleware, postChatList);

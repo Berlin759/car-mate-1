@@ -65,11 +65,6 @@ const Constants = {
         EXPIRED: 5,
         CANCELLED: 6,
     },
-    PAYMENT_METHOD: {
-        CASH: 1,
-        WALLET: 2,
-        CARD: 3,
-    },
     TRANSACTION_STATUS: {
         PENDING: 1,
         SUCCESS: 2,
@@ -102,13 +97,7 @@ const Constants = {
         SERVICE_COMPLETED: 7,
         PAYMENT_COMPLETED: 8,
         CLOSED: 9,
-    },
-    PAYMENT_METHOD: {
-        CASH: 1,
-        WALLET: 2,
-        CARD: 3,
-        UPI: 4,
-        NET_BANKING: 5,
+        FAILED: 10,
     },
     CHECK_IN_OUT_STATUS: {
         BOOKED: 1,

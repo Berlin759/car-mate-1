@@ -31,7 +31,7 @@ $(document).on("click", ".transaction-method-filter", function () {
     $("#method-filter-btn .filter-data").text(paymentMethodText).addClass("active");
     $("#method-filter-btn .hr-line-sm").addClass("active");
 
-    fetchAllTransactionList({ paymentMethod: paymentMethod });
+    fetchAllTransactionList({});
 });
 
 $(document).on("click", "#clear-method-filter", function () {
@@ -39,7 +39,7 @@ $(document).on("click", "#clear-method-filter", function () {
     $("#method-filter-btn .filter-data").text("").removeClass("active");
     $("#method-filter-btn .hr-line-sm").removeClass("active");
 
-    fetchAllTransactionList({ paymentMethod: "" });
+    fetchAllTransactionList({});
 });
 
 $(document).on("click", "#reset-transaction-filters", function () {
@@ -55,7 +55,7 @@ $(document).on("click", "#reset-transaction-filters", function () {
     $("#method-filter-btn .filter-data").removeClass("active").text('');
     $("#method-filter-btn .hr-line-sm").removeClass("active");
 
-    fetchAllTransactionList({ status: "", paymentMethod: "" });
+    fetchAllTransactionList({ status: "" });
 });
 
 $(document).on("click", ".transaction_details_show", function () {
@@ -85,14 +85,6 @@ $(document).on("click", ".transaction_details_show", function () {
 
         const transaction = response.data;
 
-        /* PAYMENT METHOD */
-        let paymentMethod = "-";
-        switch (parseInt(transaction?.paymentMethod)) {
-            case 1: paymentMethod = "Cash"; break;
-            case 2: paymentMethod = "Wallet"; break;
-            case 3: paymentMethod = "Credit Card"; break;
-        };
-
         /* PAYMENT STATUS */
         let statusText = "Pending";
         let statusClass = "alert-pending";
@@ -113,7 +105,7 @@ $(document).on("click", ".transaction_details_show", function () {
         $("#transaction_details_body #transaction_id").text(transaction?._id || "-");
         $("#transaction_details_body #transaction_total_amount").text("₹" + transaction?.totalAmount || 0);
         $("#transaction_details_body #transaction_guest_name").text(transaction?.userDetails?.fullName || "-");
-        $("#transaction_details_body #transaction_pay_method").text(paymentMethod);
+        $("#transaction_details_body #transaction_pay_method").text("Razorpay");
         $("#transaction_details_body #transaction_date").text(formatDate(transaction?.createdAt) || "-");
         $("#transaction_details_body #booking_total_amount").text("₹" + transaction?.bookingDetails?.totalAmount || 0);
         $("#transaction_details_body #booking_discount_amount").text("₹" + transaction?.bookingDetails?.discountAmount || 0);

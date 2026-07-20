@@ -2,7 +2,6 @@ import ejs from "ejs";
 import path from "path";
 import moment from "moment";
 import mongoose from "mongoose";
-import Stripe from 'stripe';
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
 import { custom_validation } from "../lib/validation.js";
@@ -16,8 +15,6 @@ import {
 } from "../lib/general.js";
 import Mechanic from "../models/mechanic.model.js";
 import OTP from "../models/otp.model.js";
-
-const stripeAccount = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();

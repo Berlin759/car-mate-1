@@ -95,11 +95,6 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
-        paymentMethod: {
-            type: Number,
-            enum: Object.values(Constants.PAYMENT_METHOD),
-            default: Constants.PAYMENT_METHOD.CASH,
-        },
         beforePhotos: [
             {
                 type: String,
@@ -125,6 +120,18 @@ const bookingSchema = new Schema(
         cancelTime: {
             type: Date,
             default: null,
+        },
+        razorpayOrderId: {
+            type: String,
+            default: "",
+        },
+        razorpayPaymentId: {
+            type: String,
+            default: "",
+        },
+        razorpaySignature: {
+            type: String,
+            default: "",
         },
         status: {
             type: Number,

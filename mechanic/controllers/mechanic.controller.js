@@ -2,7 +2,8 @@ import ejs from "ejs";
 import path from "path";
 import fs from "fs";
 import moment from "moment";
-import Stripe from 'stripe';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
@@ -19,7 +20,7 @@ import {
 } from "../lib/general.js";
 import { sendMail } from "../utils/mailSend.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
-import { postCollectPayment, postRefundPayment } from "./payment.controller.js";
+
 import { io } from "../index.js";
 import Mechanic from "../models/mechanic.model.js";
 import Chat from "../models/chat.model.js";
@@ -33,7 +34,11 @@ import KYC from "../models/kyc.model.js";
 import Withdrawal from "../models/withdrawal.model.js";
 import Rating from "../models/rating.model.js";
 
-const stripeAccount = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 const __dirname = path.resolve();
 
@@ -1087,8 +1092,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (alreadyBooked) {
                     return res.status(400).json(errorResponse("You have already accepted another booking for this time."));
                 };
+
                 notificationTitle = "Booking Accepted";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has accepted your booking.`;
+
                 break;
             }
 
@@ -1097,8 +1104,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                     bookingDetails.status === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
                     return res.status(400).json(errorResponse("Cannot cancel booking after service has started."));
                 };
+
                 notificationTitle = "Booking Cancelled";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has cancelled your booking.`;
+
                 break;
             }
 
@@ -1106,8 +1115,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_ACCEPTED) {
                     return res.status(400).json(errorResponse("Can only mark as en route after accepting booking."));
                 };
+
                 notificationTitle = "Provider En Route";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} is on the way to your location.`;
+
                 break;
             }
 
@@ -1115,8 +1126,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE) {
                     return res.status(400).json(errorResponse("Can only mark as arrived after being en route."));
                 };
+
                 notificationTitle = "Provider Arrived";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has arrived at your location.`;
+
                 break;
             }
 
@@ -1124,12 +1137,15 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.ARRIVED) {
                     return res.status(400).json(errorResponse("Can only start service after arriving."));
                 };
+
                 updatePayload.startTime = new Date();
                 if (param.beforePhotos && Array.isArray(param.beforePhotos)) {
                     updatePayload.beforePhotos = param.beforePhotos;
                 };
+
                 notificationTitle = "Service Started";
                 notificationDescription = `Service has been started for your booking.`;
+
                 break;
             }
 
@@ -1137,27 +1153,19 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_STARTED) {
                     return res.status(400).json(errorResponse("Can only complete service after starting."));
                 };
+
                 updatePayload.endTime = new Date();
                 if (param.afterPhotos && Array.isArray(param.afterPhotos)) {
                     updatePayload.afterPhotos = param.afterPhotos;
                 };
+
                 if (param.materialCost) {
                     updatePayload.materialCost = parseFloat(param.materialCost);
                 };
+
                 notificationTitle = "Service Completed";
                 notificationDescription = `Service has been completed for your booking. Please verify and make payment.`;
-                break;
-            }
 
-            case Constants.BOOKING_STATUS.PAYMENT_COMPLETED: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
-                    return res.status(400).json(errorResponse("Can only confirm payment after service completion."));
-                };
-                if (param.paymentMethod) {
-                    updatePayload.paymentMethod = parseInt(param.paymentMethod);
-                };
-                notificationTitle = "Payment Confirmed";
-                notificationDescription = `Payment has been confirmed for your booking.`;
                 break;
             }
 
@@ -1165,8 +1173,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED) {
                     return res.status(400).json(errorResponse("Can only close booking after payment."));
                 };
+
                 notificationTitle = "Booking Closed";
                 notificationDescription = `Your booking has been closed. Thank you for using our service!`;
+
                 break;
             }
 
@@ -1182,6 +1192,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
         if (notificationTitle && bookingDetails.ownerId) {
             const owner = bookingDetails.ownerId;
+
             if (owner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 owner.deviceToken && owner.deviceToken !== "") {
                 let notificationObject = {
@@ -1191,6 +1202,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     bookingId: bookingDetails._id,
                     type: Constants.NOTIFICATION_TYPE.BOOKING,
                 };
+
                 await sendPushNotification(owner.deviceToken, notificationObject);
 
                 await Notification.create({
@@ -1220,6 +1232,112 @@ export const postBookingUpdateStatus = async (req, res) => {
     } finally {
         mechanicLocks.delete(mechanicId);
     };
+};
+
+export const postVerifyRazorpayPayment = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+
+        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+            return res.status(400).json(errorResponse("Missing Razorpay payment details."));
+        };
+
+        const booking = await Booking.findOne({
+            _id: new ObjectId(bookingId),
+            mechanicId: new ObjectId(mechanicId),
+        });
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+
+        const body = razorpayOrderId + "|" + razorpayPaymentId;
+
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body)
+            .digest("hex");
+
+        const isAuthentic = expectedSignature === razorpaySignature;
+
+        if (!isAuthentic) {
+            log1(["postVerifyRazorpayPayment Signature mismatch----->"]);
+            return res.status(400).json(errorResponse("Payment verification failed. Invalid signature."));
+        };
+
+        await Booking.findByIdAndUpdate(bookingId, {
+            razorpayOrderId: razorpayOrderId,
+            razorpayPaymentId: razorpayPaymentId,
+            razorpaySignature: razorpaySignature,
+            status: Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+        });
+
+        const transaction = await Transaction.findOne({ bookingId: new ObjectId(bookingId) });
+
+        if (transaction) {
+            await Transaction.findByIdAndUpdate(transaction._id, {
+                trxId: razorpayPaymentId,
+                status: Constants.TRANSACTION_STATUS.SUCCESS,
+                description: `Razorpay Payment - ${razorpayPaymentId}`,
+            });
+        }
+
+        if (booking.ownerId) {
+            const ownerData = await (await import("../models/owner.model.js")).default.findById(booking.ownerId);
+            if (
+                ownerData &&
+                ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.deviceToken &&
+                ownerData.deviceToken !== ""
+            ) {
+                let notificationObject = {
+                    title: "Payment",
+                    description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
+                    ownerId: booking.ownerId,
+                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                };
+                await sendPushNotification(ownerData.deviceToken, notificationObject);
+            }
+        }
+
+        const mechanicData = await Mechanic.findById(mechanicId);
+        if (
+            mechanicData &&
+            mechanicData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            mechanicData.deviceToken &&
+            mechanicData.deviceToken !== ""
+        ) {
+            let notificationObject = {
+                title: "Payment Received",
+                description: `Payment of ₹${booking.totalAmount} received successfully via Razorpay.`,
+                mechanicId: mechanicId,
+                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+            };
+            await sendPushNotification(mechanicData.deviceToken, notificationObject);
+        }
+
+        if (io) {
+            io.emit(Constants.SOCKET_EVENTS.CHANGE_BOOKING_STATUS, {
+                bookingId: booking._id,
+                status: Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+                mechanicId: mechanicId,
+            });
+        }
+
+        return res.status(200).json(successResponse("Payment verified successfully.", {
+            bookingId: bookingId,
+            razorpayPaymentId: razorpayPaymentId,
+            status: "verified",
+        }));
+    } catch (error) {
+        log1(["Error in postVerifyRazorpayPayment ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    }
 };
 
 export const postNotificationList = async (req, res) => {

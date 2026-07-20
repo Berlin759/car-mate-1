@@ -264,6 +264,32 @@ export const ip2location = async (ipAddress) => {
     };
 };
 
+export const getLatLngFromIP = async (ipAddress) => {
+    try {
+        if (!ipAddress || ipAddress === "127.0.0.1" || ipAddress === "::1" || ipAddress === "::ffff:127.0.0.1") {
+            return errorResponse("Cannot determine location from local IP.");
+        }
+
+        const url = `http://ip-api.com/json/${ipAddress}?fields=status,lat,lon,country,regionName,city`;
+        const response = await axios.get(url, { timeout: 5000 });
+
+        if (response.data && response.data.status === "success") {
+            return successResponse("Location fetched from IP.", {
+                latitude: response.data.lat,
+                longitude: response.data.lon,
+                country: response.data.country || "",
+                region: response.data.regionName || "",
+                city: response.data.city || "",
+            });
+        };
+
+        return errorResponse("Could not determine location from IP.");
+    } catch (error) {
+        log1(["Error fetching getLatLngFromIP----->", error]);
+        return errorResponse("IP geolocation service unavailable.");
+    };
+};
+
 export const generateFileName = (fileName) => {
     const timestamp = moment().utc().valueOf();
     const randomString = crypto.randomBytes(16).toString("hex").slice(0, 16);
