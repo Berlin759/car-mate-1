@@ -55,37 +55,40 @@
                     <div class="row g-3">
                         <div class="col-lg-6">
                             <label class="form-label text-dark">Template Name <span class="text-danger">*</span></label>
-                            <input class="form-control" type="text" id="template_name" placeholder="e.g. booking_confirmation">
+                            <input class="form-control" type="text" id="template_name" placeholder="e.g. Booking Confirmation" pattern="[a-zA-Z\s]+" maxlength="50" required>
+                            <small class="text-muted"><span id="template_name_counter">0/50</span> characters</small>
                         </div>
                         <div class="col-lg-6">
                             <label class="form-label text-dark">Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="template_type">
+                            <select class="form-select" id="template_type" required>
                                 <option value="email">Email</option>
                                 <option value="push_notification">Push Notification</option>
                                 <option value="sms">SMS</option>
                             </select>
                         </div>
                         <div class="col-lg-6">
-                            <label class="form-label text-dark">Target Audience</label>
-                            <select class="form-select" id="template_audience">
+                            <label class="form-label text-dark">Target Audience <span class="text-danger">*</span></label>
+                            <select class="form-select" id="template_audience" required>
                                 <option value="all">All</option>
                                 <option value="owner">Car Owners</option>
                                 <option value="mechanic">Mechanics</option>
                             </select>
                         </div>
                         <div class="col-lg-6" id="subject-field-group">
-                            <label class="form-label text-dark">Subject</label>
-                            <input class="form-control" type="text" id="template_subject" placeholder="Email subject line">
+                            <label class="form-label text-dark">Subject <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" id="template_subject" placeholder="Email subject line" maxlength="60">
+                            <small class="text-muted"><span id="template_subject_counter">0/50</span> characters</small>
                         </div>
                         <div class="col-lg-12">
                             <label class="form-label text-dark">Body <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="template_body" rows="6" placeholder="Template body text. Use {{placeholder}} for dynamic values."></textarea>
+                            <textarea class="form-control" id="template_body" rows="6" placeholder="Template body text. Use {{placeholder}} for dynamic values." maxlength="400" required></textarea>
+                            <small class="text-muted"><span id="template_body_counter">0/300</span> characters</small>
                         </div>
                         <div class="col-lg-12">
-                            <label class="form-label text-dark">Placeholders</label>
+                            <label class="form-label text-dark">Placeholders <span class="text-danger">*</span></label>
                             <div class="d-flex flex-wrap gap-2 mb-2" id="placeholder-tags-container"></div>
                             <div class="input-group">
-                                <input class="form-control" type="text" id="placeholder_input" placeholder="Enter placeholder name (e.g. ownerName)">
+                                <input class="form-control" type="text" id="placeholder_input" placeholder="Enter placeholder name (e.g. ownerName)" maxlength="50" required>
                                 <button class="btn btn-outline-secondary" type="button" id="add_placeholder_btn">
                                     <i class="fa-solid fa-plus"></i>
                                 </button>

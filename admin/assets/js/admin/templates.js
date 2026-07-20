@@ -2,7 +2,65 @@ var templatePlaceholders = [];
 
 $(document).ready(function () {
     fetchTemplateList();
+    initTemplateValidation();
 });
+
+$(document).on("hide.bs.modal", "#templateModal", function () {
+    resetTemplateModal();
+});
+
+$(document).on("click", "#add_new_template_btn", function () {
+    resetTemplateModal();
+});
+
+function initTemplateValidation() {
+    $(document).on("input", "#template_name", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        const nameNoSpace = this.value.replace(/\s/g, "");
+        $("#template_name_counter").text(`${nameNoSpace.length}/50`);
+        if (nameNoSpace.length > 50) {
+            this.value = this.value.slice(0, this.value.length - (nameNoSpace.length - 50));
+            $("#template_name_counter").text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#template_subject", function () {
+        const subjectNoSpace = this.value.replace(/\s/g, "");
+        $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
+        if (subjectNoSpace.length > 50) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 50) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $("#template_subject_counter").text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#template_body", function () {
+        const bodyNoSpace = this.value.replace(/\s/g, "");
+        $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
+        if (bodyNoSpace.length > 300) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 300) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $("#template_body_counter").text(`300/300`);
+        };
+    });
+
+    $(document).on("keypress", "#templateModal input, #templateModal textarea, #templateModal select", function (e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (!$("#save_template").hasClass("d-none")) {
+                $("#save_template").trigger("click");
+            } else if (!$("#update_template").hasClass("d-none")) {
+                $("#update_template").trigger("click");
+            };
+        };
+    });
+};
 
 // Type Filter
 $(document).on("click", ".template-type-filter", function () {
@@ -46,6 +104,7 @@ $(document).on("change", "#template_type", function () {
     } else {
         $("#subject-field-group").hide();
         $("#template_subject").val("");
+        $("#template_subject_counter").text("0/50");
     }
 });
 
@@ -67,14 +126,6 @@ $(document).on("click", ".remove-placeholder-tag", function () {
     renderPlaceholderTags();
 });
 
-$(document).on("hide.bs.modal", "#templateModal", function () {
-    resetTemplateModal();
-});
-
-$(document).on("click", "#add_new_template_btn", function () {
-    resetTemplateModal();
-});
-
 // Save Template
 $(document).on("click", "#save_template", function () {
     const name = $("#template_name").val().trim();
@@ -83,9 +134,34 @@ $(document).on("click", "#save_template", function () {
     const body = $("#template_body").val().trim();
     const targetAudience = $("#template_audience").val();
 
-    if (!name) { showToast(0, "Template name is required."); return; }
-    if (!body) { showToast(0, "Template body is required."); return; }
-    if (type === "email" && !subject) { showToast(0, "Subject is required for email templates."); return; }
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    const nameNoSpace = name.replace(/\s/g, "");
+    const subjectNoSpace = subject.replace(/\s/g, "");
+    const bodyNoSpace = body.replace(/\s/g, "");
+
+    let validationMessage = "";
+    if (!name) {
+        validationMessage = "Template name is required.";
+    } else if (!nameRegex.test(name)) {
+        validationMessage = "Template name must contain only alphabetic characters and spaces.";
+    } else if (nameNoSpace.length > 50) {
+        validationMessage = "Template name must not exceed 50 characters (excluding spaces).";
+    } else if (!body) {
+        validationMessage = "Template body is required.";
+    } else if (bodyNoSpace.length > 300) {
+        validationMessage = "Template body must not exceed 300 characters (excluding spaces).";
+    } else if (type === "email" && !subject) {
+        validationMessage = "Subject is required for email templates.";
+    } else if (type === "email" && subjectNoSpace.length > 50) {
+        validationMessage = "Subject must not exceed 50 characters (excluding spaces).";
+    } else if (templatePlaceholders.length === 0) {
+        validationMessage = "At least one placeholder is required.";
+    };
+
+    if (validationMessage !== "") {
+        showToast(0, validationMessage);
+        return;
+    }
 
     postAjaxCall("/add-template", {
         name: name,
@@ -127,6 +203,13 @@ $(document).on("click", ".edit-template-btn", function () {
         templatePlaceholders = t.placeholders || [];
         renderPlaceholderTags();
 
+        const nameNoSpace = (t.name || "").replace(/\s/g, "");
+        $("#template_name_counter").text(`${nameNoSpace.length}/50`);
+        const subjectNoSpace = (t.subject || "").replace(/\s/g, "");
+        $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
+        const bodyNoSpace = (t.body || "").replace(/\s/g, "");
+        $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
+
         if (t.type !== "email") {
             $("#subject-field-group").hide();
         }
@@ -146,8 +229,24 @@ $(document).on("click", "#update_template", function () {
     const type = $("#template_type").val();
     const targetAudience = $("#template_audience").val();
 
-    if (!body) { showToast(0, "Template body is required."); return; }
-    if (type === "email" && !subject) { showToast(0, "Subject is required for email templates."); return; }
+    const subjectNoSpace = subject.replace(/\s/g, "");
+    const bodyNoSpace = body.replace(/\s/g, "");
+
+    let validationMessage = "";
+    if (!body) {
+        validationMessage = "Template body is required.";
+    } else if (bodyNoSpace.length > 300) {
+        validationMessage = "Template body must not exceed 300 characters (excluding spaces).";
+    } else if (type === "email" && !subject) {
+        validationMessage = "Subject is required for email templates.";
+    } else if (type === "email" && subjectNoSpace.length > 50) {
+        validationMessage = "Subject must not exceed 50 characters (excluding spaces).";
+    };
+
+    if (validationMessage !== "") {
+        showToast(0, validationMessage);
+        return;
+    }
 
     postAjaxCall("/update-template", {
         templateId: templateId,
@@ -242,6 +341,17 @@ function addPlaceholder() {
     const val = $("#placeholder_input").val().trim();
     if (!val) return;
 
+    const nameRegex = /^[a-zA-Z0-9]+$/;
+    if (!nameRegex.test(val)) {
+        showToast(0, "Placeholder must contain only alphabetic characters and numbers.");
+        return;
+    };
+
+    if (val.length > 50) {
+        showToast(0, "Placeholder must not exceed 50 characters.");
+        return;
+    };
+
     if (templatePlaceholders.includes(val)) {
         showToast(0, "Placeholder already added.");
         return;
@@ -272,6 +382,9 @@ function resetTemplateModal() {
     $("#template_subject").val("");
     $("#template_body").val("");
     $("#template_audience").val("all");
+    $("#template_name_counter").text("0/50");
+    $("#template_subject_counter").text("0/50");
+    $("#template_body_counter").text("0/300");
 
     templatePlaceholders = [];
 

@@ -16,18 +16,25 @@
                 <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
                 <tr>
                     <td><%= start_index %></td>
-                    <td><strong><%= template.name || "-" %></strong></td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 200px;">
+                        <strong><%= template.name || "-" %></strong>
+                    </td>
                     <td>
                         <% if (template.type === "email") { %>
-                            <span class="badge bg-primary">Email</span>
+                            <span>Email</span>
                         <% } else if (template.type === "push_notification") { %>
                             <span class="badge bg-info">Push</span>
                         <% } else { %>
                             <span class="badge bg-secondary">SMS</span>
                         <% } %>
                     </td>
-                    <td><span class="badge bg-light text-dark"><%= template.targetAudience || "all" %></span></td>
-                    <td><%= template.subject || "-" %></td>
+                    <td>
+                        <span class="bet-status alert-gray text-dark">
+                            <%= template.targetAudience || "all" %></span>
+                        </td>
+                    <td style="white-space: normal; word-wrap: break-word; max-width: 250px;">
+                        <%= template.subject || "-" %>
+                    </td>
                     <td>
                         <% if (template.isActive) { %>
                             <span class="bet-status alert-success">Active</span>
@@ -35,8 +42,8 @@
                             <span class="bet-status alert-end">Inactive</span>
                         <% } %>
                     </td>
-                    <td class="text-end">
-                        <div class="action-btn d-flex flex-wrap gap-2 justify-content-end">
+                    <td>
+                        <div class="action-btn d-flex flex-wrap gap-2 justify-content-center">
                             <a href="javascript:void(0);" class="view-template-btn text-primary" data-template-id="<%= template._id %>" title="View">
                                 <i class="fa-regular fa-eye"></i>
                             </a>

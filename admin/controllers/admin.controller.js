@@ -5324,22 +5324,61 @@ export const postAddTemplate = async (req, res) => {
     try {
         const { name, type, subject, body, targetAudience, placeholders } = req.body;
 
-        if (!name || !body) {
-            return res.status(400).json(errorResponse("Name and body are required."));
+        const trimmedName = (name || "").trim();
+        const trimmedSubject = (subject || "").trim();
+        const trimmedBody = (body || "").trim();
+        const trimmedType = (type || "").trim().toLowerCase();
+        const trimmedAudience = (targetAudience || "").trim().toLowerCase();
+
+        const nameRegex = /^[a-zA-Z\s]+$/;
+
+        if (!trimmedName) {
+            return res.status(400).json(errorResponse("Template name is required."));
+        } else if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Template name must contain only alphabetic characters and spaces."));
+        } else if (trimmedName.replace(/\s/g, "").length > 50) {
+            return res.status(400).json(errorResponse("Template name must not exceed 50 characters (excluding spaces)."));
         };
 
-        const existing = await Template.findOne({ name: name.trim() });
+        const existing = await Template.findOne({ name: trimmedName });
         if (existing) {
-            return res.status(400).json(errorResponse("Template name already exists."));
+            return res.status(400).json(errorResponse("Template name already exists. Please use a different name."));
+        };
+
+        if (!trimmedBody) {
+            return res.status(400).json(errorResponse("Template body is required."));
+        } else if (trimmedBody.replace(/\s/g, "").length > 300) {
+            return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
+        };
+
+        if (trimmedType === "email" && !trimmedSubject) {
+            return res.status(400).json(errorResponse("Subject is required for email templates."));
+        } else if (trimmedType === "email" && trimmedSubject.replace(/\s/g, "").length > 50) {
+            return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
+        };
+
+        if (!Array.isArray(placeholders) || placeholders.length === 0) {
+            return res.status(400).json(errorResponse("At least one placeholder is required."));
+        };
+
+        const seenPlaceholders = new Set();
+        for (const ph of placeholders) {
+            const trimmedPh = (ph || "").trim();
+            if (!trimmedPh) {
+                return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
+            } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
+                return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
+            };
+            seenPlaceholders.add(trimmedPh.toLowerCase());
         };
 
         const template = await Template.create({
-            name: name.trim(),
-            type: type || "email",
-            subject: subject || "",
-            body: body,
-            targetAudience: targetAudience || "all",
-            placeholders: Array.isArray(placeholders) ? placeholders : [],
+            name: trimmedName,
+            type: trimmedType || "email",
+            subject: trimmedSubject,
+            body: trimmedBody,
+            targetAudience: trimmedAudience || "all",
+            placeholders: placeholders.map(p => p.trim()),
         });
 
         return res.status(200).json(successResponse("Template created successfully.", template));
@@ -5366,8 +5405,43 @@ export const postUpdateTemplate = async (req, res) => {
             return res.status(400).json(errorResponse("Default templates cannot be modified."));
         };
 
-        if (updateData.placeholders && !Array.isArray(updateData.placeholders)) {
-            updateData.placeholders = [];
+        if (updateData.body !== undefined) {
+            const trimmedBody = (updateData.body || "").trim();
+            if (!trimmedBody) {
+                return res.status(400).json(errorResponse("Template body is required."));
+            } else if (trimmedBody.replace(/\s/g, "").length > 300) {
+                return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
+            };
+            updateData.body = trimmedBody;
+        };
+
+        if (updateData.subject !== undefined) {
+            const trimmedSubject = (updateData.subject || "").trim();
+            const currentType = updateData.type || template.type;
+            if (currentType === "email" && !trimmedSubject) {
+                return res.status(400).json(errorResponse("Subject is required for email templates."));
+            } else if (currentType === "email" && trimmedSubject.replace(/\s/g, "").length > 50) {
+                return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
+            };
+            updateData.subject = trimmedSubject;
+        };
+
+        if (updateData.placeholders !== undefined) {
+            if (!Array.isArray(updateData.placeholders)) {
+                updateData.placeholders = [];
+            } else {
+                const seenPlaceholders = new Set();
+                for (const ph of updateData.placeholders) {
+                    const trimmedPh = (ph || "").trim();
+                    if (!trimmedPh) {
+                        return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
+                    } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
+                        return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
+                    };
+                    seenPlaceholders.add(trimmedPh.toLowerCase());
+                };
+                updateData.placeholders = updateData.placeholders.map(p => p.trim());
+            };
         };
 
         await Template.findByIdAndUpdate(templateId, updateData);
