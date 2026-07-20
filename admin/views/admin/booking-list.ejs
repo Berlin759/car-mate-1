@@ -30,7 +30,7 @@
             </tr>
         </thead>
         <tbody>
-            <% if (body?.bookingList !==  undefined && body?.bookingList?.length > 0) { body.bookingList.forEach((booking, index) => { let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+            <% if (body?.bookingList !==  undefined && body?.bookingList?.length > 0) { body.bookingList.forEach((booking, index) => { let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
                 <tr>
                     <td><%= start_index %></td>
                     <td><%= booking?._id %></td>

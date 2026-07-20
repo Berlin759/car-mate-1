@@ -31,50 +31,53 @@
             </tr>
         </thead>
         <tbody>
-            <% if (body?.transactionList !==  undefined && body?.transactionList?.length > 0) { body.transactionList.forEach((transaction, index) => { let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
-                <tr>
-                    <td><%= start_index %></td>
-                    <td><%= transaction?._id %></td>
-                    <td><%= transaction?.bookingDetails?._id || "-" %></td>
-                    <td><%= transaction?.ownerDetails?.fullName || "-" %></td>
-                    <td><%= transaction?.mechanicDetails?.fullName || "-" %></td>
-                    <td><%= transaction?.serviceDetails?.fullName || "-" %></td>
-                    <td><%= transaction?.carDetails?.fullName || "-" %></td>
-                    <td>$<%= transaction?.totalAmount || 0 %></td>
-                    <td>
-                        <% if(transaction?.status === 2) { %>
-                            <span class="bet-status alert-accept">Completed</span>
-                        <% } else if(transaction?.status === 3) { %>
-                            <span class="bet-status alert-end">Failed</span>
-                        <% } else if(transaction?.status === 4) { %>
-                            <span class="bet-status alert-gray">Refunded</span>
-                        <% } else { %>
-                            <span class="bet-status alert-pending">Pending</span>
-                        <% } %>
-                    </td>
-                    <td><%= formatDate(transaction?.createdAt) || "-" %></td>
-                    <td class="text-center">
-                        <div class="d-flex flex-wrap gap-2 justify-content-end">
-                            <div class="action-btn">
-                                <a href="/transaction/<%= transaction?._id %>" title="View Details">
-                                    <i class="fa-regular fa-eye"></i>
-                                </a>
+            <% if (body?.transactionList !==  undefined && body?.transactionList?.length > 0) { %>
+                <% body.transactionList.forEach((transaction, index) => { %>
+                    <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
+                    <tr>
+                        <td><%= start_index %></td>
+                        <td><%= transaction?._id %></td>
+                        <td><%= transaction?.bookingDetails?._id || "-" %></td>
+                        <td><%= transaction?.ownerDetails?.fullName || "-" %></td>
+                        <td><%= transaction?.mechanicDetails?.fullName || "-" %></td>
+                        <td><%= transaction?.serviceDetails?.fullName || "-" %></td>
+                        <td><%= transaction?.carDetails?.fullName || "-" %></td>
+                        <td>$<%= transaction?.totalAmount || 0 %></td>
+                        <td>
+                            <% if(transaction?.status === 2) { %>
+                                <span class="bet-status alert-accept">Completed</span>
+                            <% } else if(transaction?.status === 3) { %>
+                                <span class="bet-status alert-end">Failed</span>
+                            <% } else if(transaction?.status === 4) { %>
+                                <span class="bet-status alert-gray">Refunded</span>
+                            <% } else { %>
+                                <span class="bet-status alert-pending">Pending</span>
+                            <% } %>
+                        </td>
+                        <td><%= formatDate(transaction?.createdAt) || "-" %></td>
+                        <td class="text-center">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                <div class="action-btn">
+                                    <a href="/transaction/<%= transaction?._id %>" title="View Details">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </a>
+                                </div>
+                                <div class="action-btn">
+                                    <a href="/transaction/<%= transaction?._id %>/download" target="_blank" title="Download PDF">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" class="lucide lucide-download h-3.5 w-3.5">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" x2="12" y1="15" y2="3"></line>
+                                        </svg>
+                                    </a>
+                                </div>
                             </div>
-                            <div class="action-btn">
-                                <a href="/transaction/<%= transaction?._id %>/download" target="_blank" title="Download PDF">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="lucide lucide-download h-3.5 w-3.5">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="7 10 12 15 17 10"></polyline>
-                                        <line x1="12" x2="12" y1="15" y2="3"></line>
-                                    </svg>
-                                </a>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            <% })} else { %>
+                        </td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
                 <tr>
                     <td colspan="9" class="text-center">No transactions found</td>
                 </tr>

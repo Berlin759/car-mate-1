@@ -21,17 +21,19 @@ const STATUS_MAP = {
 
 function formatDate(date) {
     if (!date) return "-";
+
     const d = new Date(date);
     const day = ("0" + d.getDate()).slice(-2);
     const month = ("0" + (d.getMonth() + 1)).slice(-2);
     const year = d.getFullYear();
+
     return `${year}-${month}-${day}`;
-}
+};
 
 function drawField(doc, label, value, x, y) {
     doc.fontSize(8).fillColor(COLORS.gray).font("Helvetica").text(label, x, y);
     doc.fontSize(9).fillColor(COLORS.dark).font("Helvetica-Bold").text(String(value || "-"), x, y + 11);
-}
+};
 
 export function generateTransactionPDF(transaction, res) {
     const doc = new PDFDocument({ size: "A4", margin: 0 });
@@ -64,16 +66,18 @@ export function generateTransactionPDF(transaction, res) {
         y += 8;
         drawFn();
         y += 6;
-    }
+    };
 
     // Transaction Info
     section("Transaction Information", () => {
         drawField(doc, "Transaction ID:", transaction?._id, ML, y);
         drawField(doc, "Invoice ID:", transaction?.invoiceId, 320, y);
         y += 28;
+
         drawField(doc, "TRX ID:", transaction?.trxId, ML, y);
         drawField(doc, "Created Date:", formatDate(transaction?.createdAt), 320, y);
         y += 28;
+
         drawField(doc, "Admin Charge:", `$${transaction?.adminCharge || 0}`, ML, y);
         drawField(doc, "Total Amount:", `$${transaction?.totalAmount || 0}`, 320, y);
         y += 28;
@@ -84,6 +88,7 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Booking ID:", transaction?.bookingDetails?._id, ML, y);
         drawField(doc, "Invoice No:", transaction?.bookingDetails?.invoiceNo, 320, y);
         y += 28;
+
         drawField(doc, "Booking Date:", formatDate(transaction?.bookingDetails?.date), ML, y);
         drawField(doc, "Booking Time:", transaction?.bookingDetails?.time || "-", 320, y);
         y += 28;
@@ -94,6 +99,7 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Owner Name:", transaction?.ownerDetails?.fullName, ML, y);
         drawField(doc, "Email:", transaction?.ownerDetails?.email, 320, y);
         y += 28;
+
         drawField(doc, "Phone:", transaction?.ownerDetails?.phoneNumber, ML, y);
         y += 28;
     });
@@ -103,6 +109,7 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Mechanic Name:", transaction?.mechanicDetails?.fullName, ML, y);
         drawField(doc, "Email:", transaction?.mechanicDetails?.email, 320, y);
         y += 28;
+
         drawField(doc, "Phone:", transaction?.mechanicDetails?.phoneNumber, ML, y);
         y += 28;
     });
@@ -112,6 +119,7 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Service Name:", transaction?.serviceDetails?.fullName, ML, y);
         drawField(doc, "Car Name:", transaction?.carDetails?.fullName, 320, y);
         y += 28;
+
         drawField(doc, "Vehicle Number:", transaction?.carDetails?.vehicleNumber, ML, y);
         y += 28;
     });
@@ -130,20 +138,21 @@ export function generateTransactionPDF(transaction, res) {
         `Generated on ${formatDate(new Date())} | Car-Mate Admin`,
         ML,
         doc.page.height - 28,
-        { width: CW, align: "center" }
+        { width: CW, align: "center" },
     );
 
     doc.end();
-}
+};
 
 function drawCell(doc, text, x, y, w, opts = {}) {
     const fontSize = opts.fontSize || 7;
     const color = opts.color || COLORS.dark;
+
     doc.save();
     doc.fontSize(fontSize).fillColor(color).font(opts.bold ? "Helvetica-Bold" : "Helvetica");
     doc.text(String(text || "-"), x + 2, y + 4, { width: w - 4, height: 12, ellipsis: true, lineBreak: false });
     doc.restore();
-}
+};
 
 export function generateAllTransactionsPDF(transactions, res) {
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0 });
@@ -186,10 +195,11 @@ export function generateAllTransactionsPDF(transactions, res) {
     const colWidths = [25, 85, 85, 80, 80, 80, 75, 60, 60, 65, 75];
     const colX = [];
     let xAcc = ML;
+
     for (let i = 0; i < colWidths.length; i++) {
         colX.push(xAcc);
         xAcc += colWidths[i];
-    }
+    };
 
     const ROW_H = 16;
     const HEADER_H = 18;
@@ -197,14 +207,16 @@ export function generateAllTransactionsPDF(transactions, res) {
     function drawPageHeader(py) {
         doc.rect(ML, py, USABLE_W, HEADER_H).fill(COLORS.primary);
         let hx = ML;
+
         for (let i = 0; i < headers.length; i++) {
             doc.save();
             doc.fontSize(7).fillColor(COLORS.white).font("Helvetica-Bold");
             doc.text(headers[i], hx + 2, py + 5, { width: colWidths[i] - 4, height: 10, lineBreak: false });
             doc.restore();
+
             hx += colWidths[i];
-        }
-    }
+        };
+    };
 
     drawPageHeader(y);
     y += HEADER_H;
@@ -217,9 +229,11 @@ export function generateAllTransactionsPDF(transactions, res) {
             doc.fontSize(18).fillColor(COLORS.white).font("Helvetica-Bold").text("All Transactions Report (continued)", ML, 15, { width: USABLE_W, align: "center" });
             doc.fontSize(9).fillColor(COLORS.white).font("Helvetica").text(`Page ${doc.bufferedPageRange().count + 1}`, ML, 38, { width: USABLE_W, align: "center" });
             y = 72;
+
             drawPageHeader(y);
+
             y += HEADER_H;
-        }
+        };
 
         const bgColor = index % 2 === 0 ? COLORS.white : "#f0f4ff";
         doc.rect(ML, y, USABLE_W, ROW_H).fill(bgColor);
@@ -248,8 +262,8 @@ export function generateAllTransactionsPDF(transactions, res) {
                 drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci], { color: status.color, bold: true });
             } else {
                 drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci]);
-            }
-        }
+            };
+        };
 
         y += ROW_H;
     });
@@ -266,4 +280,4 @@ export function generateAllTransactionsPDF(transactions, res) {
     );
 
     doc.end();
-}
+};

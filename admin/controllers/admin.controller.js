@@ -156,7 +156,7 @@ export const getDashboardPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getDashboardPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getCarOwnerPage = async (req, res) => {
@@ -179,7 +179,7 @@ export const getCarOwnerPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getCarOwnerPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddOwner = async (req, res) => {
@@ -239,19 +239,25 @@ export const postAddOwner = async (req, res) => {
 
 export const postAllCarOwnerList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            email,
+            status,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         let filter = {};
 
-        if (param.email) {
-            filter["email"] = param.email;
+        if (email) {
+            filter["email"] = email;
         };
 
-        if (param.status) {
-            filter["status"] = parseInt(param.status);
+        if (status) {
+            filter["status"] = parseInt(status);
         };
 
         let aggregatePipeline = [
@@ -316,31 +322,31 @@ export const postAllCarOwnerList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/car-owner-list.ejs"), {
             body: {
-                param: param,
+                payload: req.body,
                 carOwnerList: aggregateResp.result,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllCarOwnerList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postCarOwnerDetails = async (req, res) => {
     try {
-        const param = req?.body;
+        const { ownerId } = req?.body;
 
-        if (!param?.ownerId) {
-            return res.json(errorResponse("Invalid owner Id"));
+        if (!ownerId || !ObjectId.isValid(ownerId)) {
+            return res.status(400).json(errorResponse("Invalid Owner ID."));
         };
 
         let filter = {
-            _id: new ObjectId(param?.ownerId),
+            _id: new ObjectId(ownerId),
         };
 
         let ownerPipeline = [
@@ -392,7 +398,7 @@ export const postCarOwnerDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postCarOwnerDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postUpdateOwner = async (req, res) => {
@@ -559,19 +565,19 @@ export const getCarOwnerDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getCarOwnerDetailPage----->", error]);
         return res.redirect("/car-owner");
-    }
+    };
 };
 
 export const postCarOwnerDelete = async (req, res) => {
     try {
-        const param = req?.body;
+        const { ownerId } = req.body;
 
-        if (!param?.ownerId) {
+        if (!ownerId || !ObjectId.isValid(ownerId)) {
             return res.json(errorResponse("Invalid car owner Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.ownerId),
+            _id: new ObjectId(ownerId),
         };
 
         let carOwnerDetails = await Owner.findOne(filter);
@@ -588,7 +594,7 @@ export const postCarOwnerDelete = async (req, res) => {
     } catch (error) {
         log1(["Error in postCarOwnerDelete----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getMechanicPage = async (req, res) => {
@@ -611,7 +617,7 @@ export const getMechanicPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getMechanicPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddMechanic = async (req, res) => {
@@ -670,19 +676,26 @@ export const postAddMechanic = async (req, res) => {
 
 export const postAllMechanicList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            email,
+            status,
+            kycStatus,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         let filter = {};
 
-        if (param.email) {
-            filter["email"] = param.email;
+        if (email) {
+            filter["email"] = email;
         };
 
-        if (param.status) {
-            filter["status"] = parseInt(param.status);
+        if (status) {
+            filter["status"] = parseInt(status);
         };
 
         let aggregatePipeline = [
@@ -712,8 +725,8 @@ export const postAllMechanicList = async (req, res) => {
             },
         ];
 
-        if (param.kycStatus) {
-            if (param.kycStatus === "not_submitted") {
+        if (kycStatus) {
+            if (kycStatus === "not_submitted") {
                 aggregatePipeline.push({
                     $match: {
                         kycDetails: null,
@@ -722,10 +735,10 @@ export const postAllMechanicList = async (req, res) => {
             } else {
                 aggregatePipeline.push({
                     $match: {
-                        "kycDetails.status": parseInt(param.kycStatus),
+                        "kycDetails.status": parseInt(kycStatus),
                     },
                 });
-            }
+            };
         };
 
         aggregatePipeline.push(
@@ -787,31 +800,31 @@ export const postAllMechanicList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/mechanic-list.ejs"), {
             body: {
-                param: param,
+                payload: req.body,
                 carMechanicList: aggregateResp.result,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllMechanicList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postMechanicDetails = async (req, res) => {
     try {
-        const param = req?.body;
+        const { mechanicId } = req?.body;
 
-        if (!param?.carMechanicId) {
+        if (!mechanicId) {
             return res.json(errorResponse("Invalid mechanic Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.carMechanicId),
+            _id: new ObjectId(mechanicId),
         };
 
         let mechanicPipeline = [
@@ -863,7 +876,7 @@ export const postMechanicDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postMechanicDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postMechanicUpdate = async (req, res) => {
@@ -1035,19 +1048,19 @@ export const getMechanicDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getMechanicDetailPage----->", error]);
         return res.redirect("/mechanic");
-    }
+    };
 };
 
 export const postMechanicDelete = async (req, res) => {
     try {
-        const param = req?.body;
+        const { mechanicId } = req?.body;
 
-        if (!param?.mechanicId) {
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
             return res.json(errorResponse("Invalid mechanic Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.mechanicId),
+            _id: new ObjectId(mechanicId),
         };
 
         let mechanicDetails = await Mechanic.findOne(filter);
@@ -1064,7 +1077,7 @@ export const postMechanicDelete = async (req, res) => {
     } catch (error) {
         log1(["Error in postMechanicDelete----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getCarsPage = async (req, res) => {
@@ -1087,7 +1100,7 @@ export const getCarsPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getCarsPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddCar = async (req, res) => {
@@ -1181,15 +1194,20 @@ export const postAddCar = async (req, res) => {
 
 export const postAllCarsList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            status,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         let filter = {};
 
-        if (param.status) {
-            filter["status"] = parseInt(param.status);
+        if (status) {
+            filter["status"] = parseInt(status);
         };
 
         let aggregatePipeline = [
@@ -1246,31 +1264,31 @@ export const postAllCarsList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/cars-list.ejs"), {
             body: {
-                param: param,
+                payload: req?.body,
                 carsList: aggregateResp.result,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req?.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllCarsList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postCarDetails = async (req, res) => {
     try {
-        const param = req?.body;
+        const { carId } = req?.body;
 
-        if (!param?.carId) {
+        if (!carId || !ObjectId.isValid(carId)) {
             return res.json(errorResponse("Invalid car Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.carId),
+            _id: new ObjectId(carId),
         };
 
         let carPipeline = [
@@ -1317,7 +1335,7 @@ export const postCarDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postCarDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postUpdateCar = async (req, res) => {
@@ -1510,19 +1528,19 @@ export const getCarDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getCarDetailPage----->", error]);
         return res.redirect("/cars");
-    }
+    };
 };
 
 export const postCarDelete = async (req, res) => {
     try {
-        const param = req?.body;
+        const { carId } = req?.body;
 
-        if (!param?.carId) {
+        if (!carId || !ObjectId.isValid(carId)) {
             return res.json(errorResponse("Invalid car Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.carId),
+            _id: new ObjectId(carId),
         };
 
         let carDetails = await Car.findOne(filter);
@@ -1539,7 +1557,7 @@ export const postCarDelete = async (req, res) => {
     } catch (error) {
         log1(["Error in postCarDelete----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getServicePage = async (req, res) => {
@@ -1569,7 +1587,7 @@ export const getServicePage = async (req, res) => {
     } catch (error) {
         log1(["Error in getServicePage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddService = async (req, res) => {
@@ -1664,20 +1682,29 @@ export const postAddService = async (req, res) => {
 
 export const postAllServiceList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            mechanicId,
+            status,
+            kycStatus,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const mechanicId = param.mechanicId;
-
         if (mechanicId) {
+            if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+                return res.json(errorResponse("Invalid mechanic Id"));
+            };
+
             const mechanic = await Mechanic.findById(mechanicId)
                 .select("fullName phoneNumber serviceIds")
                 .lean();
 
             if (!mechanic) {
-                return res.status(200).json(successResponse("No data found", { blade: "", total_record: 0, param }));
+                return res.status(200).json(successResponse("No data found", { blade: "", total_record: 0, payload: req?.body }));
             };
 
             const services = await Service.find({
@@ -1706,7 +1733,7 @@ export const postAllServiceList = async (req, res) => {
             let response = successResponse();
             response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/service-list.ejs"), {
                 body: {
-                    param: param,
+                    payload: req?.body,
                     serviceList: [],
                     mechanicFilter: true,
                     mechanicName: mechanic.fullName,
@@ -1715,7 +1742,7 @@ export const postAllServiceList = async (req, res) => {
                 },
             });
             response["total_record"] = totalRecords;
-            response["param"] = param;
+            response["payload"] = req?.body;
 
             return res.status(200).json(response);
         }
@@ -1724,8 +1751,8 @@ export const postAllServiceList = async (req, res) => {
             parentId: null
         };
 
-        if (param.status) {
-            filter["status"] = parseInt(param.status);
+        if (status) {
+            filter["status"] = parseInt(status);
         };
 
         let aggregatePipeline = [
@@ -1769,31 +1796,31 @@ export const postAllServiceList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/service-list.ejs"), {
             body: {
-                param: param,
+                payload: req?.body,
                 serviceList: aggregateResp.result,
                 mechanicFilter: false,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req?.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllServiceList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postServiceDetails = async (req, res) => {
     try {
-        const param = req?.body;
+        const { serviceId } = req?.body;
 
-        if (!param?.serviceId) {
+        if (!serviceId || !ObjectId.isValid(serviceId)) {
             return res.json(errorResponse("Invalid service Id"));
         };
 
-        const serviceDetails = await Service.findById(param.serviceId).lean();
+        const serviceDetails = await Service.findById(serviceId).lean();
         if (!serviceDetails) {
             return res.json(errorResponse("Service not found"));
         }
@@ -1810,7 +1837,7 @@ export const postServiceDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postServiceDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postServiceUpdate = async (req, res) => {
@@ -1818,11 +1845,21 @@ export const postServiceUpdate = async (req, res) => {
         const admin = req.session.admin;
 
         log1(["postServiceUpdate req.body----->", req.body]);
-        const { serviceId, fullName, description, status, subCategories } = req.body;
+        const {
+            serviceId,
+            fullName,
+            description,
+            status,
+            subCategories,
+        } = req.body;
 
         const validate = await custom_validation(req.body, "admin.update_service");
         if (validate.flag !== 1) {
             return res.status(400).json(validate);
+        };
+
+        if (!serviceId || !ObjectId.isValid(serviceId)) {
+            return res.json(errorResponse("Invalid service Id"));
         };
 
         let filter = {
@@ -1842,14 +1879,17 @@ export const postServiceUpdate = async (req, res) => {
             if (!nameRegex.test(trimmedName)) {
                 return res.status(400).json(errorResponse("Category name must contain only alphabetic characters and spaces."));
             };
+
             const nameNoSpace = trimmedName.replace(/\s/g, "");
             if (nameNoSpace.length > 50) {
                 return res.status(400).json(errorResponse("Category name must not exceed 50 characters (excluding spaces)."));
             };
+
             const existingCategory = await Service.findOne({ fullName: trimmedName, parentId: null, _id: { $ne: new ObjectId(serviceId) } });
             if (existingCategory) {
                 return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
             };
+
             payload["fullName"] = trimmedName;
         };
 
@@ -1858,6 +1898,7 @@ export const postServiceUpdate = async (req, res) => {
             if (descNoSpace.length > 200) {
                 return res.status(400).json(errorResponse("Category description must not exceed 200 characters (excluding spaces)."));
             };
+
             payload["description"] = description;
         };
 
@@ -1920,14 +1961,14 @@ export const postServiceUpdate = async (req, res) => {
                         status: serviceDetails.status,
                     });
                     incomingSubIds.push(newSub._id.toString());
-                }
-            }
+                };
+            };
 
             const subsToDelete = existingSubIds.filter(id => !incomingSubIds.includes(id));
             if (subsToDelete.length > 0) {
                 await Service.deleteMany({ _id: { $in: subsToDelete.map(id => new ObjectId(id)) } });
-            }
-        }
+            };
+        };
 
         return res.status(200).json(successResponse("Service Update Successfully!"));
     } catch (error) {
@@ -1938,14 +1979,14 @@ export const postServiceUpdate = async (req, res) => {
 
 export const postServiceDelete = async (req, res) => {
     try {
-        const param = req?.body;
+        const { serviceId } = req?.body;
 
-        if (!param?.serviceId) {
+        if (!serviceId || !ObjectId.isValid(serviceId)) {
             return res.json(errorResponse("Invalid service Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.serviceId),
+            _id: new ObjectId(serviceId),
         };
 
         let serviceDetails = await Service.findOne(filter);
@@ -1964,7 +2005,7 @@ export const postServiceDelete = async (req, res) => {
     } catch (error) {
         log1(["Error in postServiceDelete----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getBookingPage = async (req, res) => {
@@ -1989,7 +2030,7 @@ export const getBookingPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getBookingPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAllBookingList = async (req, res) => {
@@ -2168,19 +2209,19 @@ export const postAllBookingList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/booking-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 bookingList: items,
             },
         });
 
         response["total_record"] = totalRecords;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllBookingList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postBookingDetails = async (req, res) => {
@@ -2326,23 +2367,19 @@ export const postBookingDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postBookingDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteBooking = async (req, res) => {
     try {
-        const param = req?.body;
+        const { bookingId } = req?.body;
 
-        if (!param?.bookingId) {
-            return res.json(errorResponse("Invalid Booking Id"));
-        };
-
-        if (!param?.bookingId || !ObjectId.isValid(param?.bookingId)) {
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid booking id."));
         };
 
         let filter = {
-            _id: new ObjectId(param?.bookingId),
+            _id: new ObjectId(bookingId),
         };
 
         let bookingDetails = await Booking.findOne(filter);
@@ -2359,7 +2396,7 @@ export const postDeleteBooking = async (req, res) => {
     } catch (error) {
         log1(["Error in postDeleteBooking----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getTransactionPage = async (req, res) => {
@@ -2382,13 +2419,11 @@ export const getTransactionPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getTransactionPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAllTransactionList = async (req, res) => {
     try {
-        const param = req?.body;
-
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
@@ -2603,25 +2638,23 @@ export const postAllTransactionList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/transaction-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 transactionList: items,
             },
         });
 
         response["total_record"] = totalRecords;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAllTransactionList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postTransactionDetails = async (req, res) => {
     try {
-        const param = req?.body;
-
         const { transactionId } = req.body;
 
         if (!transactionId || !ObjectId.isValid(transactionId)) {
@@ -2792,7 +2825,7 @@ export const postTransactionDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postTransactionDetails----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getTransactionDownload = async (req, res) => {
@@ -2888,7 +2921,7 @@ export const getTransactionDownload = async (req, res) => {
     } catch (error) {
         log1(["Error in getTransactionDownload----->", error]);
         return res.redirect("/transactions");
-    }
+    };
 };
 
 export const getAllTransactionsDownload = async (req, res) => {
@@ -2968,7 +3001,7 @@ export const getAllTransactionsDownload = async (req, res) => {
     } catch (error) {
         log1(["Error in getAllTransactionsDownload----->", error]);
         return res.redirect("/transactions");
-    }
+    };
 };
 
 export const getBookingDetailPage = async (req, res) => {
@@ -3128,7 +3161,7 @@ export const getBookingDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getBookingDetailPage----->", error]);
         return res.redirect("/bookings");
-    }
+    };
 };
 
 export const getTransactionDetailPage = async (req, res) => {
@@ -3305,7 +3338,7 @@ export const getTransactionDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getTransactionDetailPage----->", error]);
         return res.redirect("/transactions");
-    }
+    };
 };
 
 export const getReviewPage = async (req, res) => {
@@ -3344,7 +3377,7 @@ export const getReviewPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getReviewPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getSettingsPage = async (req, res) => {
@@ -3375,26 +3408,26 @@ export const getSettingsPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getSettingsPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postUpdateSettings = async (req, res) => {
     try {
-        const param = req.body;
+        const { login_secret_token, maintenance } = req.body;
 
-        const validate = custom_validation(param, "admin.update_settings");
+        const validate = custom_validation(req?.body, "admin.update_settings");
         if (validate.flag !== 1) {
             return res.json(validate);
         };
 
         const tokenDetails = await Setting.findOneAndUpdate(
             { name: "login_secret_token" },
-            { value: param.login_secret_token }
+            { value: login_secret_token }
         );
 
-        await Setting.findOneAndUpdate({ name: "maintenance" }, { value: param.maintenance });
+        await Setting.findOneAndUpdate({ name: "maintenance" }, { value: maintenance });
 
-        if (tokenDetails.value !== param.login_secret_token) {
+        if (tokenDetails.value !== login_secret_token) {
             req.session.destroy();
         };
 
@@ -3408,29 +3441,29 @@ export const postUpdateSettings = async (req, res) => {
 export const postUpdatePasswords = async (req, res) => {
     try {
         const admin = req.session.admin;
-        const param = req.body;
+        const { current_password, new_password } = req.body;
 
         const adminData = await Admin.findOne({ _id: new ObjectId(admin._id) });
         if (!adminData) {
             return res.json(errorResponse("Admin not found"));
         };
 
-        const validate = custom_validation(param, "admin.update_passwords");
+        const validate = custom_validation(req.body, "admin.update_passwords");
         if (validate.flag !== 1) {
             return res.json(validate);
         };
 
-        const isOldMatch = await decryption(param.current_password, adminData.password);
+        const isOldMatch = await decryption(current_password, adminData.password);
         if (!isOldMatch) {
             return res.json(errorResponse("Invalid current password. Please enter valid current password."));
         };
 
-        const isMatch = await decryption(param.new_password, adminData.password);
+        const isMatch = await decryption(new_password, adminData.password);
         if (isMatch) {
             return res.json(errorResponse("New password cannot be the same as the current password."));
         };
 
-        const hashedPassword = await encryption(param.new_password);
+        const hashedPassword = await encryption(new_password);
 
         await Admin.updateOne({ _id: new ObjectId(admin._id) }, { password: hashedPassword, loginToken: "" });
 
@@ -3440,7 +3473,7 @@ export const postUpdatePasswords = async (req, res) => {
     } catch (error) {
         log1(["Error in postUpdatePasswords----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postLogout = async (req, res) => {
@@ -3462,15 +3495,20 @@ export const postLogout = async (req, res) => {
 
 export const postAllReviewList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            rating,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         let match = {};
 
-        if (param.rating) {
-            match.rating = Number(param.rating);
+        if (rating) {
+            match.rating = Number(rating);
         };
 
         let aggregatePipeline = [
@@ -3604,13 +3642,13 @@ export const postAllReviewList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/review-list.ejs"), {
             body: {
-                param: param,
+                payload: req.body,
                 reviewList: aggregateResp.result,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
@@ -3621,14 +3659,14 @@ export const postAllReviewList = async (req, res) => {
 
 export const postReviewDetails = async (req, res) => {
     try {
-        const param = req?.body;
+        const { reviewId } = req?.body;
 
-        if (!param?.reviewId) {
+        if (!reviewId || !ObjectId.isValid(reviewId)) {
             return res.json(errorResponse("Invalid review Id"));
         };
 
         let filter = {
-            _id: new ObjectId(param?.reviewId),
+            _id: new ObjectId(reviewId),
         };
 
         let reviewPipeline = [
@@ -3771,7 +3809,9 @@ export const postDashboardKPIs = async (req, res) => {
             recentBookings,
         ] = await Promise.all([
             Owner.countDocuments({}),
+
             Mechanic.countDocuments({}),
+
             Booking.countDocuments({
                 status: {
                     $in: [
@@ -3783,9 +3823,11 @@ export const postDashboardKPIs = async (req, res) => {
                     ],
                 },
             }),
+
             Booking.countDocuments({
                 status: Constants.BOOKING_STATUS.CLOSED,
             }),
+
             Transaction.aggregate([
                 {
                     $match: { status: 1 },
@@ -3797,9 +3839,11 @@ export const postDashboardKPIs = async (req, res) => {
                     },
                 },
             ]),
+
             KYC.countDocuments({
                 status: Constants.KYC_STATUS.PENDING,
             }),
+
             Booking.aggregate([
                 { $sort: { createdAt: -1 } },
                 { $limit: 5 },
@@ -3907,15 +3951,15 @@ export const getKYCPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getKYCPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getKYCDetailPage = async (req, res) => {
     try {
         const admin = req.session.admin;
-        const paramId = req.params.id;
+        const { id } = req.params;
 
-        if (!paramId || !ObjectId.isValid(paramId)) {
+        if (!id || !ObjectId.isValid(id)) {
             return res.redirect("/kyc");
         };
 
@@ -3923,15 +3967,15 @@ export const getKYCDetailPage = async (req, res) => {
         let text = "";
         let backUrl = "/kyc";
 
-        let mechanicDetails = await Mechanic.findById(paramId);
+        let mechanicDetails = await Mechanic.findById(id);
         if (mechanicDetails) {
-            filter["mechanicId"] = new ObjectId(paramId);
+            filter["mechanicId"] = new ObjectId(id);
             text = "Mechanic";
-            backUrl = `/mechanic/${paramId}`;
+            backUrl = `/mechanic/${id}`;
         } else {
-            let kycDetails = await KYC.findById(paramId);
+            let kycDetails = await KYC.findById(id);
             if (kycDetails) {
-                filter["_id"] = new ObjectId(paramId);
+                filter["_id"] = new ObjectId(id);
                 text = "KYC";
                 backUrl = `/kyc`;
             } else {
@@ -4017,7 +4061,7 @@ export const getKYCDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getKYCDetailPage----->", error]);
         return res.redirect("/kyc");
-    }
+    };
 };
 
 export const getAddKYCPage = async (req, res) => {
@@ -4060,12 +4104,18 @@ export const getAddKYCPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getAddKYCPage----->", error]);
         return res.redirect("/mechanic");
-    }
+    };
 };
 
 export const postSubmitKYC = async (req, res) => {
     try {
-        const { mechanicId, bankAccountHolderName, bankName, bankAccountNumber, bankIfscCode } = req.body;
+        const {
+            mechanicId,
+            bankAccountHolderName,
+            bankName,
+            bankAccountNumber,
+            bankIfscCode,
+        } = req.body;
 
         if (!mechanicId || !ObjectId.isValid(mechanicId)) {
             return res.status(400).json(errorResponse("Invalid mechanic Id."));
@@ -4087,9 +4137,11 @@ export const postSubmitKYC = async (req, res) => {
             if (!nameRegex.test(trimmedName)) {
                 return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
             };
+
             if (trimmedName.length < 2 || trimmedName.length > 100) {
                 return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
             };
+
             const existingName = await KYC.findOne({ bankAccountHolderName: trimmedName, _id: { $ne: existingKyc?._id } });
             if (existingName) {
                 return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
@@ -4102,6 +4154,7 @@ export const postSubmitKYC = async (req, res) => {
             if (!ifscRegex.test(trimmedIfsc)) {
                 return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
             };
+
             const existingIfsc = await KYC.findOne({ bankIfscCode: trimmedIfsc, _id: { $ne: existingKyc?._id } });
             if (existingIfsc) {
                 return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
@@ -4114,9 +4167,11 @@ export const postSubmitKYC = async (req, res) => {
             if (!accNoRegex.test(trimmedAccNo)) {
                 return res.status(400).json(errorResponse("Account Number must contain only digits."));
             };
+
             if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
                 return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
             };
+
             const existingAccNo = await KYC.findOne({ bankAccountNumber: trimmedAccNo, _id: { $ne: existingKyc?._id } });
             if (existingAccNo) {
                 return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
@@ -4177,20 +4232,26 @@ export const postSubmitKYC = async (req, res) => {
     } catch (error) {
         log1(["Error in postSubmitKYC----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postPendingKYCList = async (req, res) => {
     try {
-        const param = req?.body;
-        const page = parseInt(req.body.currentPage) || Constants.DEFAULT_PAGE;
-        const limit = parseInt(req.body.itemPerPage) || Constants.DEFAULT_LIMIT;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            email,
+            status,
+        } = req?.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         let filter = {};
 
-        if (param.status) {
-            filter["status"] = parseInt(param.status);
+        if (status) {
+            filter["status"] = parseInt(status);
         };
 
         let aggregatePipeline = [
@@ -4261,19 +4322,19 @@ export const postPendingKYCList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/kyc-list.ejs"), {
             body: {
-                param: param,
+                payload: req.body,
                 kycList: aggregateResp.result,
             },
         });
 
         response["total_record"] = aggregateResp.count[0]?.count || 0;
-        response["param"] = param;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postPendingKYCList----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postApproveKYC = async (req, res) => {
@@ -4285,7 +4346,7 @@ export const postApproveKYC = async (req, res) => {
 
         if (!mechanicId || !ObjectId.isValid(mechanicId)) {
             return res.status(400).json(errorResponse("Invalid mechanic id."));
-        }
+        };
 
         let filter = {
             mechanicId: new ObjectId(mechanicId),
@@ -4294,11 +4355,11 @@ export const postApproveKYC = async (req, res) => {
         let kycDetails = await KYC.findOne(filter);
         if (!kycDetails) {
             return res.json(errorResponse("KYC details not found."));
-        }
+        };
 
         if (kycDetails.status === Constants.KYC_STATUS.APPROVED) {
             return res.status(400).json(errorResponse("KYC is already approved."));
-        }
+        };
 
         let payload = {
             status: Constants.KYC_STATUS.APPROVED,
@@ -4308,13 +4369,13 @@ export const postApproveKYC = async (req, res) => {
         const updateKYC = await KYC.findOneAndUpdate(filter, payload);
         if (!updateKYC) {
             return res.status(400).json(errorResponse("Failed to approve KYC."));
-        }
+        };
 
         return res.status(200).json(successResponse("KYC approved successfully!"));
     } catch (error) {
         log1(["Error in postApproveKYC----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postRejectKYC = async (req, res) => {
@@ -4326,11 +4387,11 @@ export const postRejectKYC = async (req, res) => {
 
         if (!mechanicId || !ObjectId.isValid(mechanicId)) {
             return res.status(400).json(errorResponse("Invalid mechanic id."));
-        }
+        };
 
         if (!rejectReason || rejectReason.trim() === "") {
             return res.status(400).json(errorResponse("Reject reason is required."));
-        }
+        };
 
         let filter = {
             mechanicId: new ObjectId(mechanicId),
@@ -4339,11 +4400,11 @@ export const postRejectKYC = async (req, res) => {
         let kycDetails = await KYC.findOne(filter);
         if (!kycDetails) {
             return res.json(errorResponse("KYC details not found."));
-        }
+        };
 
         if (kycDetails.status === Constants.KYC_STATUS.REJECTED) {
             return res.status(400).json(errorResponse("KYC is already rejected."));
-        }
+        };
 
         let payload = {
             status: Constants.KYC_STATUS.REJECTED,
@@ -4354,18 +4415,28 @@ export const postRejectKYC = async (req, res) => {
         const updateKYC = await KYC.findOneAndUpdate(filter, payload);
         if (!updateKYC) {
             return res.status(400).json(errorResponse("Failed to reject KYC."));
-        }
+        };
 
         return res.status(200).json(successResponse("KYC rejected successfully!"));
     } catch (error) {
         log1(["Error in postRejectKYC----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddCoupon = async (req, res) => {
     try {
-        const { code, description, discountType, discountValue, minOrderAmount, maxDiscountAmount, usageLimit, expiryDate } = req.body;
+        const {
+            code,
+            description,
+            discountType,
+            discountValue,
+            minOrderAmount,
+            maxDiscountAmount,
+            usageLimit,
+            expiryDate,
+        } = req.body;
+
         if (!code || !discountValue || !expiryDate) {
             return res.status(400).json(errorResponse("Code, discount value, and expiry date are required."));
         };
@@ -4375,18 +4446,24 @@ export const postAddCoupon = async (req, res) => {
             return res.status(400).json(errorResponse("Coupon code already exists."));
         };
 
-        const coupon = await Coupon.create({
-            code: code.toUpperCase(), description: description || "", discountType: discountType || "percentage",
-            discountValue: parseFloat(discountValue), minOrderAmount: parseFloat(minOrderAmount || 0),
-            maxDiscountAmount: parseFloat(maxDiscountAmount || 0), usageLimit: parseInt(usageLimit || 0),
+        let payload = {
+            code: code.toUpperCase(),
+            description: description || "",
+            discountType: discountType || "percentage",
+            discountValue: parseFloat(discountValue),
+            minOrderAmount: parseFloat(minOrderAmount || 0),
+            maxDiscountAmount: parseFloat(maxDiscountAmount || 0),
+            usageLimit: parseInt(usageLimit || 0),
             expiryDate: new Date(expiryDate),
-        });
+        };
+
+        const coupon = await Coupon.create(payload);
 
         return res.status(200).json(successResponse("Coupon created successfully.", coupon));
     } catch (error) {
         log1(["Error in postAddCoupon ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postCouponList = async (req, res) => {
@@ -4399,22 +4476,32 @@ export const postCouponList = async (req, res) => {
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
+
         const [items, total] = await Promise.all([
             Coupon.find().sort({ createdAt: -1 }).skip(skip).limit(limit), Coupon.countDocuments(),
         ]);
 
-        return res.status(200).json(successResponse("Coupon list fetched.", { items, page, limit, totalRecords: total }));
+        let response = {
+            page,
+            limit,
+            totalRecords: total,
+            items,
+        };
+
+        return res.status(200).json(successResponse("Coupon list fetched.", response));
     } catch (error) {
         log1(["Error in postCouponList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postUpdateCoupon = async (req, res) => {
     try {
         const { couponId, ...updateData } = req.body;
 
-        if (!couponId) return res.status(400).json(errorResponse("Coupon ID required."));
+        if (!couponId || !ObjectId.isValid(couponId)) {
+            return res.status(400).json(errorResponse("Invalid Coupon ID."));
+        };
 
         await Coupon.findByIdAndUpdate(couponId, updateData);
 
@@ -4422,14 +4509,16 @@ export const postUpdateCoupon = async (req, res) => {
     } catch (error) {
         log1(["Error in postUpdateCoupon ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteCoupon = async (req, res) => {
     try {
         const { couponId } = req.body;
 
-        if (!couponId) return res.status(400).json(errorResponse("Coupon ID required."));
+        if (!couponId || !ObjectId.isValid(couponId)) {
+            return res.status(400).json(errorResponse("Invalid Coupon ID."));
+        };
 
         await Coupon.findByIdAndDelete(couponId);
 
@@ -4437,15 +4526,19 @@ export const postDeleteCoupon = async (req, res) => {
     } catch (error) {
         log1(["Error in postDeleteCoupon ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAssignProvider = async (req, res) => {
     try {
         const { bookingId, mechanicId } = req.body;
 
-        if (!bookingId || !mechanicId) {
-            return res.status(400).json(errorResponse("Booking ID and Mechanic ID required."));
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
         };
 
         const booking = await Booking.findById(bookingId);
@@ -4464,136 +4557,353 @@ export const postAssignProvider = async (req, res) => {
     } catch (error) {
         log1(["Error in postAssignProvider ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postRescheduleBooking = async (req, res) => {
     try {
         const { bookingId, date, time } = req.body;
-        if (!bookingId || !date || !time) return res.status(400).json(errorResponse("Booking ID, date, and time required."));
+
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        if (!date || !time) {
+            return res.status(400).json(errorResponse("Booking ID, date, and time required."));
+        };
+
         await Booking.findByIdAndUpdate(bookingId, { date: new Date(date), time: time });
+
         return res.status(200).json(successResponse("Booking rescheduled successfully."));
     } catch (error) {
         log1(["Error in postRescheduleBooking ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postSuspendOwner = async (req, res) => {
     try {
         const { ownerId, status } = req.body;
-        if (!ownerId) return res.status(400).json(errorResponse("Owner ID required."));
+
+        if (!ownerId || !ObjectId.isValid(ownerId)) {
+            return res.status(400).json(errorResponse("Invalid Owner ID."));
+        };
+
+        if (!parseInt(status)) {
+            return res.status(400).json(errorResponse("Status is required."));
+        };
+
+        const validOwnerStatus = Object.values(Constants.OWNER_STATUS);
+        if (!validOwnerStatus.includes(status)) {
+            return res.status(400).json(errorResponse("Invalid Owner Status value."));
+        };
+
         await Owner.findByIdAndUpdate(ownerId, { status: parseInt(status) });
+
         return res.status(200).json(successResponse("Owner status updated successfully."));
     } catch (error) {
         log1(["Error in postSuspendOwner ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postSuspendMechanic = async (req, res) => {
     try {
         const { mechanicId, status } = req.body;
-        if (!mechanicId) return res.status(400).json(errorResponse("Mechanic ID required."));
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid Mechanic ID."));
+        };
+
+        if (!parseInt(status)) {
+            return res.status(400).json(errorResponse("Status is required."));
+        };
+
+        const validMechanicStatus = Object.values(Constants.MECHANIC_STATUS);
+        if (!validMechanicStatus.includes(status)) {
+            return res.status(400).json(errorResponse("Invalid Mechanic Status value."));
+        };
+
         await Mechanic.findByIdAndUpdate(mechanicId, { status: parseInt(status) });
+
         return res.status(200).json(successResponse("Mechanic status updated successfully."));
     } catch (error) {
         log1(["Error in postSuspendMechanic ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postRevenueReport = async (req, res) => {
     try {
         const { period } = req.body;
+
         let groupBy;
-        if (period === "weekly") groupBy = { year: { $year: "$createdAt" }, week: { $isoWeek: "$createdAt" } };
-        else if (period === "monthly") groupBy = { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } };
-        else groupBy = { year: { $year: "$createdAt" }, month: { $month: "$createdAt" }, day: { $dayOfMonth: "$createdAt" } };
+
+        if (period === "weekly") {
+            groupBy = {
+                year: {
+                    $year: "$createdAt",
+                },
+                week: {
+                    $isoWeek: "$createdAt",
+                },
+            };
+        } else if (period === "monthly") {
+            groupBy = {
+                year: {
+                    $year: "$createdAt",
+                },
+                month: {
+                    $month: "$createdAt",
+                },
+            };
+        } else {
+            groupBy = {
+                year: {
+                    $year: "$createdAt",
+                },
+                month: {
+                    $month: "$createdAt",
+                },
+                day: {
+                    $dayOfMonth: "$createdAt",
+                },
+            };
+        };
 
         const report = await Transaction.aggregate([
-            { $match: { status: Constants.TRANSACTION_STATUS.SUCCESS } },
-            { $group: { _id: groupBy, revenue: { $sum: "$totalAmount" }, count: { $sum: 1 } } },
-            { $sort: { "_id.year": -1, "_id.month": -1, "_id.day": -1 } },
-            { $limit: 30 },
+            {
+                $match: {
+                    status: Constants.TRANSACTION_STATUS.SUCCESS,
+                },
+            },
+            {
+                $group: {
+                    _id: groupBy,
+                    revenue: {
+                        $sum: "$totalAmount",
+                    },
+                    count: {
+                        $sum: 1,
+                    },
+                },
+            },
+            {
+                $sort: {
+                    "_id.year": -1,
+                    "_id.month": -1,
+                    "_id.day": -1,
+                },
+            },
+            {
+                $limit: 30,
+            },
         ]);
+
         return res.status(200).json(successResponse("Revenue report fetched.", report));
     } catch (error) {
         log1(["Error in postRevenueReport ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postServicePopularityReport = async (req, res) => {
     try {
         const report = await Booking.aggregate([
-            { $group: { _id: "$serviceId", bookings: { $sum: 1 }, revenue: { $sum: "$totalAmount" } } },
-            { $lookup: { from: "services", localField: "_id", foreignField: "_id", as: "service" } },
-            { $unwind: { path: "$service", preserveNullAndEmptyArrays: true } },
-            { $project: { serviceName: "$service.fullName", bookings: 1, revenue: 1 } },
-            { $sort: { bookings: -1 } },
-            { $limit: 20 },
+            {
+                $group: {
+                    _id: "$serviceId",
+                    bookings: {
+                        $sum: 1,
+                    },
+                    revenue: {
+                        $sum: "$totalAmount",
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "service",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$service",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    serviceName: "$service.fullName",
+                    bookings: 1,
+                    revenue: 1,
+                },
+            },
+            {
+                $sort: {
+                    bookings: -1,
+                },
+            },
+            {
+                $limit: 20,
+            },
         ]);
+
         return res.status(200).json(successResponse("Service popularity report fetched.", report));
     } catch (error) {
         log1(["Error in postServicePopularityReport ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postProviderPerformanceReport = async (req, res) => {
     try {
         const report = await Booking.aggregate([
-            { $match: { status: { $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED] } } },
-            { $group: { _id: "$mechanicId", completedJobs: { $sum: 1 }, totalRevenue: { $sum: "$totalAmount" } } },
-            { $lookup: { from: "mechanics", localField: "_id", foreignField: "_id", as: "mechanic" } },
-            { $unwind: { path: "$mechanic", preserveNullAndEmptyArrays: true } },
-            { $project: { mechanicName: "$mechanic.fullName", completedJobs: 1, totalRevenue: 1 } },
-            { $sort: { completedJobs: -1 } },
-            { $limit: 20 },
+            {
+                $match: {
+                    status: {
+                        $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED],
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: "$mechanicId",
+                    completedJobs: {
+                        $sum: 1,
+                    },
+                    totalRevenue: {
+                        $sum: "$totalAmount",
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "mechanic",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanic",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    mechanicName: "$mechanic.fullName",
+                    completedJobs: 1,
+                    totalRevenue: 1,
+                },
+            },
+            {
+                $sort: {
+                    completedJobs: -1,
+                },
+            },
+            {
+                $limit: 20,
+            },
         ]);
+
         return res.status(200).json(successResponse("Provider performance report fetched.", report));
     } catch (error) {
         log1(["Error in postProviderPerformanceReport ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postPeakHoursReport = async (req, res) => {
     try {
         const report = await Booking.aggregate([
-            { $addFields: { hour: { $hour: "$createdAt" } } },
-            { $group: { _id: "$hour", count: { $sum: 1 } } },
-            { $sort: { _id: 1 } },
+            {
+                $addFields: {
+                    hour: {
+                        $hour: "$createdAt",
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: "$hour",
+                    count: {
+                        $sum: 1,
+                    },
+                },
+            },
+            {
+                $sort: {
+                    _id: 1,
+                },
+            },
         ]);
+
         return res.status(200).json(successResponse("Peak hours report fetched.", report));
     } catch (error) {
         log1(["Error in postPeakHoursReport ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postCancellationTrendsReport = async (req, res) => {
     try {
         const report = await Booking.aggregate([
-            { $match: { status: Constants.BOOKING_STATUS.CANCELLED } },
-            { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
-            { $sort: { _id: -1 } },
-            { $limit: 30 },
+            {
+                $match: {
+                    status: Constants.BOOKING_STATUS.CANCELLED,
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt",
+                        },
+                    },
+                    count: {
+                        $sum: 1,
+                    },
+                },
+            },
+            {
+                $sort: {
+                    _id: -1,
+                },
+            },
+            {
+                $limit: 30,
+            },
         ]);
+
         return res.status(200).json(successResponse("Cancellation trends report fetched.", report));
     } catch (error) {
         log1(["Error in postCancellationTrendsReport ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddBanner = async (req, res) => {
     try {
-        const { title, description, link, isActive, sortOrder } = req.body;
+        const {
+            title,
+            description,
+            link,
+            isActive,
+            sortOrder,
+        } = req.body;
 
         if (!title || title.trim() === "") {
             return res.status(400).json(errorResponse("Title is required."));
+        };
+
+        if (!link || link.trim() === "") {
+            return res.status(400).json(errorResponse("Link is required."));
         };
 
         const trimmedTitle = title.trim();
@@ -4614,15 +4924,14 @@ export const postAddBanner = async (req, res) => {
             };
         };
 
-        if (link && link.trim() !== "") {
-            try {
-                const url = new URL(link.trim());
-                if (!["http:", "https:"].includes(url.protocol)) {
-                    return res.status(400).json(errorResponse("Please enter a valid URL starting with http:// or https://."));
-                };
-            } catch (e) {
-                return res.status(400).json(errorResponse("Please enter a valid URL (e.g., https://example.com)."));
+        const trimmedLink = link.trim();
+        try {
+            const url = new URL(trimmedLink);
+            if (!["http:", "https:"].includes(url.protocol)) {
+                return res.status(400).json(errorResponse("Please enter a valid URL starting with http:// or https://."));
             };
+        } catch (e) {
+            return res.status(400).json(errorResponse("Please enter a valid URL (e.g., https://example.com)."));
         };
 
         const parsedSortOrder = parseInt(sortOrder || 1);
@@ -4659,7 +4968,7 @@ export const postAddBanner = async (req, res) => {
     } catch (error) {
         log1(["Error in postAddBanner ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postBannerList = async (req, res) => {
@@ -4682,35 +4991,47 @@ export const postBannerList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/banner-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 bannerList: items,
             },
         });
 
         response["total_record"] = total;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postBannerList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteBanner = async (req, res) => {
     try {
-        await Banner.findByIdAndDelete(req.body.bannerId);
+
+        const { bannerId } = req.body;
+
+        if (!bannerId || !ObjectId.isValid(bannerId)) {
+            return res.status(400).json(errorResponse("Invalid Banner ID."));
+        };
+
+        await Banner.findByIdAndDelete(bannerId);
 
         return res.status(200).json(successResponse("Banner deleted successfully."));
     } catch (error) {
         log1(["Error in postDeleteBanner ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddFaq = async (req, res) => {
     try {
-        const { question, answer, category, sortOrder } = req.body;
+        const {
+            question,
+            answer,
+            category,
+            sortOrder,
+        } = req.body;
 
         if (!question || question.trim() === "") {
             return res.status(400).json(errorResponse("Question is required."));
@@ -4737,7 +5058,7 @@ export const postAddFaq = async (req, res) => {
     } catch (error) {
         log1(["Error in postAddFaq ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postFaqList = async (req, res) => {
@@ -4760,24 +5081,28 @@ export const postFaqList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/faq-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 faqList: items,
             },
         });
 
         response["total_record"] = total;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postFaqList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteFaq = async (req, res) => {
     try {
         const { faqId } = req.body;
+
+        if (!faqId || !ObjectId.isValid(faqId)) {
+            return res.status(400).json(errorResponse("Invalid FAQ ID."));
+        };
 
         await FAQ.findByIdAndDelete(faqId);
 
@@ -4785,15 +5110,15 @@ export const postDeleteFaq = async (req, res) => {
     } catch (error) {
         log1(["Error in postDeleteFaq ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postToggleFaqStatus = async (req, res) => {
     try {
         const { faqId, isActive } = req.body;
 
-        if (!faqId) {
-            return res.status(400).json(errorResponse("FAQ ID required."));
+        if (!faqId || !ObjectId.isValid(faqId)) {
+            return res.status(400).json(errorResponse("Invalid FAQ ID."));
         };
 
         const faq = await FAQ.findById(faqId);
@@ -4807,12 +5132,16 @@ export const postToggleFaqStatus = async (req, res) => {
     } catch (error) {
         log1(["Error in postToggleFaqStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddAnnouncement = async (req, res) => {
     try {
-        const { title, description, targetRole } = req.body;
+        const {
+            title,
+            description,
+            targetRole,
+        } = req.body;
 
         const trimmedTitle = (title || "").trim();
         const trimmedDescription = (description || "").trim();
@@ -4860,7 +5189,7 @@ export const postAddAnnouncement = async (req, res) => {
     } catch (error) {
         log1(["Error in postAddAnnouncement ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAnnouncementList = async (req, res) => {
@@ -4883,24 +5212,28 @@ export const postAnnouncementList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/announcement-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 announcementList: items,
             },
         });
 
         response["total_record"] = total;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postAnnouncementList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteAnnouncement = async (req, res) => {
     try {
         const { announcementId } = req.body;
+
+        if (!announcementId || !ObjectId.isValid(announcementId)) {
+            return res.status(400).json(errorResponse("Invalid Announcement ID."));
+        };
 
         const announcement = await Announcement.findById(announcementId);
         if (!announcement) {
@@ -4917,15 +5250,15 @@ export const postDeleteAnnouncement = async (req, res) => {
     } catch (error) {
         log1(["Error in postDeleteAnnouncement ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postToggleAnnouncementStatus = async (req, res) => {
     try {
         const { announcementId, isActive } = req.body;
 
-        if (!announcementId) {
-            return res.status(400).json(errorResponse("Announcement ID required."));
+        if (!announcementId || !ObjectId.isValid(announcementId)) {
+            return res.status(400).json(errorResponse("Invalid Announcement ID."));
         };
 
         const announcement = await Announcement.findById(announcementId);
@@ -4939,7 +5272,7 @@ export const postToggleAnnouncementStatus = async (req, res) => {
     } catch (error) {
         log1(["Error in postToggleAnnouncementStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDisputeList = async (req, res) => {
@@ -4968,35 +5301,44 @@ export const postDisputeList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/dispute-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 disputeList: items,
             },
         });
 
         response["total_record"] = total;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postDisputeList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postResolveDispute = async (req, res) => {
     try {
-        const { disputeId, resolution, refundAmount, penaltyAmount } = req.body;
+        const {
+            disputeId,
+            resolution,
+            refundAmount,
+            penaltyAmount,
+        } = req.body;
 
-        if (!disputeId || !resolution) {
-            return res.status(400).json(errorResponse("Dispute ID and resolution required."));
+        if (!disputeId || !ObjectId.isValid(disputeId)) {
+            return res.status(400).json(errorResponse("Invalid Dispute ID."));
+        };
+
+        if (!resolution) {
+            return res.status(400).json(errorResponse("Resolution is required."));
         };
 
         const payload = {
-            status: Constants.DISPUTE_STATUS.RESOLVED,
             resolution,
             refundAmount: parseFloat(refundAmount || 0),
             penaltyAmount: parseFloat(penaltyAmount || 0),
             resolvedAt: new Date(),
+            status: Constants.DISPUTE_STATUS.RESOLVED,
         };
 
         await Dispute.findByIdAndUpdate(disputeId, payload);
@@ -5005,7 +5347,7 @@ export const postResolveDispute = async (req, res) => {
     } catch (error) {
         log1(["Error in postResolveDispute ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getDisputePage = async (req, res) => {
@@ -5028,7 +5370,7 @@ export const getDisputePage = async (req, res) => {
     } catch (error) {
         log1(["Error in getDisputePage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getBannerPage = async (req, res) => {
@@ -5053,7 +5395,7 @@ export const getBannerPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getBannerPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getFaqPage = async (req, res) => {
@@ -5078,7 +5420,7 @@ export const getFaqPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getFaqPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getAnnouncementPage = async (req, res) => {
@@ -5103,7 +5445,7 @@ export const getAnnouncementPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getAnnouncementPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const getPricingPage = async (req, res) => {
@@ -5132,7 +5474,7 @@ export const getPricingPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getPricingPage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postPricingDetails = async (req, res) => {
@@ -5147,7 +5489,7 @@ export const postPricingDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postPricingDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postUpdatePricing = async (req, res) => {
@@ -5255,7 +5597,7 @@ export const getTemplatePage = async (req, res) => {
     } catch (error) {
         log1(["Error in getTemplatePage----->", error]);
         return res.json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postTemplateList = async (req, res) => {
@@ -5285,13 +5627,13 @@ export const postTemplateList = async (req, res) => {
 
         response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/template-list.ejs"), {
             body: {
-                param: req.body,
+                payload: req.body,
                 templateList: items,
             },
         });
 
         response["total_record"] = total;
-        response["param"] = req.body;
+        response["payload"] = req.body;
 
         return res.status(200).json(response);
     } catch (error) {
@@ -5304,8 +5646,8 @@ export const postTemplateDetails = async (req, res) => {
     try {
         const { templateId } = req.body;
 
-        if (!templateId) {
-            return res.status(400).json(errorResponse("Template ID required."));
+        if (!templateId || !ObjectId.isValid(templateId)) {
+            return res.status(400).json(errorResponse("Invalid Template ID."));
         };
 
         const template = await Template.findById(templateId);
@@ -5317,12 +5659,19 @@ export const postTemplateDetails = async (req, res) => {
     } catch (error) {
         log1(["Error in postTemplateDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postAddTemplate = async (req, res) => {
     try {
-        const { name, type, subject, body, targetAudience, placeholders } = req.body;
+        const {
+            name,
+            type,
+            subject,
+            body,
+            targetAudience,
+            placeholders,
+        } = req.body;
 
         const trimmedName = (name || "").trim();
         const trimmedSubject = (subject || "").trim();
@@ -5364,11 +5713,13 @@ export const postAddTemplate = async (req, res) => {
         const seenPlaceholders = new Set();
         for (const ph of placeholders) {
             const trimmedPh = (ph || "").trim();
+
             if (!trimmedPh) {
                 return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
             } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
                 return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
             };
+
             seenPlaceholders.add(trimmedPh.toLowerCase());
         };
 
@@ -5392,8 +5743,8 @@ export const postUpdateTemplate = async (req, res) => {
     try {
         const { templateId, ...updateData } = req.body;
 
-        if (!templateId) {
-            return res.status(400).json(errorResponse("Template ID required."));
+        if (!templateId || !ObjectId.isValid(templateId)) {
+            return res.status(400).json(errorResponse("Invalid Template ID."));
         };
 
         const template = await Template.findById(templateId);
@@ -5407,22 +5758,26 @@ export const postUpdateTemplate = async (req, res) => {
 
         if (updateData.body !== undefined) {
             const trimmedBody = (updateData.body || "").trim();
+
             if (!trimmedBody) {
                 return res.status(400).json(errorResponse("Template body is required."));
             } else if (trimmedBody.replace(/\s/g, "").length > 300) {
                 return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
             };
+
             updateData.body = trimmedBody;
         };
 
         if (updateData.subject !== undefined) {
             const trimmedSubject = (updateData.subject || "").trim();
             const currentType = updateData.type || template.type;
+
             if (currentType === "email" && !trimmedSubject) {
                 return res.status(400).json(errorResponse("Subject is required for email templates."));
             } else if (currentType === "email" && trimmedSubject.replace(/\s/g, "").length > 50) {
                 return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
             };
+
             updateData.subject = trimmedSubject;
         };
 
@@ -5431,32 +5786,39 @@ export const postUpdateTemplate = async (req, res) => {
                 updateData.placeholders = [];
             } else {
                 const seenPlaceholders = new Set();
+
                 for (const ph of updateData.placeholders) {
                     const trimmedPh = (ph || "").trim();
+
                     if (!trimmedPh) {
                         return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
                     } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
                         return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
                     };
+
                     seenPlaceholders.add(trimmedPh.toLowerCase());
                 };
+
                 updateData.placeholders = updateData.placeholders.map(p => p.trim());
             };
         };
 
         await Template.findByIdAndUpdate(templateId, updateData);
+
         return res.status(200).json(successResponse("Template updated successfully."));
     } catch (error) {
         log1(["Error in postUpdateTemplate ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postDeleteTemplate = async (req, res) => {
     try {
         const { templateId } = req.body;
 
-        if (!templateId) return res.status(400).json(errorResponse("Template ID required."));
+        if (!templateId || !ObjectId.isValid(templateId)) {
+            return res.status(400).json(errorResponse("Invalid Template ID."));
+        };
 
         const template = await Template.findById(templateId);
         if (!template) {
@@ -5473,15 +5835,15 @@ export const postDeleteTemplate = async (req, res) => {
     } catch (error) {
         log1(["Error in postDeleteTemplate ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postToggleTemplateStatus = async (req, res) => {
     try {
         const { templateId } = req.body;
 
-        if (!templateId) {
-            return res.status(400).json(errorResponse("Template ID required."));
+        if (!templateId || !ObjectId.isValid(templateId)) {
+            return res.status(400).json(errorResponse("Invalid Template ID."));
         };
 
         const template = await Template.findById(templateId);
@@ -5495,7 +5857,7 @@ export const postToggleTemplateStatus = async (req, res) => {
     } catch (error) {
         log1(["Error in postToggleTemplateStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
+    };
 };
 
 export const postSeedDefaultTemplates = async (req, res) => {
@@ -5580,6 +5942,7 @@ export const postSeedDefaultTemplates = async (req, res) => {
 
         for (const tmpl of defaultTemplates) {
             const exists = await Template.findOne({ name: tmpl.name });
+
             if (!exists) {
                 await Template.create(tmpl);
                 created++;

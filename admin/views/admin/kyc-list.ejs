@@ -29,7 +29,7 @@
         <tbody>
             <% if(body?.kycList !== undefined && body?.kycList?.length > 0) { %>
                 <% body.kycList.forEach((item, index) => { %>
-                    <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                    <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
                     <tr>
                         <td><%= start_index %></td>
                         <td>

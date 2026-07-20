@@ -27,7 +27,7 @@
             </thead>
             <tbody>
                 <% if (body?.mechanicServiceList && body.mechanicServiceList.length > 0) { %>
-                    <% let rowIndex = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + 1; %>
+                    <% let rowIndex = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + 1; %>
                     <% body.mechanicServiceList.forEach(function(category) { %>
                         <% category.subCategories.forEach(function(sub, subIndex) { %>
                             <tr>
@@ -70,7 +70,7 @@
             <tbody>
                 <% if(body?.serviceList !== undefined && body?.serviceList?.length > 0) { %>
                     <% body.serviceList.forEach((item, index) => { %>
-                        <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                        <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
                         <tr>
                             <td><%= start_index %></td>
                             <td>

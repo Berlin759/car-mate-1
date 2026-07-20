@@ -279,18 +279,18 @@ export const postUpdateOwnerProfile = async (req, res) => {
 export const postDeviceTokenUpdate = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { deviceToken } = req.body;
 
         log1(["postDeviceTokenUpdate ownerId ----->", ownerId]);
-        log1(["postDeviceTokenUpdate param ----->", param]);
+        log1(["postDeviceTokenUpdate req.body ----->", req.body]);
 
-        const validate = await custom_validation(param, "owner.updateDeviceToken");
+        const validate = await custom_validation(req.body, "owner.updateDeviceToken");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
         let updateObj = {
-            deviceToken: param.deviceToken,
+            deviceToken: deviceToken,
         };
 
         let updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });

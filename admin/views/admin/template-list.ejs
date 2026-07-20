@@ -13,7 +13,7 @@
         </thead>
         <tbody>
             <% if (body?.templateList && body.templateList.length > 0) { body.templateList.forEach(function(template, index) { %>
-                <% let start_index = (parseInt(body?.param?.currentPage) - 1) * parseInt(body?.param?.itemPerPage) + index + 1; %>
+                <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
                 <tr>
                     <td><%= start_index %></td>
                     <td style="white-space: normal; word-wrap: break-word; max-width: 200px;">

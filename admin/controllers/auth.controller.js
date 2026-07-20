@@ -38,19 +38,19 @@ export const getLoginPage = async (req, res) => {
 
 export const postLogin = async (req, res) => {
     try {
-        const param = req.body;
+        const { email, password } = req.body;
 
-        const validate = custom_validation(param, "admin.login");
+        const validate = custom_validation(req.body, "admin.login");
         if (validate.flag !== 1) {
             return res.json(validate);
         };
 
-        const loginAdmin = await Admin.findOne({ email: param.email });
+        const loginAdmin = await Admin.findOne({ email: email });
         if (!loginAdmin) {
             return res.json(errorResponse("Invalid Email"));
         };
 
-        const isMatch = await decryption(param.password, loginAdmin.password);
+        const isMatch = await decryption(password, loginAdmin.password);
         if (!isMatch) {
             return res.json(errorResponse("Invalid Password"));
         };
