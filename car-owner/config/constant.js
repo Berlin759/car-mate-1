@@ -93,6 +93,10 @@ const Constants = {
         LOGIN: 4,
         VERIFY_NUMBER: 5,
     },
+    OTP_CHANNEL: {
+        SMS: "sms",
+        WHATSAPP: "whatsapp",
+    },
     IS_SUSPENDED_STATUS: {
         UNSUSPENDED: 1,
         SUSPENDED: 2,

@@ -25,6 +25,11 @@ const otpSchema = new Schema(
             enum: Object.values(Constants.OTP_TYPE),
             default: Constants.OTP_TYPE.NEW_REGISTER_OTP,
         },
+        channel: {
+            type: String,
+            enum: Object.values(Constants.OTP_CHANNEL),
+            default: Constants.OTP_CHANNEL.SMS,
+        },
         expireAt: {
             type: Date,
             default: null,

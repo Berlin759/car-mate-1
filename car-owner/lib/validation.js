@@ -4,15 +4,19 @@ import { errorResponse, successResponse } from "./general.js";
 const validate_rules = {
     owner: {
         login: {
+            phone_code: "required",
             phone_number: "required",
+            channel: "required",
         },
         verify_otp: {
             phone_number: "required",
             otp: "required",
         },
         resend_otp: {
+            phone_code: "required",
             phone_number: "required",
             type: "required",
+            channel: "required",
         },
         send_email_otp: {
             email: "required",

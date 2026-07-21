@@ -13,6 +13,7 @@ import {
     log1,
     successResponse,
 } from "../lib/general.js";
+import { sendOtp } from "../lib/twilioHelper.js";
 import Owner from "../models/owner.model.js";
 import OTP from "../models/otp.model.js";
 
@@ -23,7 +24,8 @@ export const postLogin = async (req, res) => {
     try {
         log1(["PostLogin req.body ----->", req.body]);
 
-        const { phone_number } = req.body;
+        const { phone_code, phone_number, channel } = req.body;
+        const otpChannel = channel || Constants.OTP_CHANNEL.SMS;
 
         const validate = await custom_validation(req.body, "owner.login");
         if (validate.flag === 0) {
@@ -39,17 +41,24 @@ export const postLogin = async (req, res) => {
         const owner = await Owner.findOne({ phoneNumber: phone_number });
         log1(["PostLogin owner ----->", owner]);
 
-        if (!owner) {
-            const createNewOwner = await Owner.create({ phoneNumber: phone_number });
-            log1(["PostLogin createNewOwner ----->", createNewOwner]);
-        } else if (owner.status === Constants.OWNER_STATUS.PENDING) {
-            return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
-        } else if (owner.status === Constants.OWNER_STATUS.SUSPENDED) {
-            return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+        // if (!owner) {
+        //     const createNewOwner = await Owner.create({ phoneNumber: phone_number, phoneCode: phone_code });
+        //     log1(["PostLogin createNewOwner ----->", createNewOwner]);
+        // } else if (owner.status === Constants.OWNER_STATUS.PENDING) {
+        //     return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
+        // } else if (owner.status === Constants.OWNER_STATUS.SUSPENDED) {
+        //     return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+        // };
+
+        if (owner) {
+            if (owner.status === Constants.OWNER_STATUS.PENDING) {
+                return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
+            } else if (owner.status === Constants.OWNER_STATUS.SUSPENDED) {
+                return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+            };
         };
 
-        // const otp = await generateOtp();
-        const otp = "123456";
+        const otp = await generateOtp();
         const token = await generateRandomToken();
         const currentTime = moment().utc().valueOf();
         const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
@@ -59,16 +68,33 @@ export const postLogin = async (req, res) => {
             otp: otp,
             token: token,
             type: Constants.OTP_TYPE.NEW_REGISTER_OTP,
+            channel: otpChannel,
             expireAt: expire_at,
         };
         await OTP.create(otpPayload);
 
+        const phoneNumber = phone_code + phone_number;
+
+        const sendOtpResult = await sendOtp(phoneNumber, otp, otpChannel);
+        log1(["postLogin sendOtpResult ----->", sendOtpResult]);
+
+        if (!sendOtpResult.success) {
+            return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
+        };
+
+        if (!owner) {
+            const createNewOwner = await Owner.create({ phoneNumber: phone_number, phoneCode: phone_code });
+            log1(["PostLogin createNewOwner ----->", createNewOwner]);
+        };
+
         let response = {
             phoneNumber: phone_number,
+            channel: otpChannel,
             expiryTime: new Date().getTime() + Constants.OTP_EXPIRATION_TIME,
         };
 
-        return res.status(200).json(successResponse("I have sent OTP in your mobile number. Please verify your number.", response));
+        const channelMessage = otpChannel === Constants.OTP_CHANNEL.WHATSAPP ? "WhatsApp" : "SMS";
+        return res.status(200).json(successResponse(`OTP sent via ${channelMessage}. Please verify your number.`, response));
     } catch (error) {
         log1(["Error in postLogin ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -136,7 +162,8 @@ export const postResendOtp = async (req, res) => {
     try {
         log1(["postResendOtp req.body ----->", req.body]);
 
-        const { phone_number, type } = req.body;
+        const { phone_number, type, channel } = req.body;
+        const otpChannel = channel || Constants.OTP_CHANNEL.SMS;
 
         const validate = await custom_validation(req.body, "owner.resend_otp");
         if (validate.flag === 0) {
@@ -166,16 +193,27 @@ export const postResendOtp = async (req, res) => {
             otp: otp,
             token: token,
             type: parseInt(type),
+            channel: otpChannel,
             expireAt: expire_at,
         };
         await OTP.create(otpPayload);
 
+        const sendOtpResult = await sendOtp(phone_number, otp, otpChannel);
+        log1(["postResendOtp sendOtpResult ----->", sendOtpResult]);
+
+        if (!sendOtpResult.success) {
+            return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
+        };
+
         let response = {
             phoneNumber: phone_number,
+            channel: otpChannel,
             expiryTime: new Date().getTime() + Constants.OTP_EXPIRATION_TIME,
         };
 
-        return res.status(200).json(successResponse("Verification code has been resent. Please check your mobile.", response));
+        const channelMessage = otpChannel === Constants.OTP_CHANNEL.WHATSAPP ? "WhatsApp" : "SMS";
+
+        return res.status(200).json(successResponse(`OTP resent via ${channelMessage}. Please check your ${channelMessage}.`, response));
     } catch (error) {
         log1(["Error in postResendOtp ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
