@@ -30,6 +30,7 @@ export const sendSmsOtp = async (phoneNumber, otp) => {
 export const sendOtp = async (phoneNumber, otp, channel) => {
     if (channel === Constants.OTP_CHANNEL.WHATSAPP) {
         return await sendWhatsAppOtp(phoneNumber, otp);
-    }
+    };
+
     return await sendSmsOtp(phoneNumber, otp);
 };
