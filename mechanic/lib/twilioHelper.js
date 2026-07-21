@@ -1,12 +1,11 @@
 import twilio from "twilio";
 import { log1 } from "./general.js";
 import Constants from "../config/constant.js";
-import { sendWhatsAppOtp, sendWhatsAppTemplateOtp } from "./whatsappHelper.js";
+import { sendWhatsAppOtp } from "./whatsappHelper.js";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const WHATSAPP_TEMPLATE_NAME = process.env.META_WHATSAPP_TEMPLATE_NAME || "car_mate_otp";
 
 const client = twilio(accountSid, authToken);
 
@@ -30,7 +29,7 @@ export const sendSmsOtp = async (phoneNumber, otp) => {
 
 export const sendOtp = async (phoneNumber, otp, channel) => {
     if (channel === Constants.OTP_CHANNEL.WHATSAPP) {
-        return await sendWhatsAppTemplateOtp(phoneNumber, otp, WHATSAPP_TEMPLATE_NAME);
+        return await sendWhatsAppOtp(phoneNumber, otp);
     }
     return await sendSmsOtp(phoneNumber, otp);
 };
