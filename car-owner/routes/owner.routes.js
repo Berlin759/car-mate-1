@@ -51,7 +51,7 @@ import {
     postUpdateCar,
     postSearchServices,
     postVerifyRazorpayPayment,
-    postGuestBooking,
+    // postGuestBooking,
     postRazorpayWebhook,
     postUpdateLocation,
     postGetProviderLocation,
