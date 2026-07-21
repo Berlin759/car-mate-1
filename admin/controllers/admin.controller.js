@@ -167,7 +167,7 @@ export const getCarOwnerPage = async (req, res) => {
             header: {
                 page: "Car-Owner",
                 admin: admin,
-                title: "Car Owner",
+                title: "Owner Management",
                 description: "System car owner list overview",
                 id: "carOwner",
             },
@@ -605,7 +605,7 @@ export const getMechanicPage = async (req, res) => {
             header: {
                 page: "Mechanic",
                 admin: admin,
-                title: "Mechanic",
+                title: "Mechanic Management",
                 description: "System car mechanic list overview",
                 id: "carMechanic",
             },
@@ -1088,7 +1088,7 @@ export const getCarsPage = async (req, res) => {
             header: {
                 page: "Cars",
                 admin: admin,
-                title: "Cars List",
+                title: "Car Management",
                 description: "System car list overview",
                 id: "cars",
             },
@@ -1573,7 +1573,7 @@ export const getServicePage = async (req, res) => {
             header: {
                 page: "Service",
                 admin: admin,
-                title: "Service List",
+                title: "Service Management",
                 description: "System service list overview",
                 id: "service",
             },
@@ -2016,7 +2016,7 @@ export const getBookingPage = async (req, res) => {
             header: {
                 page: "Bookings",
                 admin: admin,
-                title: "Bookings",
+                title: "Booking Management",
                 description: "System bookings overview",
                 id: "bookings",
             },
@@ -2407,7 +2407,7 @@ export const getTransactionPage = async (req, res) => {
             header: {
                 page: "Transactions",
                 admin: admin,
-                title: "Transactions",
+                title: "Transaction Management",
                 description: "System transaction overview",
                 id: "transactions",
             },
@@ -3359,7 +3359,7 @@ export const getReviewPage = async (req, res) => {
             header: {
                 page: "Reviews",
                 admin: admin,
-                title: "Reviews",
+                title: "Review Management",
                 description: "System reviews overview",
                 id: "reviews",
             },
@@ -3391,7 +3391,7 @@ export const getSettingsPage = async (req, res) => {
             header: {
                 page: "Settings",
                 admin: admin,
-                title: "Settings",
+                title: "Setting Management",
                 description: "System setting overview",
                 id: "settings",
             },
@@ -3938,7 +3938,7 @@ export const getKYCPage = async (req, res) => {
             header: {
                 page: "KYC Review",
                 admin: admin,
-                title: "KYC Review",
+                title: "KYC Review Management",
                 description: "System KYC review overview",
                 id: "kyc",
             },
@@ -5357,7 +5357,7 @@ export const getDisputePage = async (req, res) => {
             header: {
                 page: "Disputes",
                 admin: admin,
-                title: "Dispute Resolution",
+                title: "Dispute Management",
                 description: "Manage customer and provider disputes",
                 id: "disputes",
             },
