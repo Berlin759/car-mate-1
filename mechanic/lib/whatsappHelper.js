@@ -33,9 +33,18 @@ export const sendWhatsAppOtp = async (phoneNumber, otp) => {
             {
                 messaging_product: "whatsapp",
                 to: formattedNumber,
-                type: "text",
-                text: {
-                    body: `Your CarMate verification code is: ${otp}. It will expire in 10 minutes. Do not share this code with anyone.`,
+                type: "template",
+                template: {
+                    name: "otp_verification",
+                    language: { code: "en" },
+                    components: [
+                        {
+                            type: "body",
+                            parameters: [
+                                { type: "text", text: String(otp) },
+                            ],
+                        },
+                    ],
                 },
             },
             {
@@ -47,6 +56,17 @@ export const sendWhatsAppOtp = async (phoneNumber, otp) => {
         );
 
         log1(["sendWhatsAppOtp response----->", response.data]);
+
+        if (response.data.error) {
+            log1(["sendWhatsAppOtp Meta API Error----->", response.data.error]);
+            return { success: false, error: response.data.error.message || "Meta API returned an error" };
+        };
+
+        if (!response.data.messages || response.data.messages.length === 0) {
+            log1(["sendWhatsAppOtp No messages in response----->", response.data]);
+            return { success: false, error: "No messages field in Meta API response" };
+        };
+
         return { success: true, data: response.data };
     } catch (error) {
         log1(["sendWhatsAppOtp Error----->", error.message]);
