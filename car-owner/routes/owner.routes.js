@@ -56,6 +56,7 @@ import {
     postUpdateLocation,
     postGetProviderLocation,
     postFileDispute,
+    postServiceHistory,
 } from "../controllers/owner.controller.js";
 
 const router = express.Router();
@@ -106,6 +107,9 @@ router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/update-booking", authMiddleware, postUpdateBooking);
 router.post("/cancel-booking", authMiddleware, postCancelBooking);
 router.post("/booking-invoice", authMiddleware, postBookingInvoice);
+
+// Service History API
+router.post("/service-history", authMiddleware, postServiceHistory);
 
 // Notification API
 router.post("/notification-list", authMiddleware, postNotificationList);

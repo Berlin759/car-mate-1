@@ -3884,3 +3884,191 @@ export const postNearbyMechanics = async (req, res) => {
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
+
+export const postServiceHistory = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postServiceHistory ownerId----->", ownerId]);
+        log1(["postServiceHistory req.body----->", req.body]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            carId,
+            serviceId,
+            startDate,
+            endDate,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const match = {
+            ownerId: new ObjectId(ownerId),
+            status: {
+                $in: [
+                    Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                    Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+                    Constants.BOOKING_STATUS.CLOSED,
+                ],
+            },
+        };
+
+        if (carId) {
+            if (!ObjectId.isValid(carId)) {
+                return res.status(400).json(errorResponse("Invalid car id."));
+            };
+            match.carId = new ObjectId(carId);
+        };
+
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+            match.serviceId = new ObjectId(serviceId);
+        };
+
+        if (startDate || endDate) {
+            match.createdAt = {};
+            if (startDate) {
+                match.createdAt.$gte = new Date(startDate);
+            };
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                match.createdAt.$lte = end;
+            };
+        };
+
+        const pipeline = [
+            { $match: match },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $lookup: {
+                                from: "services",
+                                localField: "serviceId",
+                                foreignField: "_id",
+                                as: "serviceDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$serviceDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "mechanics",
+                                localField: "mechanicId",
+                                foreignField: "_id",
+                                as: "mechanicDetails",
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            fullName: 1,
+                                            email: 1,
+                                            phoneNumber: 1,
+                                            profileImage: 1,
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$mechanicDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "cars",
+                                localField: "carId",
+                                foreignField: "_id",
+                                as: "carDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$carDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                invoiceNo: 1,
+                                date: 1,
+                                time: 1,
+                                address: 1,
+                                totalAmount: 1,
+                                status: 1,
+                                startTime: 1,
+                                endTime: 1,
+                                beforePhotos: 1,
+                                afterPhotos: 1,
+                                createdAt: 1,
+                                serviceDetails: {
+                                    _id: "$serviceDetails._id",
+                                    fullName: "$serviceDetails.fullName",
+                                    description: "$serviceDetails.description",
+                                },
+                                mechanicDetails: 1,
+                                carDetails: {
+                                    _id: "$carDetails._id",
+                                    fullName: "$carDetails.fullName",
+                                    vehicleNumber: "$carDetails.vehicleNumber",
+                                    model: "$carDetails.model",
+                                    brand: "$carDetails.brand",
+                                    year: "$carDetails.year",
+                                    color: "$carDetails.color",
+                                },
+                            },
+                        },
+                    ],
+                    totalRecords: [
+                        { $count: "count" },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
+
+        const items = result.items;
+        const totalRecords = result.totalRecords[0]?.count ?? 0;
+
+        const groupedByCar = {};
+
+        items.forEach((booking) => {
+            const carKey = booking.carDetails?._id?.toString() || "unknown";
+            if (!groupedByCar[carKey]) {
+                groupedByCar[carKey] = {
+                    carDetails: booking.carDetails,
+                    bookings: [],
+                };
+            }
+            groupedByCar[carKey].bookings.push(booking);
+        });
+
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            items: Object.values(groupedByCar),
+        };
+
+        return res.status(200).json(successResponse("Service history fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postServiceHistory ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
