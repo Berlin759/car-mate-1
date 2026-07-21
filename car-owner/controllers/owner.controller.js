@@ -758,30 +758,6 @@ export const postCarList = async (req, res) => {
                 $match: filter,
             },
             {
-                $lookup: {
-                    from: "mechanics",
-                    localField: "mechanicId",
-                    foreignField: "_id",
-                    as: "mechanicDetails",
-                    pipeline: [
-                        {
-                            $project: {
-                                _id: 1,
-                                fullName: 1,
-                                email: 1,
-                                profileImage: 1
-                            },
-                        },
-                    ],
-                },
-            },
-            {
-                $unwind: {
-                    path: "$mechanicDetails",
-                    preserveNullAndEmptyArrays: true
-                },
-            },
-            {
                 $project: {
                     _id: 1,
                     fullName: 1,
@@ -1002,19 +978,289 @@ export const postServiceList = async (req, res) => {
     };
 };
 
+// export const postGuestBooking = async (req, res) => {
+//     const ownerId = req.ownerId;
+//     const param = req.body;
+
+//     log1(["postGuestBooking ownerId----->", ownerId]);
+//     log1(["postGuestBooking param----->", param]);
+
+//     if (ownerLocks.get(ownerId)) {
+//         log1(["A Booking is already in progress. Please wait."]);
+//         return res.status(429).json(errorResponse("A Booking is already in progress. Please wait."));
+//     };
+
+//     ownerLocks.set(ownerId, true);
+
+//     try {
+//         const validate = await custom_validation(param, "owner.guest_booking");
+//         if (validate.flag === 0) {
+//             return res.status(400).json(validate);
+//         };
+
+//         if (!ObjectId.isValid(param.serviceId) || !ObjectId.isValid(param.carId) ||
+//             (
+//                 parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)
+//             )
+//         ) {
+//             return res.status(400).json(errorResponse("Invalid request."));
+//         };
+
+//         const [serviceDetails, carDetails, ownerDetails] = await Promise.all([
+//             Service.findOne({
+//                 _id: new ObjectId(param.serviceId),
+//                 status: Constants.SERVICE_STATUS.ACTIVE,
+//             }).lean(),
+
+//             Car.findOne({
+//                 _id: new ObjectId(param.carId),
+//                 ownerId: new ObjectId(ownerId),
+//                 status: Constants.CAR_STATUS.VALID,
+//             }).lean(),
+
+//             Owner.findById(ownerId).lean()
+//         ]);
+
+//         log1(["postGuestBooking serviceDetails----->", serviceDetails]);
+//         log1(["postGuestBooking carDetails----->", carDetails]);
+
+//         if (!serviceDetails) {
+//             return res.status(400).json(errorResponse("Invalid selected service. Please choose a different service."));
+//         };
+
+//         if (!carDetails) {
+//             return res.status(400).json(errorResponse("Invalid car id."));
+//         };
+
+//         let mechanicId;
+
+//         const serviceFullName = serviceDetails.fullName;
+//         const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
+
+//         if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
+//             const isServiceAvailable = (serviceDoc?.mechanicIds || []).some(
+//                 m => m.mechanicId?.toString() === param.mechanicId
+//             );
+
+//             if (!isServiceAvailable) {
+//                 return res.status(400).json(errorResponse("Selected mechanic is unavailable for this service."));
+//             };
+
+//             const mechanicDetails = await Mechanic.findOne({
+//                 _id: new ObjectId(param.mechanicId),
+//                 status: Constants.MECHANIC_STATUS.ACTIVE,
+//             });
+
+//             if (!mechanicDetails) {
+//                 return res.status(400).json(errorResponse("Selected mechanic is unavailable."));
+//             };
+
+//             const existingBooking = await Booking.exists({
+//                 mechanicId: mechanicDetails._id,
+//                 date: new Date(param.date),
+//                 time: param.time,
+//                 status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+//             });
+//             log1(["postGuestBooking existingBooking----->", existingBooking]);
+
+//             if (existingBooking) {
+//                 return res.status(400).json(errorResponse("Selected mechanic is already booked for this slot."));
+//             };
+
+//             mechanicId = mechanicDetails._id;
+//         } else {
+//             const mechanicIdsForService = (serviceDoc?.mechanicIds || []).map(m => m.mechanicId);
+
+//             if (!mechanicIdsForService.length) {
+//                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
+//             };
+
+//             const mechanics = await Mechanic.find({
+//                 _id: { $in: mechanicIdsForService },
+//                 status: Constants.MECHANIC_STATUS.ACTIVE,
+//             }).select("_id");
+
+//             if (!mechanics.length) {
+//                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
+//             };
+
+//             const bookedMechanics = await Booking.distinct("mechanicId", {
+//                 mechanicId: {
+//                     $in: mechanics.map(m => m._id),
+//                 },
+//                 date: new Date(param.date),
+//                 time: param.time,
+//                 status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+//             });
+
+//             const availableMechanics = mechanics.filter(
+//                 mechanic => !bookedMechanics.some(bookedId => bookedId.equals(mechanic._id))
+//             );
+
+//             if (!availableMechanics.length) {
+//                 return res.status(400).json(errorResponse("No mechanics are available for this time slot."));
+//             };
+
+//             const randomIndex = Math.floor(Math.random() * availableMechanics.length);
+
+//             mechanicId = availableMechanics[randomIndex]._id;
+//         };
+
+//         const alreadyBooked = await Booking.exists({
+//             ownerId: new ObjectId(ownerId),
+//             carId: new ObjectId(param.carId),
+//             date: new Date(param.date),
+//             time: param.time,
+//             status: {
+//                 $in: [
+//                     Constants.BOOKING_STATUS.PENDING,
+//                     Constants.BOOKING_STATUS.PROVIDER_ACCEPTED
+//                 ]
+//             },
+//         });
+
+//         if (alreadyBooked) {
+//             return res.status(400).json(errorResponse("You already have a booking for this time."));
+//         };
+
+//         let invoiceNo = generateInvoiceNumber();
+
+//         let basePrice = parseFloat(param.basePrice) || 0;
+//         let distanceCharge = parseFloat(param.distanceCharge) || 0;
+//         let peakHourFee = parseFloat(param.peakHourFee) || 0;
+//         let materialCost = parseFloat(param.materialCost) || 0;
+//         let taxAmount = parseFloat(param.taxAmount) || 0;
+//         let discountAmount = 0;
+//         let couponId = null;
+
+//         if (param.couponId && ObjectId.isValid(param.couponId)) {
+//             const coupon = await Coupon.findOne({
+//                 _id: new ObjectId(param.couponId),
+//                 isActive: true,
+//                 expiryDate: { $gte: new Date() },
+//             });
+
+//             if (coupon) {
+//                 const subTotal = basePrice + distanceCharge + peakHourFee + materialCost;
+
+//                 if (subTotal >= coupon.minOrderAmount) {
+//                     if (coupon.discountType === "percentage") {
+//                         discountAmount = (subTotal * coupon.discountValue) / 100;
+//                         if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+//                             discountAmount = coupon.maxDiscountAmount;
+//                         }
+//                     } else {
+//                         discountAmount = coupon.discountValue;
+//                     }
+
+//                     if (discountAmount > subTotal) {
+//                         discountAmount = subTotal;
+//                     }
+
+//                     couponId = coupon._id;
+//                 }
+//             }
+//         }
+
+//         let totalPayAmount = parseFloat(param.totalAmount) || (basePrice + distanceCharge + peakHourFee + materialCost + taxAmount - discountAmount);
+
+//         let bookingPayload = {
+//             ownerId: new ObjectId(ownerId),
+//             mechanicId: mechanicId,
+//             serviceId: new ObjectId(param.serviceId),
+//             carId: new ObjectId(param.carId),
+//             date: new Date(param.date),
+//             time: param.time,
+//             latitude: param.latitude,
+//             longitude: param.longitude,
+//             basePrice: basePrice,
+//             distanceCharge: distanceCharge,
+//             peakHourFee: peakHourFee,
+//             materialCost: materialCost,
+//             taxAmount: taxAmount,
+//             discountAmount: discountAmount,
+//             totalAmount: totalPayAmount,
+//             invoiceNo: invoiceNo,
+//         };
+
+//         if (couponId) {
+//             bookingPayload.couponId = couponId;
+//         }
+
+//         let newBooking = await Booking.create(bookingPayload);
+//         log1(["postGuestBooking newBooking----->", newBooking]);
+//         if (!newBooking) {
+//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
+//         };
+
+//         let transactionPayload = {
+//             ownerId: new ObjectId(ownerId),
+//             mechanicId: mechanicId,
+//             serviceId: new ObjectId(param.serviceId),
+//             bookingId: new ObjectId(newBooking._id),
+//             carId: new ObjectId(param.carId),
+//             invoiceId: invoiceNo,
+//             totalAmount: totalPayAmount,
+//             description: `Payment To ${ownerDetails.fullName || "Unknown"}`,
+//             status: Constants.TRANSACTION_STATUS.PENDING,
+//         };
+
+//         let transactionCreate = await Transaction.create(transactionPayload);
+//         log1(["postGuestBooking transactionCreate----->", transactionCreate]);
+//         if (!transactionCreate) {
+//             await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
+//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
+//         };
+
+//         let responseData = {
+//             bookingId: newBooking._id,
+//             message: "Congratulations, your booking was successful.",
+//         };
+
+//         try {
+//             const razorpayOrder = await razorpayInstance.orders.create({
+//                 amount: Math.round(totalPayAmount * 100),
+//                 currency: "INR",
+//                 receipt: `booking_${invoiceNo}`,
+//             });
+
+//             log1(["postGuestBooking razorpayOrder----->", razorpayOrder]);
+
+//             await Booking.findByIdAndUpdate(newBooking._id, {
+//                 razorpayOrderId: razorpayOrder.id,
+//             });
+
+//             responseData.razorpayOrderId = razorpayOrder.id;
+//             responseData.razorpayAmount = razorpayOrder.amount;
+//             responseData.razorpayCurrency = razorpayOrder.currency;
+//         } catch (razorpayError) {
+//             log1(["postGuestBooking Razorpay order creation failed----->", razorpayError.message]);
+
+//             await Booking.findByIdAndUpdate(newBooking._id, {
+//                 status: Constants.BOOKING_STATUS.FAILED,
+//             });
+
+//             await Transaction.findByIdAndUpdate(transactionCreate._id, {
+//                 status: Constants.TRANSACTION_STATUS.FAILED,
+//             });
+
+//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
+//         };
+
+//         return res.status(200).json(successResponse(responseData.message, responseData));
+//     } catch (error) {
+//         log1(["Error in postGuestBooking ----->", error]);
+//         ownerLocks.delete(ownerId);
+//         return res.status(400).json(errorResponse(messages.unexpectedDataError));
+//     } finally {
+//         ownerLocks.delete(ownerId);
+//     };
+// };
+
 export const postAddBooking = async (req, res) => {
-    const ownerId = req.ownerId;
     const param = req.body;
 
-    log1(["postAddBooking ownerId----->", ownerId]);
     log1(["postAddBooking param----->", param]);
-
-    if (ownerLocks.get(ownerId)) {
-        log1(["A Booking is already in progress. Please wait."]);
-        return res.status(429).json(errorResponse("A Booking is already in progress. Please wait."));
-    };
-
-    ownerLocks.set(ownerId, true);
 
     try {
         const validate = await custom_validation(param, "owner.add_booking");
@@ -1022,12 +1268,16 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        if (!ObjectId.isValid(param.serviceId) || !ObjectId.isValid(param.carId) ||
-            (
-                parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)
-            )
-        ) {
-            return res.status(400).json(errorResponse("Invalid request."));
+        if (!ObjectId.isValid(param.serviceId)) {
+            return res.status(400).json(errorResponse("Invalid service id."));
+        };
+
+        if (!ObjectId.isValid(param.carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+
+        if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
         };
 
         const [serviceDetails, carDetails, ownerDetails] = await Promise.all([
@@ -1042,7 +1292,7 @@ export const postAddBooking = async (req, res) => {
                 status: Constants.CAR_STATUS.VALID,
             }).lean(),
 
-            Owner.findById(ownerId).lean()
+            Owner.findOne({ phoneNumber: param.phoneNumber }).lean(),
         ]);
 
         log1(["postAddBooking serviceDetails----->", serviceDetails]);
@@ -1053,12 +1303,31 @@ export const postAddBooking = async (req, res) => {
         };
 
         if (!carDetails) {
-            return res.status(400).json(errorResponse("Invalid car id."));
+            return res.status(400).json(errorResponse("Invalid selected car. Please choose a different car."));
+        };
+
+        let ownerId;
+        let isNewOwner = false;
+
+        if (ownerDetails) {
+            ownerId = ownerDetails._id;
+            await Owner.findByIdAndUpdate(ownerId, {
+                fullName: param.fullName || ownerDetails.fullName,
+                email: param.email || ownerDetails.email,
+            });
+        } else {
+            const newOwner = await Owner.create({
+                fullName: param.fullName,
+                phoneNumber: param.phoneNumber,
+                email: param.email || "",
+                status: Constants.OWNER_STATUS.ACTIVE,
+            });
+            ownerId = newOwner._id;
+            isNewOwner = true;
+            log1(["postAddBooking newOwner created----->", newOwner]);
         };
 
         let mechanicId;
-
-        const serviceFullName = serviceDetails.fullName;
         const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
 
         if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
@@ -1109,9 +1378,7 @@ export const postAddBooking = async (req, res) => {
             };
 
             const bookedMechanics = await Booking.distinct("mechanicId", {
-                mechanicId: {
-                    $in: mechanics.map(m => m._id),
-                },
+                mechanicId: { $in: mechanics.map(m => m._id) },
                 date: new Date(param.date),
                 time: param.time,
                 status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
@@ -1148,7 +1415,6 @@ export const postAddBooking = async (req, res) => {
         };
 
         let invoiceNo = generateInvoiceNumber();
-
         let basePrice = parseFloat(param.basePrice) || 0;
         let distanceCharge = parseFloat(param.distanceCharge) || 0;
         let peakHourFee = parseFloat(param.peakHourFee) || 0;
@@ -1209,7 +1475,7 @@ export const postAddBooking = async (req, res) => {
 
         if (couponId) {
             bookingPayload.couponId = couponId;
-        }
+        };
 
         let newBooking = await Booking.create(bookingPayload);
         log1(["postAddBooking newBooking----->", newBooking]);
@@ -1225,263 +1491,12 @@ export const postAddBooking = async (req, res) => {
             carId: new ObjectId(param.carId),
             invoiceId: invoiceNo,
             totalAmount: totalPayAmount,
-            description: `Payment To ${ownerDetails.fullName || "Unknown"}`,
+            description: `Payment To ${param.fullName || "Guest"}`,
             status: Constants.TRANSACTION_STATUS.PENDING,
         };
 
         let transactionCreate = await Transaction.create(transactionPayload);
         log1(["postAddBooking transactionCreate----->", transactionCreate]);
-        if (!transactionCreate) {
-            await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        let responseData = {
-            bookingId: newBooking._id,
-            message: "Congratulations, your booking was successful.",
-        };
-
-        try {
-            const razorpayOrder = await razorpayInstance.orders.create({
-                amount: Math.round(totalPayAmount * 100),
-                currency: "INR",
-                receipt: `booking_${invoiceNo}`,
-            });
-
-            log1(["postAddBooking razorpayOrder----->", razorpayOrder]);
-
-            await Booking.findByIdAndUpdate(newBooking._id, {
-                razorpayOrderId: razorpayOrder.id,
-            });
-
-            responseData.razorpayOrderId = razorpayOrder.id;
-            responseData.razorpayAmount = razorpayOrder.amount;
-            responseData.razorpayCurrency = razorpayOrder.currency;
-        } catch (razorpayError) {
-            log1(["postAddBooking Razorpay order creation failed----->", razorpayError.message]);
-
-            await Booking.findByIdAndUpdate(newBooking._id, {
-                status: Constants.BOOKING_STATUS.FAILED,
-            });
-
-            await Transaction.findByIdAndUpdate(transactionCreate._id, {
-                status: Constants.TRANSACTION_STATUS.FAILED,
-            });
-
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        return res.status(200).json(successResponse(responseData.message, responseData));
-    } catch (error) {
-        log1(["Error in postAddBooking ----->", error]);
-        ownerLocks.delete(ownerId);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    } finally {
-        ownerLocks.delete(ownerId);
-    };
-};
-
-export const postGuestBooking = async (req, res) => {
-    const param = req.body;
-
-    log1(["postGuestBooking param----->", param]);
-
-    try {
-        const validate = await custom_validation(param, "owner.guest_booking");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
-        };
-
-        if (!ObjectId.isValid(param.serviceId)) {
-            return res.status(400).json(errorResponse("Invalid service id."));
-        };
-
-        if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)) {
-            return res.status(400).json(errorResponse("Invalid mechanic id."));
-        };
-
-        const [serviceDetails, ownerDetails] = await Promise.all([
-            Service.findOne({
-                _id: new ObjectId(param.serviceId),
-                status: Constants.SERVICE_STATUS.ACTIVE,
-            }).lean(),
-
-            Owner.findOne({ phoneNumber: param.phoneNumber }).lean(),
-        ]);
-
-        log1(["postGuestBooking serviceDetails----->", serviceDetails]);
-
-        if (!serviceDetails) {
-            return res.status(400).json(errorResponse("Invalid selected service. Please choose a different service."));
-        };
-
-        let ownerId;
-        let isNewOwner = false;
-
-        if (ownerDetails) {
-            ownerId = ownerDetails._id;
-            await Owner.findByIdAndUpdate(ownerId, {
-                fullName: param.fullName || ownerDetails.fullName,
-                email: param.email || ownerDetails.email,
-            });
-        } else {
-            const newOwner = await Owner.create({
-                fullName: param.fullName,
-                phoneNumber: param.phoneNumber,
-                email: param.email || "",
-                status: Constants.OWNER_STATUS.ACTIVE,
-            });
-            ownerId = newOwner._id;
-            isNewOwner = true;
-            log1(["postGuestBooking newOwner created----->", newOwner]);
-        };
-
-        let mechanicId;
-        const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
-
-        if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
-            const isServiceAvailable = (serviceDoc?.mechanicIds || []).some(
-                m => m.mechanicId?.toString() === param.mechanicId
-            );
-
-            if (!isServiceAvailable) {
-                return res.status(400).json(errorResponse("Selected mechanic is unavailable for this service."));
-            };
-
-            const mechanicDetails = await Mechanic.findOne({
-                _id: new ObjectId(param.mechanicId),
-                status: Constants.MECHANIC_STATUS.ACTIVE,
-            });
-
-            if (!mechanicDetails) {
-                return res.status(400).json(errorResponse("Selected mechanic is unavailable."));
-            };
-
-            mechanicId = mechanicDetails._id;
-        } else {
-            const mechanicIdsForService = (serviceDoc?.mechanicIds || []).map(m => m.mechanicId);
-
-            if (!mechanicIdsForService.length) {
-                return res.status(400).json(errorResponse("No mechanics are available for this service."));
-            };
-
-            const mechanics = await Mechanic.find({
-                _id: { $in: mechanicIdsForService },
-                status: Constants.MECHANIC_STATUS.ACTIVE,
-            }).select("_id");
-
-            if (!mechanics.length) {
-                return res.status(400).json(errorResponse("No mechanics are available for this service."));
-            };
-
-            const bookedMechanics = await Booking.distinct("mechanicId", {
-                mechanicId: { $in: mechanics.map(m => m._id) },
-                date: new Date(param.date),
-                time: param.time,
-                status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
-            });
-
-            const availableMechanics = mechanics.filter(
-                mechanic => !bookedMechanics.some(bookedId => bookedId.equals(mechanic._id))
-            );
-
-            if (!availableMechanics.length) {
-                return res.status(400).json(errorResponse("No mechanics are available for this time slot."));
-            };
-
-            const randomIndex = Math.floor(Math.random() * availableMechanics.length);
-            mechanicId = availableMechanics[randomIndex]._id;
-        };
-
-        let invoiceNo = generateInvoiceNumber();
-        let basePrice = parseFloat(param.basePrice) || 0;
-        let distanceCharge = parseFloat(param.distanceCharge) || 0;
-        let peakHourFee = parseFloat(param.peakHourFee) || 0;
-        let materialCost = parseFloat(param.materialCost) || 0;
-        let taxAmount = parseFloat(param.taxAmount) || 0;
-        let discountAmount = 0;
-        let couponId = null;
-
-        if (param.couponId && ObjectId.isValid(param.couponId)) {
-            const coupon = await Coupon.findOne({
-                _id: new ObjectId(param.couponId),
-                isActive: true,
-                expiryDate: { $gte: new Date() },
-            });
-
-            if (coupon) {
-                const subTotal = basePrice + distanceCharge + peakHourFee + materialCost;
-
-                if (subTotal >= coupon.minOrderAmount) {
-                    if (coupon.discountType === "percentage") {
-                        discountAmount = (subTotal * coupon.discountValue) / 100;
-                        if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
-                            discountAmount = coupon.maxDiscountAmount;
-                        }
-                    } else {
-                        discountAmount = coupon.discountValue;
-                    }
-
-                    if (discountAmount > subTotal) {
-                        discountAmount = subTotal;
-                    }
-
-                    couponId = coupon._id;
-                }
-            }
-        }
-
-        let totalPayAmount = parseFloat(param.totalAmount) || (basePrice + distanceCharge + peakHourFee + materialCost + taxAmount - discountAmount);
-
-        let bookingPayload = {
-            ownerId: new ObjectId(ownerId),
-            mechanicId: mechanicId,
-            serviceId: new ObjectId(param.serviceId),
-            date: new Date(param.date),
-            time: param.time,
-            latitude: param.latitude,
-            longitude: param.longitude,
-            basePrice: basePrice,
-            distanceCharge: distanceCharge,
-            peakHourFee: peakHourFee,
-            materialCost: materialCost,
-            taxAmount: taxAmount,
-            discountAmount: discountAmount,
-            totalAmount: totalPayAmount,
-            invoiceNo: invoiceNo,
-        };
-
-        if (param.carId && ObjectId.isValid(param.carId)) {
-            bookingPayload.carId = new ObjectId(param.carId);
-        }
-
-        if (couponId) {
-            bookingPayload.couponId = couponId;
-        }
-
-        let newBooking = await Booking.create(bookingPayload);
-        log1(["postGuestBooking newBooking----->", newBooking]);
-        if (!newBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        let transactionPayload = {
-            ownerId: new ObjectId(ownerId),
-            mechanicId: mechanicId,
-            serviceId: new ObjectId(param.serviceId),
-            bookingId: new ObjectId(newBooking._id),
-            invoiceId: invoiceNo,
-            totalAmount: totalPayAmount,
-            description: `Payment To ${param.fullName || "Guest"}`,
-            status: Constants.TRANSACTION_STATUS.PENDING,
-        };
-
-        if (param.carId && ObjectId.isValid(param.carId)) {
-            transactionPayload.carId = new ObjectId(param.carId);
-        }
-
-        let transactionCreate = await Transaction.create(transactionPayload);
-        log1(["postGuestBooking transactionCreate----->", transactionCreate]);
         if (!transactionCreate) {
             await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -1507,7 +1522,7 @@ export const postGuestBooking = async (req, res) => {
                 callback_method: "get",
             });
 
-            log1(["postGuestBooking paymentLink----->", paymentLink]);
+            log1(["postAddBooking paymentLink----->", paymentLink]);
 
             razorpayPaymentLink = paymentLink.short_url;
 
@@ -1515,20 +1530,31 @@ export const postGuestBooking = async (req, res) => {
                 razorpayOrderId: paymentLink.id,
             });
         } catch (razorpayError) {
-            log1(["postGuestBooking Razorpay payment link creation failed----->", razorpayError.message]);
-        }
+            log1(["postAddBooking Razorpay payment link creation failed----->", razorpayError.message]);
 
-        return res.status(200).json(successResponse("Booking created successfully. Please complete the payment.", {
+            await Booking.findByIdAndUpdate(newBooking._id, {
+                status: Constants.BOOKING_STATUS.FAILED,
+            });
+
+            await Transaction.findByIdAndUpdate(transactionCreate._id, {
+                status: Constants.TRANSACTION_STATUS.FAILED,
+            });
+
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        let responseData = {
             bookingId: newBooking._id,
             ownerId: ownerId,
             isNewOwner: isNewOwner,
             invoiceNo: invoiceNo,
             totalAmount: totalPayAmount,
             paymentLink: razorpayPaymentLink,
-            razorpayKeyId: process.env.RAZORPAY_KEY_ID,
-        }));
+        };
+
+        return res.status(200).json(successResponse("Booking created successfully. Please complete the payment.", responseData));
     } catch (error) {
-        log1(["Error in postGuestBooking ----->", error]);
+        log1(["Error in postAddBooking ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

@@ -99,8 +99,8 @@ router.post("/search-services", postSearchServices);
 router.post("/nearby-mechanics", postNearbyMechanics);
 
 // Booking API
-router.post("/guest-booking", postGuestBooking);
-router.post("/add-booking", authMiddleware, postAddBooking);
+router.post("/add-booking", postAddBooking);
+// router.post("/guest-booking", postGuestBooking);
 router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/update-booking", authMiddleware, postUpdateBooking);

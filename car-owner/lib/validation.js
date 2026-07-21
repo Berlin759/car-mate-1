@@ -33,7 +33,7 @@ const validate_rules = {
         updateDeviceToken: {
             deviceToken: "required",
         },
-        add_booking: {
+        guest_booking: {
             mechanicType: "required",
             mechanicId: "required_if:mechanicType,1",
             serviceId: "required",
@@ -44,10 +44,11 @@ const validate_rules = {
             longitude: "required",
             totalAmount: "required",
         },
-        guest_booking: {
+        add_booking: {
             fullName: "required|min:2|max:50",
             phoneNumber: "required|min:10|max:15",
             serviceId: "required",
+            carId: "required",
             mechanicType: "required",
             mechanicId: "required_if:mechanicType,1",
             date: "required",
