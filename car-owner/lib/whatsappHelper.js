@@ -9,12 +9,15 @@ const DEFAULT_COUNTRY_CODE = "91";
 
 const formatPhoneNumber = (phoneNumber) => {
     let cleaned = phoneNumber.replace(/[\s\-\(\)]/g, "");
+
     if (cleaned.startsWith("+")) {
         cleaned = cleaned.substring(1);
-    }
+    };
+
     if (cleaned.length <= 10) {
         cleaned = DEFAULT_COUNTRY_CODE + cleaned;
-    }
+    };
+
     return cleaned;
 };
 

@@ -198,7 +198,9 @@ export const postResendOtp = async (req, res) => {
         };
         await OTP.create(otpPayload);
 
-        const sendOtpResult = await sendOtp(phone_number, otp, otpChannel);
+        const phoneNumber = owner.phoneCode + phone_number;
+
+        const sendOtpResult = await sendOtp(phoneNumber, otp, otpChannel);
         log1(["postResendOtp sendOtpResult ----->", sendOtpResult]);
 
         if (!sendOtpResult.success) {

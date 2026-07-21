@@ -13,7 +13,6 @@ const validate_rules = {
             otp: "required",
         },
         resend_otp: {
-            phone_code: "required",
             phone_number: "required",
             type: "required",
             channel: "required",

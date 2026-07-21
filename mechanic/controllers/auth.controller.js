@@ -24,7 +24,7 @@ export const postLogin = async (req, res) => {
     try {
         log1(["PostLogin req.body ----->", req.body]);
 
-        const { phone_number, channel } = req.body;
+        const { phone_code, phone_number, channel } = req.body;
         const otpChannel = channel || Constants.OTP_CHANNEL.SMS;
 
         const validate = await custom_validation(req.body, "mechanic.login");
@@ -41,13 +41,21 @@ export const postLogin = async (req, res) => {
         const mechanic = await Mechanic.findOne({ phoneNumber: phone_number });
         log1(["PostLogin mechanic ----->", mechanic]);
 
-        if (!mechanic) {
-            const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number });
-            log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
-        } else if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
-            return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
-        } else if (mechanic.status === Constants.MECHANIC_STATUS.SUSPENDED) {
-            return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+        // if (!mechanic) {
+        //     const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number });
+        //     log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
+        // } else if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
+        //     return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
+        // } else if (mechanic.status === Constants.MECHANIC_STATUS.SUSPENDED) {
+        //     return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+        // };
+
+        if (mechanic) {
+            if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
+                return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
+            } else if (mechanic.status === Constants.MECHANIC_STATUS.SUSPENDED) {
+                return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
+            };
         };
 
         const otp = await generateOtp();
@@ -65,11 +73,18 @@ export const postLogin = async (req, res) => {
         };
         await OTP.create(otpPayload);
 
-        const sendOtpResult = await sendOtp(phone_number, otp, otpChannel);
+        const phoneNumber = phone_code + phone_number;
+
+        const sendOtpResult = await sendOtp(phoneNumber, otp, otpChannel);
         log1(["postLogin sendOtpResult ----->", sendOtpResult]);
 
         if (!sendOtpResult.success) {
             return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
+        };
+
+        if (!mechanic) {
+            const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number, phoneCode: phone_code });
+            log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
         };
 
         let response = {
@@ -183,7 +198,9 @@ export const postResendOtp = async (req, res) => {
         };
         await OTP.create(otpPayload);
 
-        const sendOtpResult = await sendOtp(phone_number, otp, otpChannel);
+        const phoneNumber = mechanic.phoneCode + phone_number;
+
+        const sendOtpResult = await sendOtp(phoneNumber, otp, otpChannel);
         log1(["postResendOtp sendOtpResult ----->", sendOtpResult]);
 
         if (!sendOtpResult.success) {
@@ -197,6 +214,7 @@ export const postResendOtp = async (req, res) => {
         };
 
         const channelMessage = otpChannel === Constants.OTP_CHANNEL.WHATSAPP ? "WhatsApp" : "SMS";
+
         return res.status(200).json(successResponse(`OTP resent via ${channelMessage}. Please check your ${channelMessage}.`, response));
     } catch (error) {
         log1(["Error in postResendOtp ----->", error]);
