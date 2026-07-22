@@ -21,11 +21,11 @@
                     </td>
                     <td>
                         <% if (template.type === "email") { %>
-                            <span>Email</span>
+                            <span class="bet-status alert-success">Email</span>
                         <% } else if (template.type === "push_notification") { %>
-                            <span class="badge bg-info">Push</span>
+                            <span class="bet-status alert-pending">Push Notification</span>
                         <% } else { %>
-                            <span class="badge bg-secondary">SMS</span>
+                            <span class="bet-status alert-gray">SMS</span>
                         <% } %>
                     </td>
                     <td>

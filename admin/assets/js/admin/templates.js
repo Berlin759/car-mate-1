@@ -25,6 +25,7 @@ function initTemplateValidation() {
     });
 
     $(document).on("input", "#template_subject", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
         const subjectNoSpace = this.value.replace(/\s/g, "");
         $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
         if (subjectNoSpace.length > 50) {
@@ -38,6 +39,7 @@ function initTemplateValidation() {
     });
 
     $(document).on("input", "#template_body", function () {
+        this.value = this.value.replace(/[^a-zA-Z0-9\s.,!?:;\-{}\n\r]/g, "");
         const bodyNoSpace = this.value.replace(/\s/g, "");
         $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
         if (bodyNoSpace.length > 300) {
@@ -113,12 +115,16 @@ $(document).on("click", "#add_placeholder_btn", function () {
     addPlaceholder();
 });
 
-$(document).on("keypress", "#placeholder_input", function (e) {
-    if (e.which === 13) {
-        e.preventDefault();
-        addPlaceholder();
-    }
-});
+    $(document).on("keypress", "#placeholder_input", function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            addPlaceholder();
+        }
+    });
+
+    $(document).on("input", "#placeholder_input", function () {
+        this.value = this.value.replace(/[^a-zA-Z]/g, "");
+    });
 
 $(document).on("click", ".remove-placeholder-tag", function () {
     const val = $(this).data("placeholder");
@@ -135,6 +141,7 @@ $(document).on("click", "#save_template", function () {
     const targetAudience = $("#template_audience").val();
 
     const nameRegex = /^[a-zA-Z\s]+$/;
+    const bodyRegex = /^[a-zA-Z0-9\s.,!?:;\-\{\}]+$/;
     const nameNoSpace = name.replace(/\s/g, "");
     const subjectNoSpace = subject.replace(/\s/g, "");
     const bodyNoSpace = body.replace(/\s/g, "");
@@ -148,10 +155,14 @@ $(document).on("click", "#save_template", function () {
         validationMessage = "Template name must not exceed 50 characters (excluding spaces).";
     } else if (!body) {
         validationMessage = "Template body is required.";
+    } else if (!bodyRegex.test(body)) {
+        validationMessage = "Template body must not contain special characters.";
     } else if (bodyNoSpace.length > 300) {
         validationMessage = "Template body must not exceed 300 characters (excluding spaces).";
     } else if (type === "email" && !subject) {
         validationMessage = "Subject is required for email templates.";
+    } else if (type === "email" && !nameRegex.test(subject)) {
+        validationMessage = "Subject must contain only alphabetic characters and spaces.";
     } else if (type === "email" && subjectNoSpace.length > 50) {
         validationMessage = "Subject must not exceed 50 characters (excluding spaces).";
     } else if (templatePlaceholders.length === 0) {
@@ -229,18 +240,30 @@ $(document).on("click", "#update_template", function () {
     const type = $("#template_type").val();
     const targetAudience = $("#template_audience").val();
 
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    const bodyRegex = /^[a-zA-Z0-9\s.,!?:;\-\{\}]+$/;
     const subjectNoSpace = subject.replace(/\s/g, "");
     const bodyNoSpace = body.replace(/\s/g, "");
 
     let validationMessage = "";
     if (!body) {
         validationMessage = "Template body is required.";
+    } else if (!bodyRegex.test(body)) {
+        validationMessage = "Template body must not contain special characters.";
     } else if (bodyNoSpace.length > 300) {
         validationMessage = "Template body must not exceed 300 characters (excluding spaces).";
+    } else if (!type) {
+        validationMessage = "Template type is required.";
     } else if (type === "email" && !subject) {
         validationMessage = "Subject is required for email templates.";
+    } else if (type === "email" && !nameRegex.test(subject)) {
+        validationMessage = "Subject must contain only alphabetic characters and spaces.";
     } else if (type === "email" && subjectNoSpace.length > 50) {
         validationMessage = "Subject must not exceed 50 characters (excluding spaces).";
+    } else if (!targetAudience) {
+        validationMessage = "Target audience is required.";
+    } else if (!templatePlaceholders || templatePlaceholders.length === 0) {
+        validationMessage = "At least one placeholder is required.";
     };
 
     if (validationMessage !== "") {
@@ -341,9 +364,9 @@ function addPlaceholder() {
     const val = $("#placeholder_input").val().trim();
     if (!val) return;
 
-    const nameRegex = /^[a-zA-Z0-9]+$/;
+    const nameRegex = /^[a-zA-Z]+$/;
     if (!nameRegex.test(val)) {
-        showToast(0, "Placeholder must contain only alphabetic characters and numbers.");
+        showToast(0, "Placeholder must contain only alphabetic characters.");
         return;
     };
 

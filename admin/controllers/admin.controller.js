@@ -5679,6 +5679,7 @@ export const postAddTemplate = async (req, res) => {
         const trimmedAudience = (targetAudience || "").trim().toLowerCase();
 
         const nameRegex = /^[a-zA-Z\s]+$/;
+        const bodyRegex = /^[a-zA-Z0-9\s.,!?:;\-\{\}]+$/;
 
         if (!trimmedName) {
             return res.status(400).json(errorResponse("Template name is required."));
@@ -5695,13 +5696,17 @@ export const postAddTemplate = async (req, res) => {
 
         if (!trimmedBody) {
             return res.status(400).json(errorResponse("Template body is required."));
+        } else if (!bodyRegex.test(trimmedBody)) {
+            return res.status(400).json(errorResponse("Template body must not contain special characters."));
         } else if (trimmedBody.replace(/\s/g, "").length > 300) {
             return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
         };
 
-        if (trimmedType === "email" && !trimmedSubject) {
+        if (trimmedType === Constants.TEMPLATE_TYPE.EMAIL && !trimmedSubject) {
             return res.status(400).json(errorResponse("Subject is required for email templates."));
-        } else if (trimmedType === "email" && trimmedSubject.replace(/\s/g, "").length > 50) {
+        } else if (trimmedType === Constants.TEMPLATE_TYPE.EMAIL && !nameRegex.test(trimmedSubject)) {
+            return res.status(400).json(errorResponse("Subject must contain only alphabetic characters and spaces."));
+        } else if (trimmedType === Constants.TEMPLATE_TYPE.EMAIL && trimmedSubject.replace(/\s/g, "").length > 50) {
             return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
         };
 
@@ -5724,7 +5729,7 @@ export const postAddTemplate = async (req, res) => {
 
         const template = await Template.create({
             name: trimmedName,
-            type: trimmedType || "email",
+            type: trimmedType || Constants.TEMPLATE_TYPE.EMAIL,
             subject: trimmedSubject,
             body: trimmedBody,
             targetAudience: trimmedAudience || "all",
@@ -5755,52 +5760,81 @@ export const postUpdateTemplate = async (req, res) => {
             return res.status(400).json(errorResponse("Default templates cannot be modified."));
         };
 
-        if (updateData.body !== undefined) {
-            const trimmedBody = (updateData.body || "").trim();
-
-            if (!trimmedBody) {
-                return res.status(400).json(errorResponse("Template body is required."));
-            } else if (trimmedBody.replace(/\s/g, "").length > 300) {
-                return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
-            };
-
-            updateData.body = trimmedBody;
+        if (updateData.body === undefined || updateData.body === null) {
+            return res.status(400).json(errorResponse("Template body is required."));
         };
 
-        if (updateData.subject !== undefined) {
-            const trimmedSubject = (updateData.subject || "").trim();
-            const currentType = updateData.type || template.type;
+        const trimmedBody = (updateData.body || "").trim();
+        const bodyRegex = /^[a-zA-Z0-9\s.,!?:;\-\{\}]+$/;
 
-            if (currentType === "email" && !trimmedSubject) {
-                return res.status(400).json(errorResponse("Subject is required for email templates."));
-            } else if (currentType === "email" && trimmedSubject.replace(/\s/g, "").length > 50) {
-                return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
-            };
-
-            updateData.subject = trimmedSubject;
+        if (!trimmedBody) {
+            return res.status(400).json(errorResponse("Template body is required."));
+        } else if (!bodyRegex.test(trimmedBody)) {
+            return res.status(400).json(errorResponse("Template body must not contain special characters."));
+        } else if (trimmedBody.replace(/\s/g, "").length > 300) {
+            return res.status(400).json(errorResponse("Template body must not exceed 300 characters (excluding spaces)."));
         };
 
-        if (updateData.placeholders !== undefined) {
-            if (!Array.isArray(updateData.placeholders)) {
-                updateData.placeholders = [];
-            } else {
-                const seenPlaceholders = new Set();
+        updateData.body = trimmedBody;
 
-                for (const ph of updateData.placeholders) {
-                    const trimmedPh = (ph || "").trim();
-
-                    if (!trimmedPh) {
-                        return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
-                    } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
-                        return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
-                    };
-
-                    seenPlaceholders.add(trimmedPh.toLowerCase());
-                };
-
-                updateData.placeholders = updateData.placeholders.map(p => p.trim());
-            };
+        if (updateData.type === undefined || updateData.type === null) {
+            return res.status(400).json(errorResponse("Template type is required."));
         };
+
+        const validateType = Object.values(Constants.TEMPLATE_TYPE).includes(updateData.type);
+        if (!validateType) {
+            return res.status(400).json(errorResponse("Invalid template type."));
+        };
+
+        if (updateData.targetAudience === undefined || updateData.targetAudience === null) {
+            return res.status(400).json(errorResponse("Target audience is required."));
+        };
+
+        const validateAudience = Object.values(Constants.TARGET_AUDIENCE).includes(updateData.targetAudience);
+        if (!validateAudience) {
+            return res.status(400).json(errorResponse("Invalid target audience."));
+        };
+
+        if (updateData.subject === undefined || updateData.subject === null) {
+            return res.status(400).json(errorResponse("Subject is required."));
+        };
+
+        const trimmedSubject = (updateData.subject || "").trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+
+        if (updateData.type === Constants.TEMPLATE_TYPE.EMAIL && !trimmedSubject) {
+            return res.status(400).json(errorResponse("Subject is required for email templates."));
+        } else if (updateData.type === Constants.TEMPLATE_TYPE.EMAIL && !nameRegex.test(trimmedSubject)) {
+            return res.status(400).json(errorResponse("Subject must contain only alphabetic characters and spaces."));
+        } else if (updateData.type === Constants.TEMPLATE_TYPE.EMAIL && trimmedSubject.replace(/\s/g, "").length > 50) {
+            return res.status(400).json(errorResponse("Subject must not exceed 50 characters (excluding spaces)."));
+        };
+
+        updateData.subject = trimmedSubject;
+
+        if (updateData.placeholders === undefined || updateData.placeholders === null) {
+            return res.status(400).json(errorResponse("Placeholders are required."));
+        };
+
+        if (!Array.isArray(updateData.placeholders) || updateData.placeholders.length === 0) {
+            return res.status(400).json(errorResponse("At least one placeholder is required."));
+        };
+
+        const seenPlaceholders = new Set();
+
+        for (const ph of updateData.placeholders) {
+            const trimmedPh = (ph || "").trim();
+
+            if (!trimmedPh) {
+                return res.status(400).json(errorResponse("Placeholder name cannot be empty."));
+            } else if (seenPlaceholders.has(trimmedPh.toLowerCase())) {
+                return res.status(400).json(errorResponse(`Duplicate placeholder "${trimmedPh}". Please use unique placeholder names.`));
+            };
+
+            seenPlaceholders.add(trimmedPh.toLowerCase());
+        };
+
+        updateData.placeholders = updateData.placeholders.map(p => p.trim());
 
         await Template.findByIdAndUpdate(templateId, updateData);
 

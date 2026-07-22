@@ -75,3 +75,17 @@ $(document).on("keypress", "#new_password, #current_password", function (e) {
         $("#updatePassword").click();
     };
 });
+
+$(document).on("click", "#ey2", function () {
+    const input = $("#current_password");
+    const type = input.attr("type");
+    input.attr("type", type === "password" ? "text" : "password");
+    $(this).toggleClass("fa-eye-slash fa-eye");
+});
+
+$(document).on("click", "#ey3", function () {
+    const input = $("#new_password");
+    const type = input.attr("type");
+    input.attr("type", type === "password" ? "text" : "password");
+    $(this).toggleClass("fa-eye-slash fa-eye");
+});
