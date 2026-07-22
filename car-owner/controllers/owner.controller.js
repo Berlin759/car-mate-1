@@ -25,6 +25,7 @@ import {
 import { sendMail } from "../utils/mailSend.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
 import { razorpayRefund } from "./razorpay.controller.js";
+import { io } from "../index.js";
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
 import OTP from "../models/otp.model.js";
@@ -2912,12 +2913,12 @@ export const postChatList = async (req, res) => {
             { $match: matchQuery },
             {
                 $addFields: {
-                    chatOwnerId: {
+                    chatMechanicId: {
                         $arrayElemAt: [
                             {
                                 $filter: {
-                                    input: "$ownerIds",
-                                    cond: { $ne: ["$$this", new ObjectId(ownerId)] }
+                                    input: "$mechanicIds",
+                                    cond: { $ne: ["$$this", null] }
                                 }
                             },
                             0
@@ -2927,13 +2928,13 @@ export const postChatList = async (req, res) => {
             },
             {
                 $lookup: {
-                    from: "owners",
-                    localField: "chatOwnerId",
+                    from: "mechanics",
+                    localField: "chatMechanicId",
                     foreignField: "_id",
-                    as: "chatOwner",
+                    as: "chatMechanic",
                 },
             },
-            { $unwind: "$chatOwner" },
+            { $unwind: "$chatMechanic" },
             {
                 $lookup: {
                     from: "bookings",
@@ -2946,7 +2947,7 @@ export const postChatList = async (req, res) => {
             ...(param.search && param.search.trim() !== "" ? [{
                 $match: {
                     $or: [
-                        { "chatOwner.fullName": { $regex: param.search, $options: "i" } },
+                        { "chatMechanic.fullName": { $regex: param.search, $options: "i" } },
                     ],
                 },
             }] : []),
@@ -2960,9 +2961,10 @@ export const postChatList = async (req, res) => {
                             $project: {
                                 _id: 1,
                                 ownerIds: 1,
+                                mechanicIds: 1,
                                 messages: 1,
                                 readMessages: 1,
-                                chatOwner: {
+                                chatMechanic: {
                                     _id: 1,
                                     fullName: 1,
                                     profileImage: 1,
@@ -3145,17 +3147,22 @@ export const postSendMessageToChat = async (req, res) => {
         };
 
         let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
-        let receiverOwner = await Owner.findOne({ _id: new ObjectId(param.ownerId) });
+        let receiverMechanic = await Mechanic.findOne({ _id: new ObjectId(param.mechanicId) });
 
-        if (!ownerData || !receiverOwner) {
+        if (!ownerData) {
             log1(["postSendMessageToChat owner ----->", ownerData]);
             return res.status(400).json(errorResponse("Owner not found."));
         };
 
-        const bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId) });
-        log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
-        if (!bookingDetails) {
-            return res.status(400).json(errorResponse("Chat is not Available for this booking."));
+        if (!receiverMechanic) {
+            log1(["postSendMessageToChat receiverMechanic ----->", receiverMechanic]);
+            return res.status(400).json(errorResponse("Mechanic not found."));
+        };
+
+        let bookingDetails = null;
+        if (param.bookingId) {
+            bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId) });
+            log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
         };
 
         const messagePayload = {
@@ -3175,6 +3182,7 @@ export const postSendMessageToChat = async (req, res) => {
                 longitude: param.longitude,
                 address: param?.address ? param.address : ""
             };
+
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.LOCATION;
             notificationDescription = ownerData.fullName + " sent location";
         } else if (req.files) {
@@ -3186,17 +3194,6 @@ export const postSendMessageToChat = async (req, res) => {
                 if (uploadedFile.flag === 0) {
                     return res.status(400).json(uploadedFile);
                 };
-
-                // const docType =
-                //     uploadedFile.data.folder === "images"
-                //         ? Constants.CHAT_DOCUMENT_TYPE.PHOTO
-                //         : uploadedFile.data.folder === "videos"
-                //             ? Constants.CHAT_DOCUMENT_TYPE.VIDEO
-                //             : uploadedFile.data.folder === "audio"
-                //                 ? Constants.CHAT_DOCUMENT_TYPE.AUDIO
-                //                 : uploadedFile.data.folder === "documents"
-                //                     ? Constants.CHAT_DOCUMENT_TYPE.FILE
-                //                     : Constants.CHAT_DOCUMENT_TYPE.NONE;
 
                 const docType = ({
                     images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
@@ -3224,43 +3221,57 @@ export const postSendMessageToChat = async (req, res) => {
 
         const findChatQuery = {
             ownerIds: { $in: [ownerId] },
-            bookingId: new ObjectId(param.bookingId)
+            mechanicIds: { $in: [new ObjectId(param.mechanicId)] },
+        };
+
+        if (param.chatId) {
+            findChatQuery._id = new ObjectId(param.chatId);
+        };
+
+        if (param.bookingId) {
+            findChatQuery.bookingId = new ObjectId(param.bookingId);
         };
 
         let chat = await Chat.findOne(findChatQuery);
 
         if (!param.chatId && !chat) {
-            const addChat = await Chat.create({
+            const createPayload = {
                 messages: [messagePayload],
                 readMessages: [
                     { byId: ownerId, lastReadAt: currentTime }
                 ],
-                ownerIds: [new ObjectId(ownerId), new ObjectId(param.ownerId)],
-                bookingId: new ObjectId(param.bookingId),
-            });
+                ownerIds: [new ObjectId(ownerId)],
+                mechanicIds: [new ObjectId(param.mechanicId)],
+            };
+
+            if (param.bookingId) {
+                createPayload.bookingId = new ObjectId(param.bookingId);
+            };
+
+            const addChat = await Chat.create(createPayload);
 
             if (!addChat) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
             };
 
             if (
-                receiverOwner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                receiverOwner.deviceToken &&
-                receiverOwner.deviceToken !== "" &&
-                receiverOwner.deviceToken !== null &&
-                receiverOwner.deviceToken !== undefined
+                receiverMechanic.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                receiverMechanic.deviceToken &&
+                receiverMechanic.deviceToken !== "" &&
+                receiverMechanic.deviceToken !== null &&
+                receiverMechanic.deviceToken !== undefined
             ) {
                 let notificationObject = {
                     title: ownerData.fullName,
                     description: notificationDescription,
-                    ownerId: receiverOwner._id,
+                    mechanicId: receiverMechanic._id,
                     chatId: addChat._id,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
-                await sendPushNotification(receiverOwner.deviceToken, notificationObject);
+                await sendPushNotification(receiverMechanic.deviceToken, notificationObject);
             };
 
-            io.emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: addChat._id, message: messagePayload });
+            io.to(addChat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: addChat._id, message: messagePayload });
 
             return res.status(200).json(successResponse("Message sent successfully.", { chatId: addChat._id, document: document }));
         };
@@ -3282,34 +3293,34 @@ export const postSendMessageToChat = async (req, res) => {
             });
         };
 
-        if (!chat.ownerDetailsPageIds.includes(receiverOwner._id)) {
+        if (!chat.mechanicDetailsPageIds.includes(receiverMechanic._id)) {
             if (
-                receiverOwner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                receiverOwner.deviceToken &&
-                receiverOwner.deviceToken !== "" &&
-                receiverOwner.deviceToken !== null &&
-                receiverOwner.deviceToken !== undefined
+                receiverMechanic.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                receiverMechanic.deviceToken &&
+                receiverMechanic.deviceToken !== "" &&
+                receiverMechanic.deviceToken !== null &&
+                receiverMechanic.deviceToken !== undefined
             ) {
                 let notificationObject = {
                     title: ownerData.fullName,
                     description: notificationDescription,
-                    ownerId: receiverOwner._id,
+                    mechanicId: receiverMechanic._id,
                     chatId: chat._id,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
-                await sendPushNotification(receiverOwner.deviceToken, notificationObject);
+                await sendPushNotification(receiverMechanic.deviceToken, notificationObject);
             };
         } else {
-            const isReceiverRead = readMessages.find((read) => read.byId.toString() === receiverOwner._id.toString());
+            const isReceiverRead = readMessages.find((read) => read.byId.toString() === receiverMechanic._id.toString());
 
             if (!isReceiverRead) {
                 readMessages.push({
-                    byId: new ObjectId(receiverOwner._id),
+                    byId: new ObjectId(receiverMechanic._id),
                     lastReadAt: currentTime,
                 });
             } else {
                 readMessages = readMessages.map((read) => {
-                    if (read.byId.toString() === receiverOwner._id.toString()) {
+                    if (read.byId.toString() === receiverMechanic._id.toString()) {
                         read.lastReadAt = currentTime;
                     };
                     return read;
@@ -3331,7 +3342,7 @@ export const postSendMessageToChat = async (req, res) => {
 
         messagePayload.sender = { fullName: ownerData.fullName };
 
-        io.emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: messagePayload });
+        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: messagePayload });
 
         return res.status(200).json(successResponse("Message sent successfully.", { chatId: chat._id, document: document }));
     } catch (error) {

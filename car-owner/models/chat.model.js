@@ -28,7 +28,8 @@ const chatSchema = new Schema(
         bookingId: {
             type: Schema.Types.ObjectId,
             ref: "Booking",
-            required: true,
+            required: false,
+            default: null,
         },
         readMessages: [
             {

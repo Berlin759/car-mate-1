@@ -7,6 +7,8 @@ import http from "http";
 import moment from "moment";
 import fileUpload from "express-fileupload";
 import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
 import { ObjectId } from "mongodb";
 import connectDB from "./utils/db.helper.js";
 import errorHandler from "./utils/errorHandler.js";
@@ -37,6 +39,19 @@ export const io = new Server(httpServer, {
         origin: [process.env.APP_URL],
     },
 });
+
+const setupRedisAdapter = async () => {
+    try {
+        const pubClient = createClient({ url: process.env.REDIS_URL });
+        const subClient = pubClient.duplicate();
+        await Promise.all([pubClient.connect(), subClient.connect()]);
+        io.adapter(createAdapter(pubClient, subClient));
+        log1(["Socket.IO Redis adapter connected successfully"]);
+    } catch (error) {
+        log1(["Redis adapter setup failed, using default adapter:", error.message]);
+    }
+};
+setupRedisAdapter();
 
 io.on("connection", async (socket) => {
     const mechanicId = socket?.handshake?.auth?.mechanicId;
