@@ -42,9 +42,10 @@ $(document).on("click", "#reset-template-filters", function () {
 $(document).on("click", "#seed-default-templates-btn", function () {
     postAjaxCall("/seed-default-templates", {}, function (response) {
         showToast(response.flag, response.msg);
+
         if (response.flag === 1) {
             fetchTemplateList();
-        }
+        };
     });
 });
 
@@ -56,7 +57,7 @@ $(document).on("change", "#template_type", function () {
         $("#subject-field-group").hide();
         $("#template_subject").val("");
         $("#template_subject_counter").text("0/50");
-    }
+    };
 });
 
 // Placeholders
@@ -68,7 +69,7 @@ $(document).on("keypress", "#placeholder_input", function (e) {
     if (e.which === 13) {
         e.preventDefault();
         addPlaceholder();
-    }
+    };
 });
 
 $(document).on("input", "#placeholder_input", function () {
@@ -121,7 +122,7 @@ $(document).on("click", "#save_template", function () {
     if (validationMessage !== "") {
         showToast(0, validationMessage);
         return;
-    }
+    };
 
     postAjaxCall("/add-template", {
         name: name,
@@ -132,10 +133,11 @@ $(document).on("click", "#save_template", function () {
         placeholders: templatePlaceholders,
     }, function (response) {
         showToast(response.flag, response.msg);
+
         if (response.flag === 1) {
             $("#templateModal").modal("hide");
             fetchTemplateList();
-        }
+        };
     });
 });
 
@@ -151,7 +153,7 @@ $(document).on("click", ".edit-template-btn", function () {
         if (t.isDefault) {
             showToast(0, "Default templates cannot be edited.");
             return;
-        }
+        };
 
         resetTemplateModal();
         $("#template_id").val(t._id);
@@ -165,14 +167,16 @@ $(document).on("click", ".edit-template-btn", function () {
 
         const nameNoSpace = (t.name || "").replace(/\s/g, "");
         $("#template_name_counter").text(`${nameNoSpace.length}/50`);
+
         const subjectNoSpace = (t.subject || "").replace(/\s/g, "");
         $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
+
         const bodyNoSpace = (t.body || "").replace(/\s/g, "");
         $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
 
         if (t.type !== "email") {
             $("#subject-field-group").hide();
-        }
+        };
 
         $("#templateModalLabel").text("Edit Template");
         $("#save_template").addClass("d-none");
@@ -218,7 +222,7 @@ $(document).on("click", "#update_template", function () {
     if (validationMessage !== "") {
         showToast(0, validationMessage);
         return;
-    }
+    };
 
     postAjaxCall("/update-template", {
         templateId: templateId,
@@ -229,10 +233,11 @@ $(document).on("click", "#update_template", function () {
         placeholders: templatePlaceholders,
     }, function (response) {
         showToast(response.flag, response.msg);
+
         if (response.flag === 1) {
             $("#templateModal").modal("hide");
             fetchTemplateList();
-        }
+        };
     });
 });
 
@@ -255,7 +260,7 @@ $(document).on("click", ".view-template-btn", function () {
             $("#view-subject-group").hide();
         } else {
             $("#view-subject-group").show();
-        }
+        };
 
         if (t.isActive) {
             $("#view-template-active").removeClass("d-none");
@@ -263,12 +268,13 @@ $(document).on("click", ".view-template-btn", function () {
         } else {
             $("#view-template-active").addClass("d-none");
             $("#view-template-inactive").removeClass("d-none");
-        }
+        };
 
         let phHtml = "";
         (t.placeholders || []).forEach(function (p) {
             phHtml += '<span class="badge bg-info text-dark">{{' + p + "}}</span>";
         });
+
         $("#view-template-placeholders").html(phHtml || '<span class="text-muted">None</span>');
 
         $("#viewTemplateModal").modal("show");
@@ -282,9 +288,10 @@ $(document).on("click", ".toggle-template-status", function () {
 
     postAjaxCall("/toggle-template-status", { templateId: templateId }, function (response) {
         showToast(response.flag, response.msg);
+
         if (response.flag === 1) {
             fetchTemplateList();
-        }
+        };
     });
 });
 
@@ -297,9 +304,10 @@ $(document).on("click", ".delete-template-btn", function () {
 
     postAjaxCall("/delete-template", { templateId: templateId }, function (response) {
         showToast(response.flag, response.msg);
+
         if (response.flag === 1) {
             fetchTemplateList();
-        }
+        };
     });
 });
 
@@ -307,7 +315,9 @@ function initTemplateValidation() {
     $(document).on("input", "#template_name", function () {
         this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
         const nameNoSpace = this.value.replace(/\s/g, "");
+
         $("#template_name_counter").text(`${nameNoSpace.length}/50`);
+
         if (nameNoSpace.length > 50) {
             let trimmed = this.value;
 
@@ -323,28 +333,38 @@ function initTemplateValidation() {
 
     $(document).on("input", "#template_subject", function () {
         this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+
         const subjectNoSpace = this.value.replace(/\s/g, "");
         $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
+
         if (subjectNoSpace.length > 50) {
             let trimmed = this.value;
+
             while (trimmed.replace(/\s/g, "").length > 50) {
                 trimmed = trimmed.slice(0, -1);
             };
+
             this.value = trimmed;
+
             $("#template_subject_counter").text(`50/50`);
         };
     });
 
     $(document).on("input", "#template_body", function () {
         this.value = this.value.replace(/[^a-zA-Z0-9\s.,!?:;\-{}\n\r]/g, "");
+
         const bodyNoSpace = this.value.replace(/\s/g, "");
         $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
+
         if (bodyNoSpace.length > 300) {
             let trimmed = this.value;
+
             while (trimmed.replace(/\s/g, "").length > 300) {
                 trimmed = trimmed.slice(0, -1);
             };
+
             this.value = trimmed;
+
             $("#template_body_counter").text(`300/300`);
         };
     });
@@ -352,6 +372,7 @@ function initTemplateValidation() {
     $(document).on("keypress", "#templateModal input, #templateModal textarea, #templateModal select", function (e) {
         if (e.key === "Enter") {
             e.preventDefault();
+
             if (!$("#save_template").hasClass("d-none")) {
                 $("#save_template").trigger("click");
             } else if (!$("#update_template").hasClass("d-none")) {
