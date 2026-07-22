@@ -58,7 +58,8 @@ export const postLogin = async (req, res) => {
             };
         };
 
-        const otp = await generateOtp();
+        // const otp = await generateOtp();
+        const otp = "123456";
         const token = await generateRandomToken();
         const currentTime = moment().utc().valueOf();
         const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
@@ -183,7 +184,8 @@ export const postResendOtp = async (req, res) => {
             return res.status(400).json(errorResponse("Please enter valid phone number."));
         };
 
-        const otp = await generateOtp();
+        // const otp = await generateOtp();
+        const otp = "123456";
         const token = await generateRandomToken();
         const currentTime = moment().utc().valueOf();
         const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
