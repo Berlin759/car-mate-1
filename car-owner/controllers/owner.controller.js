@@ -2930,8 +2930,8 @@ export const postChatList = async (req, res) => {
                     from: "owners",
                     localField: "chatOwnerId",
                     foreignField: "_id",
-                    as: "chatOwner"
-                }
+                    as: "chatOwner",
+                },
             },
             { $unwind: "$chatOwner" },
             {
@@ -2939,8 +2939,8 @@ export const postChatList = async (req, res) => {
                     from: "bookings",
                     localField: "bookingId",
                     foreignField: "_id",
-                    as: "bookingsDetails"
-                }
+                    as: "bookingsDetails",
+                },
             },
             { $unwind: { path: "$bookingsDetails", preserveNullAndEmptyArrays: true } },
             ...(param.search && param.search.trim() !== "" ? [{
@@ -3015,7 +3015,7 @@ export const postChatList = async (req, res) => {
                     } else {
                         chat.lastMessage.isMessageSeen = false;
                     };
-                }
+                };
 
                 const updatedChat = chat;
                 delete updatedChat.messages;
@@ -3150,7 +3150,7 @@ export const postSendMessageToChat = async (req, res) => {
         if (!ownerData || !receiverOwner) {
             log1(["postSendMessageToChat owner ----->", ownerData]);
             return res.status(400).json(errorResponse("Owner not found."));
-        }
+        };
 
         const bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId) });
         log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
@@ -3179,23 +3179,32 @@ export const postSendMessageToChat = async (req, res) => {
             notificationDescription = ownerData.fullName + " sent location";
         } else if (req.files) {
             let allfiles = Array.isArray(req.files["files"]) ? req.files["files"] : [req.files["files"]];
+
             for (const file of allfiles) {
                 const uploadedFile = await uploadFile(file, true);
 
                 if (uploadedFile.flag === 0) {
                     return res.status(400).json(uploadedFile);
-                }
+                };
 
-                const docType =
-                    uploadedFile.data.folder === "images"
-                        ? Constants.CHAT_DOCUMENT_TYPE.PHOTO
-                        : uploadedFile.data.folder === "videos"
-                            ? Constants.CHAT_DOCUMENT_TYPE.VIDEO
-                            : uploadedFile.data.folder === "audio"
-                                ? Constants.CHAT_DOCUMENT_TYPE.AUDIO
-                                : uploadedFile.data.folder === "documents"
-                                    ? Constants.CHAT_DOCUMENT_TYPE.FILE
-                                    : Constants.CHAT_DOCUMENT_TYPE.NONE;
+                // const docType =
+                //     uploadedFile.data.folder === "images"
+                //         ? Constants.CHAT_DOCUMENT_TYPE.PHOTO
+                //         : uploadedFile.data.folder === "videos"
+                //             ? Constants.CHAT_DOCUMENT_TYPE.VIDEO
+                //             : uploadedFile.data.folder === "audio"
+                //                 ? Constants.CHAT_DOCUMENT_TYPE.AUDIO
+                //                 : uploadedFile.data.folder === "documents"
+                //                     ? Constants.CHAT_DOCUMENT_TYPE.FILE
+                //                     : Constants.CHAT_DOCUMENT_TYPE.NONE;
+
+                const docType = ({
+                    images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
+                    videos: Constants.CHAT_DOCUMENT_TYPE.VIDEO,
+                    audio: Constants.CHAT_DOCUMENT_TYPE.AUDIO,
+                    documents: Constants.CHAT_DOCUMENT_TYPE.FILE,
+                }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
+
                 document.push({
                     url: uploadedFile.data.url,
                     thumbnailUrl: uploadedFile.data.thumbnailUrl,
@@ -3204,8 +3213,10 @@ export const postSendMessageToChat = async (req, res) => {
                     originalName: uploadedFile.data.originalName
                 });
             };
+
             messagePayload.document = document;
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.DOCUMENT;
+
             notificationDescription = ownerData.fullName + " sent document";
         } else {
             return res.status(400).json(errorResponse("Invalid chat message."));
@@ -3215,6 +3226,7 @@ export const postSendMessageToChat = async (req, res) => {
             ownerIds: { $in: [ownerId] },
             bookingId: new ObjectId(param.bookingId)
         };
+
         let chat = await Chat.findOne(findChatQuery);
 
         if (!param.chatId && !chat) {
@@ -3226,6 +3238,7 @@ export const postSendMessageToChat = async (req, res) => {
                 ownerIds: [new ObjectId(ownerId), new ObjectId(param.ownerId)],
                 bookingId: new ObjectId(param.bookingId),
             });
+
             if (!addChat) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
             };
@@ -3252,9 +3265,9 @@ export const postSendMessageToChat = async (req, res) => {
             return res.status(200).json(successResponse("Message sent successfully.", { chatId: addChat._id, document: document }));
         };
 
-
         let readMessages = chat.readMessages || [];
         const isRead = readMessages.find((read) => read.byId.toString() === ownerId.toString());
+
         if (!isRead) {
             readMessages.push({
                 byId: new ObjectId(ownerId),
@@ -3288,6 +3301,7 @@ export const postSendMessageToChat = async (req, res) => {
             };
         } else {
             const isReceiverRead = readMessages.find((read) => read.byId.toString() === receiverOwner._id.toString());
+
             if (!isReceiverRead) {
                 readMessages.push({
                     byId: new ObjectId(receiverOwner._id),
@@ -3301,7 +3315,7 @@ export const postSendMessageToChat = async (req, res) => {
                     return read;
                 });
             };
-        }
+        };
 
         const updateChatQuery = {
             $push: {
