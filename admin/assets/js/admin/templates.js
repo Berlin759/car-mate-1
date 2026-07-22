@@ -13,57 +13,6 @@ $(document).on("click", "#add_new_template_btn", function () {
     resetTemplateModal();
 });
 
-function initTemplateValidation() {
-    $(document).on("input", "#template_name", function () {
-        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
-        const nameNoSpace = this.value.replace(/\s/g, "");
-        $("#template_name_counter").text(`${nameNoSpace.length}/50`);
-        if (nameNoSpace.length > 50) {
-            this.value = this.value.slice(0, this.value.length - (nameNoSpace.length - 50));
-            $("#template_name_counter").text(`50/50`);
-        };
-    });
-
-    $(document).on("input", "#template_subject", function () {
-        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
-        const subjectNoSpace = this.value.replace(/\s/g, "");
-        $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
-        if (subjectNoSpace.length > 50) {
-            let trimmed = this.value;
-            while (trimmed.replace(/\s/g, "").length > 50) {
-                trimmed = trimmed.slice(0, -1);
-            };
-            this.value = trimmed;
-            $("#template_subject_counter").text(`50/50`);
-        };
-    });
-
-    $(document).on("input", "#template_body", function () {
-        this.value = this.value.replace(/[^a-zA-Z0-9\s.,!?:;\-{}\n\r]/g, "");
-        const bodyNoSpace = this.value.replace(/\s/g, "");
-        $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
-        if (bodyNoSpace.length > 300) {
-            let trimmed = this.value;
-            while (trimmed.replace(/\s/g, "").length > 300) {
-                trimmed = trimmed.slice(0, -1);
-            };
-            this.value = trimmed;
-            $("#template_body_counter").text(`300/300`);
-        };
-    });
-
-    $(document).on("keypress", "#templateModal input, #templateModal textarea, #templateModal select", function (e) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (!$("#save_template").hasClass("d-none")) {
-                $("#save_template").trigger("click");
-            } else if (!$("#update_template").hasClass("d-none")) {
-                $("#update_template").trigger("click");
-            };
-        };
-    });
-};
-
 // Type Filter
 $(document).on("click", ".template-type-filter", function () {
     const type = $(this).data("type");
@@ -115,16 +64,16 @@ $(document).on("click", "#add_placeholder_btn", function () {
     addPlaceholder();
 });
 
-    $(document).on("keypress", "#placeholder_input", function (e) {
-        if (e.which === 13) {
-            e.preventDefault();
-            addPlaceholder();
-        }
-    });
+$(document).on("keypress", "#placeholder_input", function (e) {
+    if (e.which === 13) {
+        e.preventDefault();
+        addPlaceholder();
+    }
+});
 
-    $(document).on("input", "#placeholder_input", function () {
-        this.value = this.value.replace(/[^a-zA-Z]/g, "");
-    });
+$(document).on("input", "#placeholder_input", function () {
+    this.value = this.value.replace(/[^a-zA-Z]/g, "");
+});
 
 $(document).on("click", ".remove-placeholder-tag", function () {
     const val = $(this).data("placeholder");
@@ -353,6 +302,64 @@ $(document).on("click", ".delete-template-btn", function () {
         }
     });
 });
+
+function initTemplateValidation() {
+    $(document).on("input", "#template_name", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        const nameNoSpace = this.value.replace(/\s/g, "");
+        $("#template_name_counter").text(`${nameNoSpace.length}/50`);
+        if (nameNoSpace.length > 50) {
+            let trimmed = this.value;
+
+            while (trimmed.replace(/\s/g, "").length > 50) {
+                trimmed = trimmed.slice(0, -1);
+            };
+
+            this.value = trimmed;
+
+            $("#template_name_counter").text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#template_subject", function () {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        const subjectNoSpace = this.value.replace(/\s/g, "");
+        $("#template_subject_counter").text(`${subjectNoSpace.length}/50`);
+        if (subjectNoSpace.length > 50) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 50) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $("#template_subject_counter").text(`50/50`);
+        };
+    });
+
+    $(document).on("input", "#template_body", function () {
+        this.value = this.value.replace(/[^a-zA-Z0-9\s.,!?:;\-{}\n\r]/g, "");
+        const bodyNoSpace = this.value.replace(/\s/g, "");
+        $("#template_body_counter").text(`${bodyNoSpace.length}/300`);
+        if (bodyNoSpace.length > 300) {
+            let trimmed = this.value;
+            while (trimmed.replace(/\s/g, "").length > 300) {
+                trimmed = trimmed.slice(0, -1);
+            };
+            this.value = trimmed;
+            $("#template_body_counter").text(`300/300`);
+        };
+    });
+
+    $(document).on("keypress", "#templateModal input, #templateModal textarea, #templateModal select", function (e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (!$("#save_template").hasClass("d-none")) {
+                $("#save_template").trigger("click");
+            } else if (!$("#update_template").hasClass("d-none")) {
+                $("#update_template").trigger("click");
+            };
+        };
+    });
+};
 
 function fetchTemplateList(filterObj = {}) {
     setFilters({ ...filterObj });
