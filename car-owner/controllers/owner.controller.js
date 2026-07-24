@@ -3576,78 +3576,13 @@ export const postSetDefaultAddress = async (req, res) => {
     };
 };
 
-export const postWalletBalance = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-
-        log1(["postWalletBalance ownerId----->", ownerId]);
-
-        const owner = await Owner.findById(ownerId).select("walletBalance");
-        if (!owner) {
-            return res.status(400).json(errorResponse("Owner not found."));
-        };
-
-        return res.status(200).json(successResponse("Wallet balance fetched successfully.", {
-            walletBalance: owner.walletBalance || 0,
-        }));
-    } catch (error) {
-        log1(["Error in postWalletBalance ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postAddToWallet = async (req, res) => {
+export const postCouponList = async (req, res) => {
     try {
         const ownerId = req.ownerId;
         const param = req.body;
 
-        log1(["postAddToWallet ownerId----->", ownerId]);
-        log1(["postAddToWallet param----->", param]);
-
-        const { amount } = param;
-
-        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-            return res.status(400).json(errorResponse("Please provide a valid amount."));
-        };
-
-        const addAmount = parseFloat(amount);
-
-        const updatedOwner = await Owner.findByIdAndUpdate(
-            ownerId,
-            { $inc: { walletBalance: addAmount } },
-            { new: true }
-        ).select("walletBalance");
-
-        if (!updatedOwner) {
-            return res.status(400).json(errorResponse("Owner not found."));
-        };
-
-        await Transaction.create({
-            ownerId: new ObjectId(ownerId),
-            mechanicId: new ObjectId(ownerId),
-            serviceId: new ObjectId(ownerId),
-            bookingId: new ObjectId(ownerId),
-            totalAmount: addAmount,
-            description: `Added ₹${addAmount} to wallet`,
-            status: Constants.TRANSACTION_STATUS.SUCCESS,
-        });
-
-        return res.status(200).json(successResponse("Amount added to wallet successfully.", {
-            walletBalance: updatedOwner.walletBalance,
-        }));
-    } catch (error) {
-        log1(["Error in postAddToWallet ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postWalletTransactionList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postWalletTransactionList ownerId----->", ownerId]);
-        log1(["postWalletTransactionList param----->", param]);
+        log1(["postCouponList ownerId----->", ownerId]);
+        log1(["postCouponList param----->", param]);
 
         const {
             currentPage = Constants.DEFAULT_PAGE,
@@ -3658,47 +3593,36 @@ export const postWalletTransactionList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const match = {
-            ownerId: new ObjectId(ownerId),
-            description: { $regex: "wallet", $options: "i" },
+        const filter = {
+            isActive: true,
+            expiryDate: { $gte: new Date() },
+            $expr: {
+                $or: [
+                    { $eq: ["$usageLimit", 0] },
+                    { $lt: ["$usedCount", "$usageLimit"] },
+                ],
+            },
         };
 
-        const pipeline = [
-            { $match: match },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    items: [
-                        { $skip: skip },
-                        { $limit: limit },
-                        {
-                            $project: {
-                                totalAmount: 1,
-                                description: 1,
-                                status: 1,
-                                createdAt: 1,
-                            },
-                        },
-                    ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
-                },
-            },
-        ];
-
-        const [result] = await Transaction.aggregate(pipeline).allowDiskUse(true);
+        const [items, totalCount] = await Promise.all([
+            Coupon.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Coupon.countDocuments(filter),
+        ]);
 
         const response = {
             page,
             limit,
-            totalRecords: result.totalRecords[0]?.count ?? 0,
-            items: result.items,
+            totalRecords: totalCount,
+            items,
         };
 
-        return res.status(200).json(successResponse("Wallet transaction list fetched successfully.", response));
+        return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
     } catch (error) {
-        log1(["Error in postWalletTransactionList ----->", error]);
+        log1(["Error in postCouponList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -3742,18 +3666,18 @@ export const postApplyCoupon = async (req, res) => {
 
         let discountAmount = 0;
 
-        if (coupon.discountType === "percentage") {
+        if (coupon.discountType === Constants.DISCOUNT_TYPE.PERCENTAGE) {
             discountAmount = (amount * coupon.discountValue) / 100;
             if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
                 discountAmount = coupon.maxDiscountAmount;
-            }
+            };
         } else {
             discountAmount = coupon.discountValue;
-        }
+        };
 
         if (discountAmount > amount) {
             discountAmount = amount;
-        }
+        };
 
         const finalAmount = amount - discountAmount;
 
@@ -3768,57 +3692,6 @@ export const postApplyCoupon = async (req, res) => {
         }));
     } catch (error) {
         log1(["Error in postApplyCoupon ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postCouponList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postCouponList ownerId----->", ownerId]);
-        log1(["postCouponList param----->", param]);
-
-        const {
-            currentPage = Constants.DEFAULT_PAGE,
-            itemPerPage = Constants.DEFAULT_LIMIT,
-        } = param;
-
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const filter = {
-            isActive: true,
-            expiryDate: { $gte: new Date() },
-            $expr: {
-                $or: [
-                    { $eq: ["$usageLimit", 0] },
-                    { $lt: ["$usedCount", "$usageLimit"] },
-                ],
-            },
-        };
-
-        const [items, totalCount] = await Promise.all([
-            Coupon.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Coupon.countDocuments(filter),
-        ]);
-
-        const response = {
-            items,
-            page,
-            limit,
-            totalRecords: totalCount,
-        };
-
-        return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
-    } catch (error) {
-        log1(["Error in postCouponList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

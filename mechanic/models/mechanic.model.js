@@ -95,7 +95,7 @@ const mechanicSchema = new Schema(
             enum: Object.values(Constants.MECHANIC_STATUS),
             default: Constants.MECHANIC_STATUS.PENDING,
         },
-        walletBalance: {
+        earningBalance: {
             type: Number,
             default: 0,
         },

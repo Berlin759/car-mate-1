@@ -168,6 +168,11 @@ const Constants = {
         APPROVED: 2,
         REJECTED: 3,
     },
+    EARNING_STATUS: {
+        PENDING: 1,
+        SUCCESS: 2,
+        FAILED: 3,
+    },
 };
 
 export default Constants;

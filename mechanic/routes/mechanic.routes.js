@@ -35,9 +35,7 @@ import {
     postToggleAvailability,
     postUpdateWorkingHours,
     postAvailabilityStatus,
-    postWalletBalance,
-    postRequestWithdrawal,
-    postWithdrawalHistory,
+    postEarningHistory,
     postPerformanceMetrics,
     postReviewsReceived,
     postDashboard,
@@ -106,10 +104,8 @@ router.post("/toggle-availability", authMiddleware, postToggleAvailability);
 router.post("/update-working-hours", authMiddleware, postUpdateWorkingHours);
 router.post("/availability-status", authMiddleware, postAvailabilityStatus);
 
-// Wallet & Earnings API
-router.post("/wallet-balance", authMiddleware, postWalletBalance);
-router.post("/request-withdrawal", authMiddleware, postRequestWithdrawal);
-router.post("/withdrawal-history", authMiddleware, postWithdrawalHistory);
+// Earnings API
+router.post("/earning-history", authMiddleware, postEarningHistory);
 
 // Performance API
 router.post("/performance-metrics", authMiddleware, postPerformanceMetrics);

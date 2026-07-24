@@ -32,8 +32,8 @@ import Setting from "../models/setting.model.js";
 import Notification from "../models/notification.model.js";
 import Service from "../models/service.model.js";
 import KYC from "../models/kyc.model.js";
-import Withdrawal from "../models/withdrawal.model.js";
 import Rating from "../models/rating.model.js";
+import Earning from "../models/earning.model.js";
 
 
 const razorpayInstance = new Razorpay({
@@ -133,11 +133,17 @@ export const getProfileDetails = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
+                    // email: 1,
                     phoneNumber: 1,
+                    phoneCode: 1,
                     profileImage: 1,
                     countryName: 1,
                     countryCode: 1,
+                    location: 1,
+                    latitude: 1,
+                    longitude: 1,
+                    earningBalance: 1,
+                    isOnline: 1,
                     deviceToken: 1,
                     loginToken: 1,
                     lastLoginAt: 1,
@@ -792,7 +798,7 @@ export const postBookingList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
+                                            // email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -965,7 +971,7 @@ export const postBookingDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
+                                // email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -1512,7 +1518,7 @@ export const postTransactionList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
+                                            // email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -2285,87 +2291,43 @@ export const postAvailabilityStatus = async (req, res) => {
     };
 };
 
-export const postWalletBalance = async (req, res) => {
+export const postEarningHistory = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const mechanic = await Mechanic.findById(mechanicId).select("walletBalance");
-        if (!mechanic) {
-            return res.status(400).json(errorResponse("Mechanic not found."));
-        };
-        return res.status(200).json(successResponse("Wallet balance fetched successfully.", {
-            walletBalance: mechanic.walletBalance || 0,
-        }));
-    } catch (error) {
-        log1(["Error in postWalletBalance ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
 
-export const postRequestWithdrawal = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const param = req.body;
-
-        const mechanic = await Mechanic.findById(mechanicId);
-        if (!mechanic) {
-            return res.status(400).json(errorResponse("Mechanic not found."));
-        };
-
-        const amount = parseFloat(param.amount);
-        if (!amount || amount <= 0) {
-            return res.status(400).json(errorResponse("Invalid withdrawal amount."));
-        };
-
-        if (amount > mechanic.walletBalance) {
-            return res.status(400).json(errorResponse("Insufficient wallet balance."));
-        };
-
-        const pendingWithdrawal = await Withdrawal.findOne({
-            mechanicId: new ObjectId(mechanicId),
-            status: 1,
-        });
-        if (pendingWithdrawal) {
-            return res.status(400).json(errorResponse("You already have a pending withdrawal request."));
-        };
-
-        await Mechanic.findByIdAndUpdate(mechanicId, {
-            $inc: { walletBalance: -amount },
-        });
-
-        const withdrawal = await Withdrawal.create({
-            mechanicId: new ObjectId(mechanicId),
-            amount: amount,
-            bankAccountNumber: param.bankAccountNumber || "",
-            bankIfscCode: param.bankIfscCode || "",
-            bankAccountHolderName: param.bankAccountHolderName || "",
-        });
-
-        return res.status(200).json(successResponse("Withdrawal request submitted successfully.", withdrawal));
-    } catch (error) {
-        log1(["Error in postRequestWithdrawal ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postWithdrawalHistory = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         const filter = { mechanicId: new ObjectId(mechanicId) };
-        const [items, totalCount] = await Promise.all([
-            Withdrawal.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
-            Withdrawal.countDocuments(filter),
+
+        const [totalCount, items] = await Promise.all([
+            Earning.countDocuments(filter),
+
+            Earning.aggregate([
+                {
+                    $match: filter,
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+            ]),
         ]);
 
-        return res.status(200).json(successResponse("Withdrawal history fetched successfully.", {
-            items, page, limit, totalRecords: totalCount,
-        }));
+        const response = {
+            page,
+            limit,
+            totalRecords: totalCount,
+            items,
+        };
+
+        return res.status(200).json(successResponse("Earning history fetched successfully.", response));
     } catch (error) {
-        log1(["Error in postWithdrawalHistory ----->", error]);
+        log1(["Error in postEarningHistory ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -2438,10 +2400,12 @@ export const postDashboard = async (req, res) => {
                 date: { $gte: today, $lt: tomorrow },
                 status: { $nin: [Constants.BOOKING_STATUS.CANCELLED] },
             }),
+
             Booking.countDocuments({
                 mechanicId: new ObjectId(mechanicId),
                 status: Constants.BOOKING_STATUS.PENDING,
             }),
+
             Transaction.aggregate([
                 {
                     $match: {
@@ -2451,14 +2415,15 @@ export const postDashboard = async (req, res) => {
                 },
                 { $group: { _id: null, total: { $sum: "$totalAmount" } } },
             ]),
-            Mechanic.findById(mechanicId).select("walletBalance isOnline serviceRadius"),
+
+            Mechanic.findById(mechanicId).select("earningBalance isOnline serviceRadius"),
         ]);
 
         return res.status(200).json(successResponse("Dashboard data fetched successfully.", {
             todayJobs,
             pendingRequests,
             todayEarnings: todayEarnings[0]?.total || 0,
-            walletBalance: mechanic?.walletBalance || 0,
+            earningBalance: mechanic?.earningBalance || 0,
             isOnline: mechanic?.isOnline,
             serviceRadius: mechanic?.serviceRadius || 10,
         }));

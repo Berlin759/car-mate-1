@@ -40,11 +40,8 @@ import {
     postUpdateAddress,
     postDeleteAddress,
     postSetDefaultAddress,
-    postWalletBalance,
-    postAddToWallet,
-    postWalletTransactionList,
-    postApplyCoupon,
     postCouponList,
+    postApplyCoupon,
     postNearbyMechanics,
     postSetDefaultCar,
     postDeleteCar,
@@ -138,14 +135,9 @@ router.post("/update-address", authMiddleware, postUpdateAddress);
 router.post("/delete-address", authMiddleware, postDeleteAddress);
 router.post("/set-default-address", authMiddleware, postSetDefaultAddress);
 
-// Wallet API
-router.post("/wallet-balance", authMiddleware, postWalletBalance);
-router.post("/add-to-wallet", authMiddleware, postAddToWallet);
-router.post("/wallet-transaction-list", authMiddleware, postWalletTransactionList);
-
 // Coupon API
-router.post("/apply-coupon", authMiddleware, postApplyCoupon);
 router.post("/coupon-list", authMiddleware, postCouponList);
+router.post("/apply-coupon", authMiddleware, postApplyCoupon);
 
 // Tracking
 router.post("/get-provider-location", authMiddleware, postGetProviderLocation);

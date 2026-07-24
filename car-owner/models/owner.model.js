@@ -94,10 +94,6 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.ONLINE_STATUS),
             default: Constants.ONLINE_STATUS.FALSE,
         },
-        walletBalance: {
-            type: Number,
-            default: 0,
-        },
     },
     {
         versionKey: false,
