@@ -290,7 +290,7 @@ export const postDeviceTokenUpdate = async (req, res) => {
         log1(["postDeviceTokenUpdate ownerId ----->", ownerId]);
         log1(["postDeviceTokenUpdate req.body ----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.updateDeviceToken");
+        const validate = await custom_validation(req.body, "owner.update_device_token");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -345,6 +345,28 @@ export const postUpdatePreferences = async (req, res) => {
         log1(["Error in postUpdatePreferences ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     }
+};
+
+export const postUpdateLocation = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { latitude, longitude } = req.body;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Latitude and longitude are required."));
+        };
+
+        await Owner.findByIdAndUpdate(ownerId, {
+            latitude: latitude,
+            longitude: longitude,
+            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
+        });
+
+        return res.status(200).json(successResponse("Location updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateLocation ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
 };
 
 export const postSendEmailOTP = async (req, res) => {
@@ -485,16 +507,16 @@ export const postLogout = async (req, res) => {
     };
 };
 
-export const getHomeDetails = async (req, res) => {
+export const postHomeDetails = async (req, res) => {
     try {
         const ownerId = req.ownerId;
         let param = req.body;
-        log1(["getHomeDetails param----->", param]);
-        log1(["getHomeDetails ownerId----->", ownerId]);
+        log1(["postHomeDetails param----->", param]);
+        log1(["postHomeDetails ownerId----->", ownerId]);
 
         if (ownerId) {
             let ownerData = await Owner.findById(ownerId);
-            log1(["getHomeDetails ownerData----->", ownerData]);
+            log1(["postHomeDetails ownerData----->", ownerData]);
             let updatePayload = {};
 
             const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
@@ -517,7 +539,7 @@ export const getHomeDetails = async (req, res) => {
                 };
             };
 
-            log1(["getHomeDetails updatePayload------>", updatePayload]);
+            log1(["postHomeDetails updatePayload------>", updatePayload]);
 
             if (Object.keys(updatePayload).length > 0) {
                 let updateOwner = await Owner.findByIdAndUpdate(ownerId, updatePayload, { new: true });
@@ -536,10 +558,10 @@ export const getHomeDetails = async (req, res) => {
 
         if (!nearbyLatitude || !nearbyLongitude) {
             const ipAddress = getIpAddress(req);
-            log1(["getHomeDetails ipAddress----->", ipAddress]);
+            log1(["postHomeDetails ipAddress----->", ipAddress]);
 
             const ipLocation = await getLatLngFromIP(ipAddress);
-            log1(["getHomeDetails ipLocation----->", ipLocation]);
+            log1(["postHomeDetails ipLocation----->", ipLocation]);
 
             if (ipLocation.flag === 1 && ipLocation.data) {
                 nearbyLatitude = ipLocation.data.latitude;
@@ -567,7 +589,7 @@ export const getHomeDetails = async (req, res) => {
                 },
             }).select("_id serviceIds").lean();
 
-            log1(["getHomeDetails nearbyMechanics count----->", nearbyMechanics.length]);
+            log1(["postHomeDetails nearbyMechanics count----->", nearbyMechanics.length]);
 
             if (nearbyMechanics.length > 0) {
                 const mechanicIds = nearbyMechanics.map(m => m._id);
@@ -618,7 +640,7 @@ export const getHomeDetails = async (req, res) => {
             } : null,
         }));
     } catch (error) {
-        log1(["Error in getHomeDetails ----->", error]);
+        log1(["Error in postHomeDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -816,6 +838,101 @@ export const postCarList = async (req, res) => {
     };
 };
 
+export const postUpdateCar = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postUpdateCar ownerId----->", ownerId]);
+        log1(["postUpdateCar req.body----->", req.body]);
+
+        const { carId, vehicleNumber, fuelType, vehicleColour } = req.body;
+
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+
+        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
+        if (!car) {
+            return res.status(400).json(errorResponse("Car not found."));
+        };
+
+        let updatePayload = {};
+        if (vehicleNumber) updatePayload.vehicleNumber = vehicleNumber;
+        if (fuelType) updatePayload.fuelType = fuelType;
+        if (vehicleColour) updatePayload.vehicleColour = vehicleColour;
+
+        if (req.files && req.files.images) {
+            let images = req.files.images;
+
+            if (!Array.isArray(images)) {
+                images = [images];
+            };
+
+            if (images.length > 4) {
+                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
+            };
+
+            if (car.images && car.images.length > 0) {
+                for (const oldImage of car.images) {
+                    const parts = oldImage.split("/");
+
+                    if (parts.length >= 2) {
+                        const folder = parts[1];
+                        const fileName = parts[2];
+                        await removeFile(folder, fileName);
+                    };
+                };
+            };
+
+            let uploadedImages = [];
+            for (const image of images) {
+                const uploadResp = await uploadFile(image);
+
+                if (uploadResp.flag !== 1) {
+                    return res.status(400).json(uploadResp);
+                };
+
+                uploadedImages.push(uploadResp.data.url);
+            };
+            updatePayload.images = uploadedImages;
+        };
+
+        if (Object.keys(updatePayload).length === 0) {
+            return res.status(400).json(errorResponse("No fields to update."));
+        };
+
+        await Car.findByIdAndUpdate(carId, updatePayload);
+
+        return res.status(200).json(successResponse("Car updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateCar ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteCar = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { carId } = req.body;
+
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+
+        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
+        if (!car) {
+            return res.status(400).json(errorResponse("Car not found."));
+        };
+
+        await Car.findByIdAndDelete(carId);
+
+        return res.status(200).json(successResponse("Car deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteCar ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postServiceList = async (req, res) => {
     try {
         log1(["postServiceList req.body----->", req.body]);
@@ -823,16 +940,26 @@ export const postServiceList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            keyword,
+            minPrice,
+            maxPrice,
             categoryId,
             latitude,
             longitude,
             radius,
         } = req.body;
 
-        const skip = (Number(currentPage) - 1) * Number(itemPerPage);
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
         let nearbyLatitude = latitude || null;
         let nearbyLongitude = longitude || null;
+
+        const filter = {
+            parentId: { $ne: null },
+            "mechanicIds.0": { $exists: true },
+        };
 
         if (!nearbyLatitude || !nearbyLongitude) {
             const ipAddress = getIpAddress(req);
@@ -844,8 +971,8 @@ export const postServiceList = async (req, res) => {
             if (ipLocation.flag === 1 && ipLocation.data) {
                 nearbyLatitude = ipLocation.data.latitude;
                 nearbyLongitude = ipLocation.data.longitude;
-            }
-        }
+            };
+        };
 
         let nearbyMechanicIds = [];
 
@@ -869,11 +996,6 @@ export const postServiceList = async (req, res) => {
 
             nearbyMechanicIds = nearbyMechanics.map(m => m._id);
             log1(["postServiceList nearbyMechanicIds count----->", nearbyMechanicIds.length]);
-        }
-
-        const filter = {
-            parentId: { $ne: null },
-            "mechanicIds.0": { $exists: true },
         };
 
         if (categoryId) {
@@ -882,13 +1004,31 @@ export const postServiceList = async (req, res) => {
 
         if (nearbyMechanicIds.length > 0) {
             filter["mechanicIds.mechanicId"] = { $in: nearbyMechanicIds };
-        }
+        };
 
-        const services = await Service.find(filter)
+        if (keyword && keyword.trim() !== "") {
+            filter.$or = [
+                { fullName: { $regex: keyword, $options: "i" } },
+                { description: { $regex: keyword, $options: "i" } },
+            ];
+        };
+
+        let services = await Service.find(filter)
             .select("_id fullName description parentId mechanicIds")
             .populate("parentId", "fullName description")
             .populate("mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
             .lean();
+
+        if (minPrice || maxPrice) {
+            services = services.filter(service => {
+                const price = service.mechanicIds?.[0]?.price || 0;
+
+                if (minPrice && price < parseFloat(minPrice)) return false;
+                if (maxPrice && price > parseFloat(maxPrice)) return false;
+
+                return true;
+            });
+        };
 
         const items = services.map(service => {
             const parent = service.parentId;
@@ -959,17 +1099,17 @@ export const postServiceList = async (req, res) => {
         });
 
         const totalCount = items.length;
-        const paginatedItems = items.slice(skip, skip + Number(itemPerPage));
+        const paginatedItems = items.slice(skip, skip + limit);
 
         const response = {
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
+            page: page,
+            limit: limit,
             totalRecords: totalCount,
-            items: paginatedItems,
             location: nearbyLatitude && nearbyLongitude ? {
                 latitude: nearbyLatitude,
                 longitude: nearbyLongitude,
             } : null,
+            items: paginatedItems,
         };
 
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
@@ -979,284 +1119,624 @@ export const postServiceList = async (req, res) => {
     };
 };
 
-// export const postGuestBooking = async (req, res) => {
-//     const ownerId = req.ownerId;
-//     const param = req.body;
+export const postNearbyMechanics = async (req, res) => {
+    try {
+        const param = req.body;
 
-//     log1(["postGuestBooking ownerId----->", ownerId]);
-//     log1(["postGuestBooking param----->", param]);
+        log1(["postNearbyMechanics param----->", param]);
 
-//     if (ownerLocks.get(ownerId)) {
-//         log1(["A Booking is already in progress. Please wait."]);
-//         return res.status(429).json(errorResponse("A Booking is already in progress. Please wait."));
-//     };
+        const {
+            latitude,
+            longitude,
+            radius = 10,
+            serviceId,
+        } = param;
 
-//     ownerLocks.set(ownerId, true);
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Please provide latitude and longitude."));
+        };
 
-//     try {
-//         const validate = await custom_validation(param, "owner.guest_booking");
-//         if (validate.flag === 0) {
-//             return res.status(400).json(validate);
-//         };
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+        const radiusInMeters = parseFloat(radius) * 1000;
 
-//         if (!ObjectId.isValid(param.serviceId) || !ObjectId.isValid(param.carId) ||
-//             (
-//                 parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)
-//             )
-//         ) {
-//             return res.status(400).json(errorResponse("Invalid request."));
-//         };
+        if (isNaN(lat) || isNaN(lng)) {
+            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
+        };
 
-//         const [serviceDetails, carDetails, ownerDetails] = await Promise.all([
-//             Service.findOne({
-//                 _id: new ObjectId(param.serviceId),
-//                 status: Constants.SERVICE_STATUS.ACTIVE,
-//             }).lean(),
+        let matchFilter = {
+            status: Constants.MECHANIC_STATUS.ACTIVE,
+            "location.coordinates": {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [lng, lat],
+                    },
+                    $maxDistance: radiusInMeters,
+                },
+            },
+        };
 
-//             Car.findOne({
-//                 _id: new ObjectId(param.carId),
-//                 ownerId: new ObjectId(ownerId),
-//                 status: Constants.CAR_STATUS.VALID,
-//             }).lean(),
+        if (serviceId && ObjectId.isValid(serviceId)) {
+            matchFilter.serviceIds = new ObjectId(serviceId);
+        };
 
-//             Owner.findById(ownerId).lean()
-//         ]);
+        const mechanics = await Mechanic.find(matchFilter)
+            .select("fullName email phoneNumber profileImage latitude longitude address serviceIds")
+            .limit(50)
+            .lean();
 
-//         log1(["postGuestBooking serviceDetails----->", serviceDetails]);
-//         log1(["postGuestBooking carDetails----->", carDetails]);
+        const response = mechanics.map((mechanic) => {
+            const mLat = parseFloat(mechanic.latitude) || 0;
+            const mLng = parseFloat(mechanic.longitude) || 0;
+            const R = 6371;
+            const dLat = ((mLat - lat) * Math.PI) / 180;
+            const dLng = ((mLng - lng) * Math.PI) / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos((lat * Math.PI) / 180) *
+                Math.cos((mLat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
 
-//         if (!serviceDetails) {
-//             return res.status(400).json(errorResponse("Invalid selected service. Please choose a different service."));
-//         };
+            return {
+                _id: mechanic._id,
+                fullName: mechanic.fullName,
+                email: mechanic.email,
+                phoneNumber: mechanic.phoneNumber,
+                profileImage: mechanic.profileImage,
+                latitude: mechanic.latitude,
+                longitude: mechanic.longitude,
+                address: mechanic.address,
+                distance: Math.round(distance * 100) / 100,
+            };
+        });
 
-//         if (!carDetails) {
-//             return res.status(400).json(errorResponse("Invalid car id."));
-//         };
+        response.sort((a, b) => a.distance - b.distance);
 
-//         let mechanicId;
+        return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", {
+            items: response,
+            totalRecords: response.length,
+        }));
+    } catch (error) {
+        log1(["Error in postNearbyMechanics ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
 
-//         const serviceFullName = serviceDetails.fullName;
-//         const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
+export const postServiceHistory = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
 
-//         if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
-//             const isServiceAvailable = (serviceDoc?.mechanicIds || []).some(
-//                 m => m.mechanicId?.toString() === param.mechanicId
-//             );
+        log1(["postServiceHistory ownerId----->", ownerId]);
+        log1(["postServiceHistory req.body----->", req.body]);
 
-//             if (!isServiceAvailable) {
-//                 return res.status(400).json(errorResponse("Selected mechanic is unavailable for this service."));
-//             };
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            carId,
+            serviceId,
+            startDate,
+            endDate,
+        } = req.body;
 
-//             const mechanicDetails = await Mechanic.findOne({
-//                 _id: new ObjectId(param.mechanicId),
-//                 status: Constants.MECHANIC_STATUS.ACTIVE,
-//             });
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
-//             if (!mechanicDetails) {
-//                 return res.status(400).json(errorResponse("Selected mechanic is unavailable."));
-//             };
+        const match = {
+            ownerId: new ObjectId(ownerId),
+            status: {
+                $in: [
+                    Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                    Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+                    Constants.BOOKING_STATUS.CLOSED,
+                ],
+            },
+        };
 
-//             const existingBooking = await Booking.exists({
-//                 mechanicId: mechanicDetails._id,
-//                 date: new Date(param.date),
-//                 time: param.time,
-//                 status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
-//             });
-//             log1(["postGuestBooking existingBooking----->", existingBooking]);
+        if (carId) {
+            if (!ObjectId.isValid(carId)) {
+                return res.status(400).json(errorResponse("Invalid car id."));
+            };
+            match.carId = new ObjectId(carId);
+        };
 
-//             if (existingBooking) {
-//                 return res.status(400).json(errorResponse("Selected mechanic is already booked for this slot."));
-//             };
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+            match.serviceId = new ObjectId(serviceId);
+        };
 
-//             mechanicId = mechanicDetails._id;
-//         } else {
-//             const mechanicIdsForService = (serviceDoc?.mechanicIds || []).map(m => m.mechanicId);
+        if (startDate || endDate) {
+            match.createdAt = {};
+            if (startDate) {
+                match.createdAt.$gte = new Date(startDate);
+            };
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                match.createdAt.$lte = end;
+            };
+        };
 
-//             if (!mechanicIdsForService.length) {
-//                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
-//             };
+        const pipeline = [
+            { $match: match },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $lookup: {
+                                from: "services",
+                                localField: "serviceId",
+                                foreignField: "_id",
+                                as: "serviceDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$serviceDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "mechanics",
+                                localField: "mechanicId",
+                                foreignField: "_id",
+                                as: "mechanicDetails",
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            fullName: 1,
+                                            email: 1,
+                                            phoneNumber: 1,
+                                            profileImage: 1,
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$mechanicDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "cars",
+                                localField: "carId",
+                                foreignField: "_id",
+                                as: "carDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$carDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                invoiceNo: 1,
+                                date: 1,
+                                time: 1,
+                                address: 1,
+                                totalAmount: 1,
+                                status: 1,
+                                startTime: 1,
+                                endTime: 1,
+                                beforePhotos: 1,
+                                afterPhotos: 1,
+                                createdAt: 1,
+                                serviceDetails: {
+                                    _id: "$serviceDetails._id",
+                                    fullName: "$serviceDetails.fullName",
+                                    description: "$serviceDetails.description",
+                                },
+                                mechanicDetails: 1,
+                                carDetails: {
+                                    _id: "$carDetails._id",
+                                    fullName: "$carDetails.fullName",
+                                    vehicleNumber: "$carDetails.vehicleNumber",
+                                    model: "$carDetails.model",
+                                    brand: "$carDetails.brand",
+                                    year: "$carDetails.year",
+                                    color: "$carDetails.color",
+                                },
+                            },
+                        },
+                    ],
+                    totalRecords: [
+                        { $count: "count" },
+                    ],
+                },
+            },
+        ];
 
-//             const mechanics = await Mechanic.find({
-//                 _id: { $in: mechanicIdsForService },
-//                 status: Constants.MECHANIC_STATUS.ACTIVE,
-//             }).select("_id");
+        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
 
-//             if (!mechanics.length) {
-//                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
-//             };
+        const items = result.items;
+        const totalRecords = result.totalRecords[0]?.count ?? 0;
 
-//             const bookedMechanics = await Booking.distinct("mechanicId", {
-//                 mechanicId: {
-//                     $in: mechanics.map(m => m._id),
-//                 },
-//                 date: new Date(param.date),
-//                 time: param.time,
-//                 status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
-//             });
+        const groupedByCar = {};
 
-//             const availableMechanics = mechanics.filter(
-//                 mechanic => !bookedMechanics.some(bookedId => bookedId.equals(mechanic._id))
-//             );
+        items.forEach((booking) => {
+            const carKey = booking.carDetails?._id?.toString() || "unknown";
+            if (!groupedByCar[carKey]) {
+                groupedByCar[carKey] = {
+                    carDetails: booking.carDetails,
+                    bookings: [],
+                };
+            }
+            groupedByCar[carKey].bookings.push(booking);
+        });
 
-//             if (!availableMechanics.length) {
-//                 return res.status(400).json(errorResponse("No mechanics are available for this time slot."));
-//             };
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            items: Object.values(groupedByCar),
+        };
 
-//             const randomIndex = Math.floor(Math.random() * availableMechanics.length);
+        return res.status(200).json(successResponse("Service history fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postServiceHistory ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
 
-//             mechanicId = availableMechanics[randomIndex]._id;
-//         };
+export const postAddAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { label, address, latitude, longitude, isDefault } = req.body;
 
-//         const alreadyBooked = await Booking.exists({
-//             ownerId: new ObjectId(ownerId),
-//             carId: new ObjectId(param.carId),
-//             date: new Date(param.date),
-//             time: param.time,
-//             status: {
-//                 $in: [
-//                     Constants.BOOKING_STATUS.PENDING,
-//                     Constants.BOOKING_STATUS.PROVIDER_ACCEPTED
-//                 ]
-//             },
-//         });
+        log1(["postAddAddress ownerId----->", ownerId]);
+        log1(["postAddAddress req.body----->", req.body]);
 
-//         if (alreadyBooked) {
-//             return res.status(400).json(errorResponse("You already have a booking for this time."));
-//         };
+        const validate = await custom_validation(req.body, "owner.add_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
 
-//         let invoiceNo = generateInvoiceNumber();
+        if (isDefault === true || isDefault === "true") {
+            await Address.updateMany(
+                { ownerId: new ObjectId(ownerId), isDefault: true },
+                { $set: { isDefault: false } }
+            );
+        };
 
-//         let basePrice = parseFloat(param.basePrice) || 0;
-//         let distanceCharge = parseFloat(param.distanceCharge) || 0;
-//         let peakHourFee = parseFloat(param.peakHourFee) || 0;
-//         let materialCost = parseFloat(param.materialCost) || 0;
-//         let taxAmount = parseFloat(param.taxAmount) || 0;
-//         let discountAmount = 0;
-//         let couponId = null;
+        let payload = {
+            ownerId: new ObjectId(ownerId),
+            label: label,
+            address: address,
+            latitude: latitude,
+            longitude: longitude,
+            isDefault: isDefault === true || isDefault === "true",
+        };
 
-//         if (param.couponId && ObjectId.isValid(param.couponId)) {
-//             const coupon = await Coupon.findOne({
-//                 _id: new ObjectId(param.couponId),
-//                 isActive: true,
-//                 expiryDate: { $gte: new Date() },
-//             });
+        const newAddress = await Address.create(payload);
+        log1(["postAddAddress newAddress----->", newAddress]);
 
-//             if (coupon) {
-//                 const subTotal = basePrice + distanceCharge + peakHourFee + materialCost;
+        if (!newAddress) {
+            return res.status(400).json(errorResponse("Failed to add address."));
+        };
 
-//                 if (subTotal >= coupon.minOrderAmount) {
-//                     if (coupon.discountType === "percentage") {
-//                         discountAmount = (subTotal * coupon.discountValue) / 100;
-//                         if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
-//                             discountAmount = coupon.maxDiscountAmount;
-//                         }
-//                     } else {
-//                         discountAmount = coupon.discountValue;
-//                     }
+        return res.status(200).json(successResponse("Address added successfully!", newAddress));
+    } catch (error) {
+        log1(["Error in postAddAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
 
-//                     if (discountAmount > subTotal) {
-//                         discountAmount = subTotal;
-//                     }
+export const postAddressList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
 
-//                     couponId = coupon._id;
-//                 }
-//             }
-//         }
+        log1(["postAddressList ownerId----->", ownerId]);
+        log1(["postAddressList req.body----->", req.body]);
 
-//         let totalPayAmount = parseFloat(param.totalAmount) || (basePrice + distanceCharge + peakHourFee + materialCost + taxAmount - discountAmount);
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
-//         let bookingPayload = {
-//             ownerId: new ObjectId(ownerId),
-//             mechanicId: mechanicId,
-//             serviceId: new ObjectId(param.serviceId),
-//             carId: new ObjectId(param.carId),
-//             date: new Date(param.date),
-//             time: param.time,
-//             latitude: param.latitude,
-//             longitude: param.longitude,
-//             basePrice: basePrice,
-//             distanceCharge: distanceCharge,
-//             peakHourFee: peakHourFee,
-//             materialCost: materialCost,
-//             taxAmount: taxAmount,
-//             discountAmount: discountAmount,
-//             totalAmount: totalPayAmount,
-//             invoiceNo: invoiceNo,
-//         };
+        let filter = {
+            ownerId: new ObjectId(ownerId),
+        };
 
-//         if (couponId) {
-//             bookingPayload.couponId = couponId;
-//         }
+        const [items, totalCount] = await Promise.all([
+            Address.find(filter).sort({ isDefault: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+            Address.countDocuments(filter),
+        ]);
 
-//         let newBooking = await Booking.create(bookingPayload);
-//         log1(["postGuestBooking newBooking----->", newBooking]);
-//         if (!newBooking) {
-//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
-//         };
+        const response = {
+            page: page,
+            limit: limit,
+            totalRecords: totalCount,
+            items: items,
+        };
 
-//         let transactionPayload = {
-//             ownerId: new ObjectId(ownerId),
-//             mechanicId: mechanicId,
-//             serviceId: new ObjectId(param.serviceId),
-//             bookingId: new ObjectId(newBooking._id),
-//             carId: new ObjectId(param.carId),
-//             invoiceId: invoiceNo,
-//             totalAmount: totalPayAmount,
-//             description: `Payment To ${ownerDetails.fullName || "Unknown"}`,
-//             status: Constants.TRANSACTION_STATUS.PENDING,
-//         };
+        return res.status(200).json(successResponse("Address list get successfully.", response));
+    } catch (error) {
+        log1(["Error in postAddressList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
 
-//         let transactionCreate = await Transaction.create(transactionPayload);
-//         log1(["postGuestBooking transactionCreate----->", transactionCreate]);
-//         if (!transactionCreate) {
-//             await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
-//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
-//         };
+export const postUpdateAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { addressId, label, address, latitude, longitude, isDefault } = req.body;
 
-//         let responseData = {
-//             bookingId: newBooking._id,
-//             message: "Congratulations, your booking was successful.",
-//         };
+        log1(["postUpdateAddress ownerId----->", ownerId]);
+        log1(["postUpdateAddress req.body----->", req.body]);
 
-//         try {
-//             const razorpayOrder = await razorpayInstance.orders.create({
-//                 amount: Math.round(totalPayAmount * 100),
-//                 currency: "INR",
-//                 receipt: `booking_${invoiceNo}`,
-//             });
+        const validate = await custom_validation(req.body, "owner.update_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
 
-//             log1(["postGuestBooking razorpayOrder----->", razorpayOrder]);
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
 
-//             await Booking.findByIdAndUpdate(newBooking._id, {
-//                 razorpayOrderId: razorpayOrder.id,
-//             });
+        const addressDetails = await Address.findOne({
+            _id: new ObjectId(addressId),
+            ownerId: new ObjectId(ownerId),
+        });
 
-//             responseData.razorpayOrderId = razorpayOrder.id;
-//             responseData.razorpayAmount = razorpayOrder.amount;
-//             responseData.razorpayCurrency = razorpayOrder.currency;
-//         } catch (razorpayError) {
-//             log1(["postGuestBooking Razorpay order creation failed----->", razorpayError.message]);
+        if (!addressDetails) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
 
-//             await Booking.findByIdAndUpdate(newBooking._id, {
-//                 status: Constants.BOOKING_STATUS.FAILED,
-//             });
+        let updateObj = {};
 
-//             await Transaction.findByIdAndUpdate(transactionCreate._id, {
-//                 status: Constants.TRANSACTION_STATUS.FAILED,
-//             });
+        if (label !== undefined && label !== null && label !== "") {
+            updateObj.label = label;
+        };
 
-//             return res.status(400).json(errorResponse(messages.unexpectedDataError));
-//         };
+        if (address !== undefined && address !== null && address !== "") {
+            updateObj.address = address;
+        };
 
-//         return res.status(200).json(successResponse(responseData.message, responseData));
-//     } catch (error) {
-//         log1(["Error in postGuestBooking ----->", error]);
-//         ownerLocks.delete(ownerId);
-//         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-//     } finally {
-//         ownerLocks.delete(ownerId);
-//     };
-// };
+        if (latitude !== undefined && latitude !== null && latitude !== "") {
+            updateObj.latitude = latitude;
+        };
+
+        if (longitude !== undefined && longitude !== null && longitude !== "") {
+            updateObj.longitude = longitude;
+        };
+
+        if (isDefault === true || isDefault === "true") {
+            await Address.updateMany(
+                { ownerId: new ObjectId(ownerId), isDefault: true },
+                { $set: { isDefault: false } }
+            );
+
+            updateObj.isDefault = true;
+        };
+
+        if (Object.keys(updateObj).length > 0) {
+            await Address.findByIdAndUpdate(addressId, updateObj, { new: true });
+        };
+
+        const updatedAddress = await Address.findById(addressId);
+
+        return res.status(200).json(successResponse("Address updated successfully!", updatedAddress));
+    } catch (error) {
+        log1(["Error in postUpdateAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { addressId } = req.body;
+
+        log1(["postDeleteAddress ownerId----->", ownerId]);
+        log1(["postDeleteAddress req.body----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.delete_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const address = await Address.findOne({
+            _id: new ObjectId(addressId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!address) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
+
+        await Address.findByIdAndDelete(addressId);
+
+        return res.status(200).json(successResponse("Address deleted successfully!"));
+    } catch (error) {
+        log1(["Error in postDeleteAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postSetDefaultAddress = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { addressId } = req.body;
+
+        log1(["postSetDefaultAddress ownerId----->", ownerId]);
+        log1(["postSetDefaultAddress req.body----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.set_default_address");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const address = await Address.findOne({
+            _id: new ObjectId(addressId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!address) {
+            return res.status(400).json(errorResponse("Address not found."));
+        };
+
+        await Address.updateMany(
+            { ownerId: new ObjectId(ownerId), isDefault: true },
+            { $set: { isDefault: false } }
+        );
+
+        await Address.findByIdAndUpdate(addressId, { $set: { isDefault: true } });
+
+        const updatedAddress = await Address.findById(addressId);
+
+        return res.status(200).json(successResponse("Default address set successfully!", updatedAddress));
+    } catch (error) {
+        log1(["Error in postSetDefaultAddress ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postCouponList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        log1(["postCouponList ownerId----->", ownerId]);
+        log1(["postCouponList req.body----->", req.body]);
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const filter = {
+            isActive: true,
+            expiryDate: { $gte: new Date() },
+            $expr: {
+                $or: [
+                    { $eq: ["$usageLimit", 0] },
+                    { $lt: ["$usedCount", "$usageLimit"] },
+                ],
+            },
+        };
+
+        const [items, totalCount] = await Promise.all([
+            Coupon.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+
+            Coupon.countDocuments(filter),
+        ]);
+
+        const response = {
+            page,
+            limit,
+            totalRecords: totalCount,
+            items,
+        };
+
+        return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postCouponList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postApplyCoupon = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { couponCode, orderAmount } = req.body;
+
+        log1(["postApplyCoupon ownerId----->", ownerId]);
+        log1(["postApplyCoupon req.body----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.apply_coupon");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        const coupon = await Coupon.findOne({
+            code: couponCode.toUpperCase(),
+            isActive: true,
+        });
+
+        if (!coupon) {
+            return res.status(400).json(errorResponse("Invalid coupon code."));
+        };
+
+        if (coupon.expiryDate < new Date()) {
+            return res.status(400).json(errorResponse("This coupon has expired."));
+        };
+
+        if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
+            return res.status(400).json(errorResponse("This coupon has reached its usage limit."));
+        };
+
+        const amount = parseFloat(orderAmount) || 0;
+
+        if (amount < coupon.minOrderAmount) {
+            return res.status(400).json(errorResponse(`Minimum order amount of ₹${coupon.minOrderAmount} required for this coupon.`));
+        };
+
+        let discountAmount = 0;
+
+        if (coupon.discountType === Constants.DISCOUNT_TYPE.PERCENTAGE) {
+            discountAmount = (amount * coupon.discountValue) / 100;
+            if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+                discountAmount = coupon.maxDiscountAmount;
+            };
+        } else {
+            discountAmount = coupon.discountValue;
+        };
+
+        if (discountAmount > amount) {
+            discountAmount = amount;
+        };
+
+        const finalAmount = amount - discountAmount;
+
+        const response = {
+            couponId: coupon._id,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            discountAmount: discountAmount,
+            orderAmount: amount,
+            finalAmount: finalAmount,
+        };
+
+        return res.status(200).json(successResponse("Coupon applied successfully.", response));
+    } catch (error) {
+        log1(["Error in postApplyCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
 
 export const postAddBooking = async (req, res) => {
     const param = req.body;
@@ -1558,90 +2038,6 @@ export const postAddBooking = async (req, res) => {
         log1(["Error in postAddBooking ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
-};
-
-export const postRazorpayWebhook = async (req, res) => {
-    try {
-        log1(["postRazorpayWebhook req.body----->", req.body]);
-
-        const webhookSignature = req.headers["x-razorpay-signature"];
-        const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "";
-
-        if (webhookSecret && webhookSignature) {
-            const body = JSON.stringify(req.body);
-            const expectedSignature = crypto
-                .createHmac("sha256", webhookSecret)
-                .update(body)
-                .digest("hex");
-
-            if (expectedSignature !== webhookSignature) {
-                log1(["postRazorpayWebhook Signature mismatch----->"]);
-                return res.status(400).json({ status: "error", message: "Invalid signature" });
-            }
-        }
-
-        const event = req.body;
-        log1(["postRazorpayWebhook event----->", event.event]);
-
-        if (event.event === "payment_link.payment.failed") {
-            const paymentLink = event.payload?.payment_link?.entity;
-            const referenceId = paymentLink?.reference_id;
-
-            if (referenceId && referenceId.startsWith("booking_")) {
-                const invoiceNo = referenceId.replace("booking_", "");
-                const booking = await Booking.findOne({ invoiceNo: invoiceNo });
-
-                if (booking) {
-                    await Transaction.findOneAndUpdate(
-                        { bookingId: booking._id },
-                        {
-                            status: Constants.TRANSACTION_STATUS.FAILED,
-                            description: "Payment failed via Razorpay",
-                        }
-                    );
-                    log1(["postRazorpayWebhook Payment failed for booking----->", booking._id]);
-                }
-            }
-        }
-
-        if (event.event === "payment_link.payment.captured" || event.event === "payment_link.payment.authorized") {
-            const paymentLink = event.payload?.payment_link?.entity;
-            const referenceId = paymentLink?.reference_id;
-            const paymentId = event.payload?.payment?.entity?.id;
-
-            log1(["postRazorpayWebhook payment success referenceId----->", referenceId]);
-            log1(["postRazorpayWebhook payment success paymentId----->", paymentId]);
-
-            if (referenceId && referenceId.startsWith("booking_")) {
-                const invoiceNo = referenceId.replace("booking_", "");
-                const booking = await Booking.findOne({ invoiceNo: invoiceNo });
-
-                if (booking) {
-                    await Booking.findByIdAndUpdate(booking._id, {
-                        razorpayPaymentId: paymentId || "",
-                        razorpayOrderId: paymentLink?.id || "",
-                        status: Constants.BOOKING_STATUS.PENDING,
-                    });
-
-                    await Transaction.findOneAndUpdate(
-                        { bookingId: booking._id },
-                        {
-                            trxId: paymentId || "",
-                            status: Constants.TRANSACTION_STATUS.SUCCESS,
-                            description: `Razorpay Payment - ${paymentId || ""}`,
-                        }
-                    );
-
-                    log1(["postRazorpayWebhook Payment success for booking----->", booking._id]);
-                }
-            }
-        }
-
-        return res.status(200).json({ status: "ok" });
-    } catch (error) {
-        log1(["Error in postRazorpayWebhook ----->", error]);
-        return res.status(200).json({ status: "ok" });
-    }
 };
 
 export const postBookingList = async (req, res) => {
@@ -1959,34 +2355,6 @@ export const postBookingDetails = async (req, res) => {
     };
 };
 
-export const postBookingInvoice = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        log1(["postBookingInvoice ownerId----->", ownerId]);
-        log1(["postBookingInvoice req.body----->", req.body]);
-
-        const { bookingId } = req.body;
-
-        const validate = await custom_validation(req.body, "owner.bookingDetails");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
-        };
-
-        let filter = { _id: new ObjectId(bookingId) };
-
-        const bookingDetails = await Booking.findOne(filter);
-        log1(["postBookingInvoice bookingDetails----->", bookingDetails]);
-        if (!bookingDetails) {
-            return res.status(400).json(errorResponse("This Booking is not Available."));
-        };
-
-        return res.status(200).json(successResponse("Booking Invoice Details Get Successfully.", bookingDetails));
-    } catch (error) {
-        log1(["Error in postBookingInvoice ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
 export const postUpdateBooking = async (req, res) => {
     const ownerId = req.ownerId;
     const param = req.body;
@@ -2002,7 +2370,7 @@ export const postUpdateBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(param, "owner.updateBooking");
+        const validate = await custom_validation(param, "owner.update_booking");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -2021,22 +2389,6 @@ export const postUpdateBooking = async (req, res) => {
 
         if (param.totalAmount) {
             updatePayload["totalAmount"] = parseFloat(param.totalAmount);
-        };
-
-        if (param.taxAmount) {
-            updatePayload["taxAmount"] = parseFloat(param.taxAmount);
-        };
-
-        if (param.discountAmount) {
-            updatePayload["discountAmount"] = parseFloat(param.discountAmount);
-        };
-
-        if (param.discountPercentage) {
-            updatePayload["discountPercentage"] = parseInt(param.discountPercentage);
-        };
-
-        if (param.finalPayAmount) {
-            updatePayload["finalPayAmount"] = parseFloat(param.finalPayAmount);
         };
 
         if (Object.keys(updatePayload).length > 0) {
@@ -2071,7 +2423,7 @@ export const postCancelBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(param, "owner.cancelBooking");
+        const validate = await custom_validation(param, "owner.cancel_booking");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -2154,535 +2506,6 @@ export const postCancelBooking = async (req, res) => {
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     } finally {
         ownerLocks.delete(ownerId);
-    };
-};
-
-export const postSetDefaultCar = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { carId } = req.body;
-        if (!carId || !ObjectId.isValid(carId)) {
-            return res.status(400).json(errorResponse("Invalid car id."));
-        };
-        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
-        if (!car) {
-            return res.status(400).json(errorResponse("Car not found."));
-        };
-        await Car.updateMany({ ownerId: new ObjectId(ownerId) }, { isDefault: false });
-        await Car.findByIdAndUpdate(carId, { isDefault: true });
-        return res.status(200).json(successResponse("Default car set successfully."));
-    } catch (error) {
-        log1(["Error in postSetDefaultCar ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateCar = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        log1(["postUpdateCar ownerId----->", ownerId]);
-        log1(["postUpdateCar req.body----->", req.body]);
-        const { carId, vehicleNumber, fuelType, vehicleColour } = req.body;
-        if (!carId || !ObjectId.isValid(carId)) {
-            return res.status(400).json(errorResponse("Invalid car id."));
-        };
-        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
-        if (!car) {
-            return res.status(400).json(errorResponse("Car not found."));
-        };
-        let updatePayload = {};
-        if (vehicleNumber) updatePayload.vehicleNumber = vehicleNumber;
-        if (fuelType) updatePayload.fuelType = fuelType;
-        if (vehicleColour) updatePayload.vehicleColour = vehicleColour;
-
-        if (req.files && req.files.images) {
-            let images = req.files.images;
-            if (!Array.isArray(images)) {
-                images = [images];
-            };
-
-            if (images.length > 4) {
-                return res.status(400).json(errorResponse("Maximum 4 images are allowed."));
-            };
-
-            if (car.images && car.images.length > 0) {
-                for (const oldImage of car.images) {
-                    const parts = oldImage.split("/");
-                    if (parts.length >= 2) {
-                        const folder = parts[1];
-                        const fileName = parts[2];
-                        await removeFile(folder, fileName);
-                    };
-                };
-            };
-
-            let uploadedImages = [];
-            for (const image of images) {
-                const uploadResp = await uploadFile(image);
-                if (uploadResp.flag !== 1) {
-                    return res.status(400).json(uploadResp);
-                };
-                uploadedImages.push(uploadResp.data.url);
-            };
-            updatePayload.images = uploadedImages;
-        };
-
-        if (Object.keys(updatePayload).length === 0) {
-            return res.status(400).json(errorResponse("No fields to update."));
-        };
-        await Car.findByIdAndUpdate(carId, updatePayload);
-        return res.status(200).json(successResponse("Car updated successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateCar ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postDeleteCar = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { carId } = req.body;
-        if (!carId || !ObjectId.isValid(carId)) {
-            return res.status(400).json(errorResponse("Invalid car id."));
-        };
-        const car = await Car.findOne({ _id: new ObjectId(carId), ownerId: new ObjectId(ownerId) });
-        if (!car) {
-            return res.status(400).json(errorResponse("Car not found."));
-        };
-        await Car.findByIdAndDelete(carId);
-        return res.status(200).json(successResponse("Car deleted successfully."));
-    } catch (error) {
-        log1(["Error in postDeleteCar ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postSearchServices = async (req, res) => {
-    try {
-        const { keyword, minPrice, maxPrice, minRating, categoryId, currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const filter = { parentId: { $ne: null }, "mechanicIds.0": { $exists: true } };
-
-        if (keyword && keyword.trim() !== "") {
-            filter.$or = [
-                { fullName: { $regex: keyword, $options: "i" } },
-                { description: { $regex: keyword, $options: "i" } },
-            ];
-        };
-
-        if (categoryId) {
-            filter.parentId = new ObjectId(categoryId);
-        };
-
-        let services = await Service.find(filter)
-            .select("_id fullName description parentId mechanicIds")
-            .populate("parentId", "fullName description")
-            .lean();
-
-        if (minPrice || maxPrice) {
-            services = services.filter(service => {
-                const price = service.mechanicIds?.[0]?.price || 0;
-                if (minPrice && price < parseFloat(minPrice)) return false;
-                if (maxPrice && price > parseFloat(maxPrice)) return false;
-                return true;
-            });
-        };
-
-        const totalCount = services.length;
-        const paginatedItems = services.slice(skip, skip + limit);
-
-        return res.status(200).json(successResponse("Services searched successfully.", {
-            page, limit, totalRecords: totalCount, items: paginatedItems,
-        }));
-    } catch (error) {
-        log1(["Error in postSearchServices ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postVerifyRazorpayPayment = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-
-        if (!bookingId || !ObjectId.isValid(bookingId)) {
-            return res.status(400).json(errorResponse("Invalid booking id."));
-        };
-
-        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-            return res.status(400).json(errorResponse("Missing Razorpay payment details."));
-        };
-
-        const booking = await Booking.findOne({
-            _id: new ObjectId(bookingId),
-            ownerId: new ObjectId(ownerId),
-        });
-
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found."));
-        };
-
-        const body = razorpayOrderId + "|" + razorpayPaymentId;
-
-        const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body)
-            .digest("hex");
-
-        const isAuthentic = expectedSignature === razorpaySignature;
-
-        if (!isAuthentic) {
-            log1(["postVerifyRazorpayPayment Signature mismatch----->"]);
-            return res.status(400).json(errorResponse("Payment verification failed. Invalid signature."));
-        };
-
-        await Booking.findByIdAndUpdate(bookingId, {
-            razorpayOrderId: razorpayOrderId,
-            razorpayPaymentId: razorpayPaymentId,
-            razorpaySignature: razorpaySignature,
-        });
-
-        const transaction = await Transaction.findOne({ bookingId: new ObjectId(bookingId) });
-
-        if (transaction) {
-            await Transaction.findByIdAndUpdate(transaction._id, {
-                trxId: razorpayPaymentId,
-                status: Constants.TRANSACTION_STATUS.SUCCESS,
-                description: `Razorpay Payment - ${razorpayPaymentId}`,
-            });
-        }
-
-        const ownerData = await Owner.findById(ownerId);
-        if (
-            ownerData &&
-            ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-            ownerData.deviceToken &&
-            ownerData.deviceToken !== ""
-        ) {
-            let notificationObject = {
-                title: "Payment",
-                description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
-                ownerId: ownerId,
-                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-            };
-            await sendPushNotification(ownerData.deviceToken, notificationObject);
-        }
-
-        return res.status(200).json(successResponse("Payment verified successfully.", {
-            bookingId: bookingId,
-            razorpayPaymentId: razorpayPaymentId,
-            status: "verified",
-        }));
-    } catch (error) {
-        log1(["Error in postVerifyRazorpayPayment ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateLocation = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { latitude, longitude } = req.body;
-        if (!latitude || !longitude) {
-            return res.status(400).json(errorResponse("Latitude and longitude are required."));
-        };
-        await Owner.findByIdAndUpdate(ownerId, {
-            latitude: latitude,
-            longitude: longitude,
-            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
-        });
-        return res.status(200).json(successResponse("Location updated successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateLocation ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postGetProviderLocation = async (req, res) => {
-    try {
-        const { bookingId } = req.body;
-        if (!bookingId || !ObjectId.isValid(bookingId)) {
-            return res.status(400).json(errorResponse("Invalid booking id."));
-        };
-        const booking = await Booking.findOne({ _id: new ObjectId(bookingId) }).select("mechanicId status");
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found."));
-        };
-        const mechanic = await Mechanic.findById(booking.mechanicId).select("latitude longitude fullName phoneNumber profileImage isOnline");
-        if (!mechanic) {
-            return res.status(400).json(errorResponse("Provider not found."));
-        };
-        return res.status(200).json(successResponse("Provider location fetched successfully.", {
-            latitude: mechanic.latitude,
-            longitude: mechanic.longitude,
-            fullName: mechanic.fullName,
-            phoneNumber: mechanic.phoneNumber,
-            profileImage: mechanic.profileImage,
-            isOnline: mechanic.isOnline,
-            bookingStatus: booking.status,
-        }));
-    } catch (error) {
-        log1(["Error in postGetProviderLocation ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postFileDispute = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { bookingId, reason, description } = req.body;
-
-        if (!bookingId || !ObjectId.isValid(bookingId) || !reason) {
-            return res.status(400).json(errorResponse("Booking ID and reason are required."));
-        };
-
-        const dispute = await Dispute.create({
-            bookingId: new ObjectId(bookingId),
-            filedBy: new ObjectId(ownerId),
-            filedByRole: "owner",
-            reason: reason,
-            description: description || "",
-        });
-
-        return res.status(200).json(successResponse("Dispute filed successfully.", dispute));
-    } catch (error) {
-        log1(["Error in postFileDispute ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postNotificationList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postNotificationList ownerId----->", ownerId]);
-        log1(["postNotificationList param----->", param]);
-
-        const currentPage = param?.currentPage || Constants.DEFAULT_PAGE;
-        const itemPerPage = param?.itemPerPage || Constants.DEFAULT_LIMIT;
-
-        const skip = (Number(currentPage) - 1) * Number(itemPerPage);
-
-        const result = await Notification.aggregate([
-            { $match: { ownerId: new ObjectId(ownerId) } },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    totalCount: [{ $count: "count" }],
-                    notifications: [{ $skip: skip }, { $limit: itemPerPage }]
-                }
-            }
-        ]);
-
-        const totalCount = result[0].totalCount[0] ? result[0].totalCount[0].count : 0;
-        const notificationList = result[0].notifications;
-
-        const response = {
-            items: notificationList,
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
-            totalRecords: totalCount
-        };
-
-        return res.status(200).json(successResponse("Notification List.", response));
-    } catch (error) {
-        log1(["Error in postNotificationList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateNotification = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postUpdateNotification ownerId----->", ownerId]);
-        log1(["postUpdateNotification param----->", param]);
-
-        if (param.allRead === true) {
-            await Notification.updateMany({ ownerId: new ObjectId(ownerId), isRead: false }, { isRead: true });
-        } else if (param.singleRead === true) {
-            if (!mongoose.Types.ObjectId.isValid(param.notificationId)) {
-                return res.status(400).json(errorResponse("Invalid notification id."));
-            }
-            await Notification.findOneAndUpdate({ _id: new ObjectId(param.notificationId), ownerId: new ObjectId(ownerId) }, { isRead: true });
-        }
-
-        return res.status(200).json(successResponse("Notification Read Successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateNotification ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postAddRating = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postAddRating ownerId----->", ownerId]);
-        log1(["postAddRating param----->", param]);
-
-        const validate = await custom_validation(param, "owner.createRating");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
-        };
-
-        let ownerData = await Owner.findById(ownerId);
-        if (!ownerData) {
-            return res.status(400).json(errorResponse("Owner not found."));
-        }
-
-        let filter = {
-            _id: new ObjectId(param.bookingId),
-            ownerId: new ObjectId(ownerId),
-        };
-
-        const bookingDetails = await Booking.findOne({ ...filter }).populate([
-            { path: "ownerId", select: "_id pushNotification deviceToken" },
-        ]);
-        log1(["postAddRating bookingDetails----->", bookingDetails]);
-
-        if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED &&
-            bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED &&
-            bookingDetails.status !== Constants.BOOKING_STATUS.CLOSED) {
-            return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
-        };
-
-        let ratingPayload = {
-            bookingId: bookingDetails._id,
-            rating: parseInt(param.rating),
-            description: param.description,
-        };
-
-        ratingPayload.ownerId = ownerId;
-        ratingPayload.serviceId = bookingDetails.serviceId;
-
-        const createRating = await Rating.create(ratingPayload);
-        log1(["postAddRating createRating----->", createRating]);
-        if (!createRating) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        return res.status(200).json(successResponse("Rating Add Successfully!"));
-    } catch (error) {
-        log1(["Error in postAddRating ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postRatingList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postRatingList ownerId----->", ownerId]);
-        log1(["postRatingList param----->", param]);
-
-        let filter = {
-            ownerId: new ObjectId(ownerId),
-        };
-        let ratingFilter = {};
-        let sortOption = { createdAt: -1 };
-
-        const currentPage = param?.currentPage || Constants.DEFAULT_PAGE;
-        const itemPerPage = param?.itemPerPage || Constants.DEFAULT_LIMIT;
-
-        const skip = (Number(currentPage) - 1) * Number(itemPerPage);
-
-        if (param.rating && parseInt(param.rating) >= 1 && parseInt(param.rating) <= 5) {
-            ratingFilter.rating = parseInt(param.rating);
-        };
-
-        const result = await Rating.aggregate([
-            {
-                $match: {
-                    ...filter,
-                    ...ratingFilter
-                }
-            },
-            {
-                $lookup: {
-                    from: "owners",
-                    localField: "ownerId",
-                    foreignField: "_id",
-                    as: "ownerDetails"
-                },
-            },
-            { $unwind: "$ownerDetails" },
-            {
-                $lookup: {
-                    from: "services",
-                    localField: "serviceId",
-                    foreignField: "_id",
-                    as: "serviceDetails"
-                }
-            },
-            { $unwind: "$serviceDetails" },
-            {
-                $lookup: {
-                    from: "bookings",
-                    localField: "bookingId",
-                    foreignField: "_id",
-                    as: "bookingDetails"
-                }
-            },
-            { $unwind: { path: "$bookingDetails", preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 1,
-                    rating: 1,
-                    description: 1,
-                    createdAt: 1,
-                    "ownerDetails.fullName": 1,
-                    "ownerDetails.profileImage": 1,
-                    "serviceDetails.fullName": 1,
-                    "serviceDetails.image": 1,
-                    "bookingDetails.totalAmount": 1,
-                },
-            },
-            { $sort: sortOption },
-            { $skip: skip },
-            { $limit: parseInt(itemPerPage) }
-        ]);
-
-        const stats = await Rating.aggregate([
-            {
-                $match: {
-                    ...filter
-                },
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalReviews: { $sum: 1 },
-                    avgRating: { $avg: "$rating" }
-                },
-            },
-        ]);
-
-        const totalReviews = stats[0]?.totalReviews || 0;
-        const avgRating = stats[0]?.avgRating || 0;
-
-        await Rating.updateMany({ ...filter, isRead: false }, { isRead: true });
-
-        const response = {
-            items: result,
-            totalReviews: totalReviews,
-            avgRating: avgRating,
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
-            totalRecords: totalReviews,
-        };
-
-        return res.status(200).json(successResponse("Reviews List!", response));
-    } catch (error) {
-        log1(["Error in postRatingList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
 
@@ -2890,6 +2713,420 @@ export const postTransactionList = async (req, res) => {
         return res.status(200).json(successResponse("Transaction List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postTransactionList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postVerifyRazorpayPayment = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.verify_razorpay_payment");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+
+        const booking = await Booking.findOne({
+            _id: new ObjectId(bookingId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found."));
+        };
+
+        const body = razorpayOrderId + "|" + razorpayPaymentId;
+
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body)
+            .digest("hex");
+
+        const isAuthentic = expectedSignature === razorpaySignature;
+
+        if (!isAuthentic) {
+            log1(["postVerifyRazorpayPayment Signature mismatch----->"]);
+            return res.status(400).json(errorResponse("Payment verification failed. Invalid signature."));
+        };
+
+        await Booking.findByIdAndUpdate(bookingId, {
+            razorpayOrderId: razorpayOrderId,
+            razorpayPaymentId: razorpayPaymentId,
+            razorpaySignature: razorpaySignature,
+        });
+
+        const transaction = await Transaction.findOne({ bookingId: new ObjectId(bookingId) });
+
+        if (transaction) {
+            await Transaction.findByIdAndUpdate(transaction._id, {
+                trxId: razorpayPaymentId,
+                status: Constants.TRANSACTION_STATUS.SUCCESS,
+                description: `Razorpay Payment - ${razorpayPaymentId}`,
+            });
+        };
+
+        const ownerData = await Owner.findById(ownerId);
+        if (
+            ownerData &&
+            ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerData.deviceToken &&
+            ownerData.deviceToken !== ""
+        ) {
+            let notificationObject = {
+                title: "Payment",
+                description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
+                ownerId: ownerId,
+                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+            };
+            await sendPushNotification(ownerData.deviceToken, notificationObject);
+        };
+
+        const response = {
+            bookingId: bookingId,
+            razorpayPaymentId: razorpayPaymentId,
+            status: "verified",
+        };
+
+        return res.status(200).json(successResponse("Payment verified successfully.", response));
+    } catch (error) {
+        log1(["Error in postVerifyRazorpayPayment ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postRazorpayWebhook = async (req, res) => {
+    try {
+        log1(["postRazorpayWebhook req.body----->", req.body]);
+
+        const webhookSignature = req.headers["x-razorpay-signature"];
+        const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "";
+
+        if (webhookSecret && webhookSignature) {
+            const body = JSON.stringify(req.body);
+            const expectedSignature = crypto
+                .createHmac("sha256", webhookSecret)
+                .update(body)
+                .digest("hex");
+
+            if (expectedSignature !== webhookSignature) {
+                log1(["postRazorpayWebhook Signature mismatch----->"]);
+                return res.status(400).json({ status: "error", message: "Invalid signature" });
+            };
+        };
+
+        const event = req.body;
+        log1(["postRazorpayWebhook event----->", event.event]);
+
+        if (event.event === "payment_link.payment.failed") {
+            const paymentLink = event.payload?.payment_link?.entity;
+            const referenceId = paymentLink?.reference_id;
+
+            if (referenceId && referenceId.startsWith("booking_")) {
+                const invoiceNo = referenceId.replace("booking_", "");
+                const booking = await Booking.findOne({ invoiceNo: invoiceNo });
+
+                if (booking) {
+                    await Transaction.findOneAndUpdate(
+                        { bookingId: booking._id },
+                        {
+                            status: Constants.TRANSACTION_STATUS.FAILED,
+                            description: "Payment failed via Razorpay",
+                        },
+                    );
+                    log1(["postRazorpayWebhook Payment failed for booking----->", booking._id]);
+                };
+            };
+        };
+
+        if (event.event === "payment_link.payment.captured" || event.event === "payment_link.payment.authorized") {
+            const paymentLink = event.payload?.payment_link?.entity;
+            const referenceId = paymentLink?.reference_id;
+            const paymentId = event.payload?.payment?.entity?.id;
+
+            log1(["postRazorpayWebhook payment success referenceId----->", referenceId]);
+            log1(["postRazorpayWebhook payment success paymentId----->", paymentId]);
+
+            if (referenceId && referenceId.startsWith("booking_")) {
+                const invoiceNo = referenceId.replace("booking_", "");
+                const booking = await Booking.findOne({ invoiceNo: invoiceNo });
+
+                if (booking) {
+                    await Booking.findByIdAndUpdate(booking._id, {
+                        razorpayPaymentId: paymentId || "",
+                        razorpayOrderId: paymentLink?.id || "",
+                        status: Constants.BOOKING_STATUS.PENDING,
+                    });
+
+                    await Transaction.findOneAndUpdate(
+                        { bookingId: booking._id },
+                        {
+                            trxId: paymentId || "",
+                            status: Constants.TRANSACTION_STATUS.SUCCESS,
+                            description: `Razorpay Payment - ${paymentId || ""}`,
+                        },
+                    );
+
+                    log1(["postRazorpayWebhook Payment success for booking----->", booking._id]);
+                };
+            };
+        };
+
+        return res.status(200).json({ status: "ok" });
+    } catch (error) {
+        log1(["Error in postRazorpayWebhook ----->", error]);
+        return res.status(200).json({ status: "ok" });
+    };
+};
+
+export const postNotificationList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        log1(["postNotificationList ownerId----->", ownerId]);
+        log1(["postNotificationList req.body----->", req.body]);
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const result = await Notification.aggregate([
+            { $match: { ownerId: new ObjectId(ownerId) } },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    totalCount: [{ $count: "count" }],
+                    notifications: [{ $skip: skip }, { $limit: limit }]
+                },
+            },
+        ]);
+
+        const totalCount = result[0].totalCount[0] ? result[0].totalCount[0].count : 0;
+        const notificationList = result[0].notifications;
+
+        const response = {
+            page: page,
+            limit: limit,
+            totalRecords: totalCount,
+            items: notificationList,
+        };
+
+        return res.status(200).json(successResponse("Notification List.", response));
+    } catch (error) {
+        log1(["Error in postNotificationList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateNotification = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const param = req.body;
+
+        log1(["postUpdateNotification ownerId----->", ownerId]);
+        log1(["postUpdateNotification param----->", param]);
+
+        if (param.allRead === true) {
+            await Notification.updateMany({ ownerId: new ObjectId(ownerId), isRead: false }, { isRead: true });
+        } else if (param.singleRead === true) {
+            if (!mongoose.Types.ObjectId.isValid(param.notificationId)) {
+                return res.status(400).json(errorResponse("Invalid notification id."));
+            };
+
+            await Notification.findOneAndUpdate({ _id: new ObjectId(param.notificationId), ownerId: new ObjectId(ownerId) }, { isRead: true });
+        };
+
+        return res.status(200).json(successResponse("Notification Read Successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateNotification ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAddRating = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId, rating, description } = req.body;
+
+        log1(["postAddRating ownerId----->", ownerId]);
+        log1(["postAddRating req.body----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.create_rating");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        let ownerData = await Owner.findById(ownerId);
+        if (!ownerData) {
+            return res.status(400).json(errorResponse("Owner not found."));
+        }
+
+        let filter = {
+            _id: new ObjectId(bookingId),
+            ownerId: new ObjectId(ownerId),
+        };
+
+        const bookingDetails = await Booking.findOne({ ...filter }).populate([
+            { path: "ownerId", select: "_id pushNotification deviceToken" },
+        ]);
+        log1(["postAddRating bookingDetails----->", bookingDetails]);
+
+        if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED &&
+            bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED &&
+            bookingDetails.status !== Constants.BOOKING_STATUS.CLOSED) {
+            return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
+        };
+
+        let ratingPayload = {
+            ownerId: ownerId,
+            bookingId: bookingDetails._id,
+            serviceId: bookingDetails.serviceId,
+            rating: parseInt(rating),
+            description: description ? description : "",
+        };
+
+        const createRating = await Rating.create(ratingPayload);
+        log1(["postAddRating createRating----->", createRating]);
+        if (!createRating) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        return res.status(200).json(successResponse("Rating Add Successfully!"));
+    } catch (error) {
+        log1(["Error in postAddRating ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postRatingList = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            rating,
+        } = req.body;
+
+        log1(["postRatingList ownerId----->", ownerId]);
+        log1(["postRatingList req.body----->", req.body]);
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let filter = {
+            ownerId: new ObjectId(ownerId),
+        };
+
+        let ratingFilter = {};
+        let sortOption = { createdAt: -1 };
+
+        if (rating && parseInt(rating) >= 1 && parseInt(rating) <= 5) {
+            ratingFilter.rating = parseInt(rating);
+        };
+
+        const result = await Rating.aggregate([
+            {
+                $match: {
+                    ...filter,
+                    ...ratingFilter
+                }
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails"
+                }
+            },
+            { $unwind: "$serviceDetails" },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    rating: 1,
+                    description: 1,
+                    createdAt: 1,
+                    "ownerDetails.fullName": 1,
+                    "ownerDetails.profileImage": 1,
+                    "serviceDetails.fullName": 1,
+                    "serviceDetails.image": 1,
+                    "bookingDetails.totalAmount": 1,
+                },
+            },
+            { $sort: sortOption },
+            { $skip: skip },
+            { $limit: limit }
+        ]);
+
+        const stats = await Rating.aggregate([
+            {
+                $match: {
+                    ...filter
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalReviews: { $sum: 1 },
+                    avgRating: { $avg: "$rating" }
+                },
+            },
+        ]);
+
+        const totalReviews = stats[0]?.totalReviews || 0;
+        const avgRating = stats[0]?.avgRating || 0;
+
+        await Rating.updateMany({ ...filter, isRead: false }, { isRead: true });
+
+        const response = {
+            totalReviews: totalReviews,
+            avgRating: avgRating,
+            page: page,
+            limit: limit,
+            totalRecords: totalReviews,
+            items: result,
+        };
+
+        return res.status(200).json(successResponse("Reviews List!", response));
+    } catch (error) {
+        log1(["Error in postRatingList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -3141,7 +3378,7 @@ export const postSendMessageToChat = async (req, res) => {
 
         const currentTime = moment().utc().toDate();
 
-        const validate = await custom_validation(param, "owner.sendMessageToChat");
+        const validate = await custom_validation(param, "owner.send_message_to_chat");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -3351,622 +3588,31 @@ export const postSendMessageToChat = async (req, res) => {
     };
 };
 
-export const postAddAddress = async (req, res) => {
+export const postFileDispute = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { bookingId, reason, description } = req.body;
 
-        log1(["postAddAddress ownerId----->", ownerId]);
-        log1(["postAddAddress param----->", param]);
-
-        const validate = await custom_validation(param, "owner.add_address");
-        if (validate.flag !== 1) {
+        const validate = await custom_validation(req.body, "owner.file_dispute");
+        if (validate.flag != 1) {
             return res.status(400).json(validate);
         };
 
-        if (param.isDefault === true || param.isDefault === "true") {
-            await Address.updateMany(
-                { ownerId: new ObjectId(ownerId), isDefault: true },
-                { $set: { isDefault: false } }
-            );
+        if (!ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking Id."));
         };
 
-        let payload = {
-            ownerId: new ObjectId(ownerId),
-            label: param.label,
-            address: param.address,
-            latitude: param.latitude,
-            longitude: param.longitude,
-            isDefault: param.isDefault === true || param.isDefault === "true",
-        };
-
-        const newAddress = await Address.create(payload);
-        log1(["postAddAddress newAddress----->", newAddress]);
-
-        if (!newAddress) {
-            return res.status(400).json(errorResponse("Failed to add address."));
-        };
-
-        return res.status(200).json(successResponse("Address added successfully!", newAddress));
-    } catch (error) {
-        log1(["Error in postAddAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postAddressList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postAddressList ownerId----->", ownerId]);
-        log1(["postAddressList param----->", param]);
-
-        const {
-            currentPage = Constants.DEFAULT_PAGE,
-            itemPerPage = Constants.DEFAULT_LIMIT,
-        } = param;
-
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        let filter = {
-            ownerId: new ObjectId(ownerId),
-        };
-
-        const [items, totalCount] = await Promise.all([
-            Address.find(filter).sort({ isDefault: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
-            Address.countDocuments(filter),
-        ]);
-
-        const response = {
-            items: items,
-            page: page,
-            limit: limit,
-            totalRecords: totalCount,
-        };
-
-        return res.status(200).json(successResponse("Address list get successfully.", response));
-    } catch (error) {
-        log1(["Error in postAddressList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateAddress = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postUpdateAddress ownerId----->", ownerId]);
-        log1(["postUpdateAddress param----->", param]);
-
-        const validate = await custom_validation(param, "owner.update_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
-        };
-
-        if (!ObjectId.isValid(param.addressId)) {
-            return res.status(400).json(errorResponse("Invalid address id."));
-        };
-
-        const address = await Address.findOne({
-            _id: new ObjectId(param.addressId),
-            ownerId: new ObjectId(ownerId),
+        const dispute = await Dispute.create({
+            bookingId: new ObjectId(bookingId),
+            filedBy: new ObjectId(ownerId),
+            filedByRole: Constants.USER_ROLE.OWNER,
+            reason: reason,
+            description: description || "",
         });
 
-        if (!address) {
-            return res.status(400).json(errorResponse("Address not found."));
-        };
-
-        let updateObj = {};
-
-        if (param.label !== undefined && param.label !== null && param.label !== "") {
-            updateObj.label = param.label;
-        };
-
-        if (param.address !== undefined && param.address !== null && param.address !== "") {
-            updateObj.address = param.address;
-        };
-
-        if (param.latitude !== undefined && param.latitude !== null && param.latitude !== "") {
-            updateObj.latitude = param.latitude;
-        };
-
-        if (param.longitude !== undefined && param.longitude !== null && param.longitude !== "") {
-            updateObj.longitude = param.longitude;
-        };
-
-        if (param.isDefault === true || param.isDefault === "true") {
-            await Address.updateMany(
-                { ownerId: new ObjectId(ownerId), isDefault: true },
-                { $set: { isDefault: false } }
-            );
-            updateObj.isDefault = true;
-        };
-
-        if (Object.keys(updateObj).length > 0) {
-            await Address.findByIdAndUpdate(param.addressId, updateObj, { new: true });
-        };
-
-        const updatedAddress = await Address.findById(param.addressId);
-
-        return res.status(200).json(successResponse("Address updated successfully!", updatedAddress));
+        return res.status(200).json(successResponse("Dispute filed successfully.", dispute));
     } catch (error) {
-        log1(["Error in postUpdateAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postDeleteAddress = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postDeleteAddress ownerId----->", ownerId]);
-        log1(["postDeleteAddress param----->", param]);
-
-        const validate = await custom_validation(param, "owner.delete_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
-        };
-
-        if (!ObjectId.isValid(param.addressId)) {
-            return res.status(400).json(errorResponse("Invalid address id."));
-        };
-
-        const address = await Address.findOne({
-            _id: new ObjectId(param.addressId),
-            ownerId: new ObjectId(ownerId),
-        });
-
-        if (!address) {
-            return res.status(400).json(errorResponse("Address not found."));
-        };
-
-        await Address.findByIdAndDelete(param.addressId);
-
-        return res.status(200).json(successResponse("Address deleted successfully!"));
-    } catch (error) {
-        log1(["Error in postDeleteAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postSetDefaultAddress = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postSetDefaultAddress ownerId----->", ownerId]);
-        log1(["postSetDefaultAddress param----->", param]);
-
-        const validate = await custom_validation(param, "owner.set_default_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
-        };
-
-        if (!ObjectId.isValid(param.addressId)) {
-            return res.status(400).json(errorResponse("Invalid address id."));
-        };
-
-        const address = await Address.findOne({
-            _id: new ObjectId(param.addressId),
-            ownerId: new ObjectId(ownerId),
-        });
-
-        if (!address) {
-            return res.status(400).json(errorResponse("Address not found."));
-        };
-
-        await Address.updateMany(
-            { ownerId: new ObjectId(ownerId), isDefault: true },
-            { $set: { isDefault: false } }
-        );
-
-        await Address.findByIdAndUpdate(param.addressId, { $set: { isDefault: true } });
-
-        const updatedAddress = await Address.findById(param.addressId);
-
-        return res.status(200).json(successResponse("Default address set successfully!", updatedAddress));
-    } catch (error) {
-        log1(["Error in postSetDefaultAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postCouponList = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postCouponList ownerId----->", ownerId]);
-        log1(["postCouponList param----->", param]);
-
-        const {
-            currentPage = Constants.DEFAULT_PAGE,
-            itemPerPage = Constants.DEFAULT_LIMIT,
-        } = param;
-
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const filter = {
-            isActive: true,
-            expiryDate: { $gte: new Date() },
-            $expr: {
-                $or: [
-                    { $eq: ["$usageLimit", 0] },
-                    { $lt: ["$usedCount", "$usageLimit"] },
-                ],
-            },
-        };
-
-        const [items, totalCount] = await Promise.all([
-            Coupon.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Coupon.countDocuments(filter),
-        ]);
-
-        const response = {
-            page,
-            limit,
-            totalRecords: totalCount,
-            items,
-        };
-
-        return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
-    } catch (error) {
-        log1(["Error in postCouponList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postApplyCoupon = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const param = req.body;
-
-        log1(["postApplyCoupon ownerId----->", ownerId]);
-        log1(["postApplyCoupon param----->", param]);
-
-        const { code, orderAmount } = param;
-
-        if (!code) {
-            return res.status(400).json(errorResponse("Please provide a coupon code."));
-        };
-
-        const coupon = await Coupon.findOne({
-            code: code.toUpperCase(),
-            isActive: true,
-        });
-
-        if (!coupon) {
-            return res.status(400).json(errorResponse("Invalid coupon code."));
-        };
-
-        if (coupon.expiryDate < new Date()) {
-            return res.status(400).json(errorResponse("This coupon has expired."));
-        };
-
-        if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
-            return res.status(400).json(errorResponse("This coupon has reached its usage limit."));
-        };
-
-        const amount = parseFloat(orderAmount) || 0;
-
-        if (amount < coupon.minOrderAmount) {
-            return res.status(400).json(errorResponse(`Minimum order amount of ₹${coupon.minOrderAmount} required for this coupon.`));
-        };
-
-        let discountAmount = 0;
-
-        if (coupon.discountType === Constants.DISCOUNT_TYPE.PERCENTAGE) {
-            discountAmount = (amount * coupon.discountValue) / 100;
-            if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
-                discountAmount = coupon.maxDiscountAmount;
-            };
-        } else {
-            discountAmount = coupon.discountValue;
-        };
-
-        if (discountAmount > amount) {
-            discountAmount = amount;
-        };
-
-        const finalAmount = amount - discountAmount;
-
-        return res.status(200).json(successResponse("Coupon applied successfully.", {
-            couponId: coupon._id,
-            code: coupon.code,
-            discountType: coupon.discountType,
-            discountValue: coupon.discountValue,
-            discountAmount: discountAmount,
-            orderAmount: amount,
-            finalAmount: finalAmount,
-        }));
-    } catch (error) {
-        log1(["Error in postApplyCoupon ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postNearbyMechanics = async (req, res) => {
-    try {
-        const param = req.body;
-
-        log1(["postNearbyMechanics param----->", param]);
-
-        const {
-            latitude,
-            longitude,
-            radius = 10,
-            serviceId,
-        } = param;
-
-        if (!latitude || !longitude) {
-            return res.status(400).json(errorResponse("Please provide latitude and longitude."));
-        };
-
-        const lat = parseFloat(latitude);
-        const lng = parseFloat(longitude);
-        const radiusInMeters = parseFloat(radius) * 1000;
-
-        if (isNaN(lat) || isNaN(lng)) {
-            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
-        };
-
-        let matchFilter = {
-            status: Constants.MECHANIC_STATUS.ACTIVE,
-            "location.coordinates": {
-                $near: {
-                    $geometry: {
-                        type: "Point",
-                        coordinates: [lng, lat],
-                    },
-                    $maxDistance: radiusInMeters,
-                },
-            },
-        };
-
-        if (serviceId && ObjectId.isValid(serviceId)) {
-            matchFilter.serviceIds = new ObjectId(serviceId);
-        }
-
-        const mechanics = await Mechanic.find(matchFilter)
-            .select("fullName email phoneNumber profileImage latitude longitude address serviceIds")
-            .limit(50)
-            .lean();
-
-        const response = mechanics.map((mechanic) => {
-            const mLat = parseFloat(mechanic.latitude) || 0;
-            const mLng = parseFloat(mechanic.longitude) || 0;
-            const R = 6371;
-            const dLat = ((mLat - lat) * Math.PI) / 180;
-            const dLng = ((mLng - lng) * Math.PI) / 180;
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos((lat * Math.PI) / 180) *
-                Math.cos((mLat * Math.PI) / 180) *
-                Math.sin(dLng / 2) *
-                Math.sin(dLng / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = R * c;
-
-            return {
-                _id: mechanic._id,
-                fullName: mechanic.fullName,
-                email: mechanic.email,
-                phoneNumber: mechanic.phoneNumber,
-                profileImage: mechanic.profileImage,
-                latitude: mechanic.latitude,
-                longitude: mechanic.longitude,
-                address: mechanic.address,
-                distance: Math.round(distance * 100) / 100,
-            };
-        });
-
-        response.sort((a, b) => a.distance - b.distance);
-
-        return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", {
-            items: response,
-            totalRecords: response.length,
-        }));
-    } catch (error) {
-        log1(["Error in postNearbyMechanics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postServiceHistory = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-
-        log1(["postServiceHistory ownerId----->", ownerId]);
-        log1(["postServiceHistory req.body----->", req.body]);
-
-        const {
-            currentPage = Constants.DEFAULT_PAGE,
-            itemPerPage = Constants.DEFAULT_LIMIT,
-            carId,
-            serviceId,
-            startDate,
-            endDate,
-        } = req.body;
-
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const match = {
-            ownerId: new ObjectId(ownerId),
-            status: {
-                $in: [
-                    Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                    Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
-                    Constants.BOOKING_STATUS.CLOSED,
-                ],
-            },
-        };
-
-        if (carId) {
-            if (!ObjectId.isValid(carId)) {
-                return res.status(400).json(errorResponse("Invalid car id."));
-            };
-            match.carId = new ObjectId(carId);
-        };
-
-        if (serviceId) {
-            if (!ObjectId.isValid(serviceId)) {
-                return res.status(400).json(errorResponse("Invalid service id."));
-            };
-            match.serviceId = new ObjectId(serviceId);
-        };
-
-        if (startDate || endDate) {
-            match.createdAt = {};
-            if (startDate) {
-                match.createdAt.$gte = new Date(startDate);
-            };
-            if (endDate) {
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                match.createdAt.$lte = end;
-            };
-        };
-
-        const pipeline = [
-            { $match: match },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    items: [
-                        { $skip: skip },
-                        { $limit: limit },
-                        {
-                            $lookup: {
-                                from: "services",
-                                localField: "serviceId",
-                                foreignField: "_id",
-                                as: "serviceDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "mechanics",
-                                localField: "mechanicId",
-                                foreignField: "_id",
-                                as: "mechanicDetails",
-                                pipeline: [
-                                    {
-                                        $project: {
-                                            fullName: 1,
-                                            email: 1,
-                                            phoneNumber: 1,
-                                            profileImage: 1,
-                                        },
-                                    },
-                                ],
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$mechanicDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "cars",
-                                localField: "carId",
-                                foreignField: "_id",
-                                as: "carDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$carDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                                invoiceNo: 1,
-                                date: 1,
-                                time: 1,
-                                address: 1,
-                                totalAmount: 1,
-                                status: 1,
-                                startTime: 1,
-                                endTime: 1,
-                                beforePhotos: 1,
-                                afterPhotos: 1,
-                                createdAt: 1,
-                                serviceDetails: {
-                                    _id: "$serviceDetails._id",
-                                    fullName: "$serviceDetails.fullName",
-                                    description: "$serviceDetails.description",
-                                },
-                                mechanicDetails: 1,
-                                carDetails: {
-                                    _id: "$carDetails._id",
-                                    fullName: "$carDetails.fullName",
-                                    vehicleNumber: "$carDetails.vehicleNumber",
-                                    model: "$carDetails.model",
-                                    brand: "$carDetails.brand",
-                                    year: "$carDetails.year",
-                                    color: "$carDetails.color",
-                                },
-                            },
-                        },
-                    ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
-                },
-            },
-        ];
-
-        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
-
-        const items = result.items;
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
-
-        const groupedByCar = {};
-
-        items.forEach((booking) => {
-            const carKey = booking.carDetails?._id?.toString() || "unknown";
-            if (!groupedByCar[carKey]) {
-                groupedByCar[carKey] = {
-                    carDetails: booking.carDetails,
-                    bookings: [],
-                };
-            }
-            groupedByCar[carKey].bookings.push(booking);
-        });
-
-        const response = {
-            page,
-            limit,
-            totalRecords,
-            items: Object.values(groupedByCar),
-        };
-
-        return res.status(200).json(successResponse("Service history fetched successfully.", response));
-    } catch (error) {
-        log1(["Error in postServiceHistory ----->", error]);
+        log1(["Error in postFileDispute ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

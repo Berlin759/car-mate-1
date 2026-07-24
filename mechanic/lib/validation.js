@@ -42,11 +42,17 @@ const validate_rules = {
             latitude: "required",
             longitude: "required",
         },
-        sendMessageToChat: {
+        send_message_to_chat: {
             ownerId: "required",
         },
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+        },
+        submit_kyc: {
+            bankAccountHolderName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            bankIfscCode: "required",
+            bankAccountNumber: "required",
+            bankName: "required",
         },
     },
 };

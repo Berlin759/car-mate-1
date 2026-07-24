@@ -8,33 +8,24 @@ import {
 import {
     getPrivacyPolicy,
     getTermsCondition,
-    getRefund,
     getFaq,
+    getRefund,
     getProfileDetails,
     postUpdateOwnerProfile,
-    postUpdatePreferences,
     postDeviceTokenUpdate,
+    postUpdatePreferences,
+    postUpdateLocation,
     postSendEmailOTP,
     postVerifyEmail,
     postLogout,
-    getHomeDetails,
+    postHomeDetails,
     postAddCar,
     postCarList,
+    postUpdateCar,
+    postDeleteCar,
     postServiceList,
-    postAddBooking,
-    postBookingList,
-    postBookingDetails,
-    postUpdateBooking,
-    postCancelBooking,
-    postNotificationList,
-    postAddRating,
-    postRatingList,
-    postTransactionList,
-    postUpdateNotification,
-    postBookingInvoice,
-    postChatList,
-    postChatMessagesList,
-    postSendMessageToChat,
+    postNearbyMechanics,
+    postServiceHistory,
     postAddAddress,
     postAddressList,
     postUpdateAddress,
@@ -42,18 +33,22 @@ import {
     postSetDefaultAddress,
     postCouponList,
     postApplyCoupon,
-    postNearbyMechanics,
-    postSetDefaultCar,
-    postDeleteCar,
-    postUpdateCar,
-    postSearchServices,
+    postAddBooking,
+    postBookingList,
+    postBookingDetails,
+    postUpdateBooking,
+    postCancelBooking,
+    postTransactionList,
     postVerifyRazorpayPayment,
-    // postGuestBooking,
     postRazorpayWebhook,
-    postUpdateLocation,
-    postGetProviderLocation,
+    postNotificationList,
+    postUpdateNotification,
+    postAddRating,
+    postRatingList,
+    postChatList,
+    postChatMessagesList,
+    postSendMessageToChat,
     postFileDispute,
-    postServiceHistory,
 } from "../controllers/owner.controller.js";
 
 const router = express.Router();
@@ -65,8 +60,8 @@ router.post("/resend-otp", postResendOtp);
 
 router.get("/privacy-policy", getPrivacyPolicy);
 router.get("/terms-condition", getTermsCondition);
-router.get("/refund", getRefund);
 router.get("/faq", getFaq);
+router.get("/refund", getRefund);
 
 // Owner profile API
 router.get("/profile-details", authMiddleware, getProfileDetails);
@@ -82,51 +77,18 @@ router.post("/verify-email", authMiddleware, postVerifyEmail);
 router.post("/logout", authMiddleware, postLogout);
 
 // Home API (Public - no auth required)
-router.post("/home-details", getHomeDetails);
+router.post("/home-details", postHomeDetails);
 
 // Vehicle Management
 router.post("/add-car", authMiddleware, postAddCar);
 router.post("/car-list", authMiddleware, postCarList);
-router.post("/set-default-car", authMiddleware, postSetDefaultCar);
 router.post("/update-car", authMiddleware, postUpdateCar);
 router.post("/delete-car", authMiddleware, postDeleteCar);
 
 // Service API (Public - no auth required)
 router.post("/service-list", postServiceList);
-router.post("/search-services", postSearchServices);
 router.post("/nearby-mechanics", postNearbyMechanics);
-
-// Booking API
-router.post("/add-booking", postAddBooking);
-// router.post("/guest-booking", postGuestBooking);
-router.post("/booking-list", authMiddleware, postBookingList);
-router.post("/booking-details", authMiddleware, postBookingDetails);
-router.post("/update-booking", authMiddleware, postUpdateBooking);
-router.post("/cancel-booking", authMiddleware, postCancelBooking);
-router.post("/booking-invoice", authMiddleware, postBookingInvoice);
-
-// Service History API
 router.post("/service-history", authMiddleware, postServiceHistory);
-
-// Notification API
-router.post("/notification-list", authMiddleware, postNotificationList);
-router.post("/notification-update", authMiddleware, postUpdateNotification);
-
-// Rating API
-router.post("/add-rating", authMiddleware, postAddRating);
-router.post("/rating-list", authMiddleware, postRatingList);
-
-// Transaction Routes
-router.post("/transaction-list", authMiddleware, postTransactionList);
-router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
-
-// Razorpay Webhook (Public - called by Razorpay)
-router.post("/razorpay-webhook", postRazorpayWebhook);
-
-// Chat Routes
-router.post("/chat-list", authMiddleware, postChatList);
-router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
-router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
 
 // Address API
 router.post("/add-address", authMiddleware, postAddAddress);
@@ -139,8 +101,32 @@ router.post("/set-default-address", authMiddleware, postSetDefaultAddress);
 router.post("/coupon-list", authMiddleware, postCouponList);
 router.post("/apply-coupon", authMiddleware, postApplyCoupon);
 
-// Tracking
-router.post("/get-provider-location", authMiddleware, postGetProviderLocation);
+// Booking API
+router.post("/add-booking", postAddBooking);
+router.post("/booking-list", authMiddleware, postBookingList);
+router.post("/booking-details", authMiddleware, postBookingDetails);
+router.post("/update-booking", authMiddleware, postUpdateBooking);
+router.post("/cancel-booking", authMiddleware, postCancelBooking);
+
+// Transaction Routes
+router.post("/transaction-list", authMiddleware, postTransactionList);
+router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
+
+// Razorpay Webhook (Public - called by Razorpay)
+router.post("/razorpay-webhook", postRazorpayWebhook);
+
+// Notification API
+router.post("/notification-list", authMiddleware, postNotificationList);
+router.post("/notification-update", authMiddleware, postUpdateNotification);
+
+// Rating API
+router.post("/add-rating", authMiddleware, postAddRating);
+router.post("/rating-list", authMiddleware, postRatingList);
+
+// Chat Routes
+router.post("/chat-list", authMiddleware, postChatList);
+router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
+router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
 
 // Dispute
 router.post("/file-dispute", authMiddleware, postFileDispute);

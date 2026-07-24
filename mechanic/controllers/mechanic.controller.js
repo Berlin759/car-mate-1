@@ -347,6 +347,28 @@ export const postUpdatePreferences = async (req, res) => {
     }
 };
 
+export const postUpdateLocation = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { latitude, longitude } = req.body;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json(errorResponse("Latitude and longitude are required."));
+        };
+
+        await Mechanic.findByIdAndUpdate(mechanicId, {
+            latitude: latitude,
+            longitude: longitude,
+            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
+        });
+
+        return res.status(200).json(successResponse("Location updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateLocation ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postSendEmailOTP = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
@@ -485,49 +507,120 @@ export const postLogout = async (req, res) => {
     };
 };
 
-export const getHomeDetails = async (req, res) => {
+export const postHomeDetails = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
         let param = req.body;
-        log1(["getHomeDetails param----->", param]);
-        log1(["getHomeDetails mechanicId----->", mechanicId]);
+        log1(["postHomeDetails param----->", param]);
+        log1(["postHomeDetails mechanicId----->", mechanicId]);
 
-        let mechanicData = await Mechanic.findById(mechanicId);
-        log1(["getHomeDetails mechanicData----->", mechanicData]);
-        let updatePayload = {};
+        // let mechanicData = await Mechanic.findById(mechanicId);
+        // log1(["postHomeDetails mechanicData----->", mechanicData]);
+        // let updatePayload = {};
 
-        const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
-        simpleFields.forEach((field) => {
-            if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
-                updatePayload[field] = param[field];
-            };
-        });
+        // const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
+        // simpleFields.forEach((field) => {
+        //     if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
+        //         updatePayload[field] = param[field];
+        //     };
+        // });
 
-        if (
-            param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&
-            param["longitude"] !== undefined && param["longitude"] !== null && param["longitude"] !== ""
-        ) {
-            updatePayload["location"] = {
-                type: "Point",
-                coordinates: [
-                    param["longitude"],
-                    param["latitude"]
-                ]
-            };
+        // if (
+        //     param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&
+        //     param["longitude"] !== undefined && param["longitude"] !== null && param["longitude"] !== ""
+        // ) {
+        //     updatePayload["location"] = {
+        //         type: "Point",
+        //         coordinates: [
+        //             param["longitude"],
+        //             param["latitude"]
+        //         ]
+        //     };
+        // };
+
+        // log1(["postHomeDetails updatePayload------>", updatePayload]);
+
+        // if (Object.keys(updatePayload).length > 0) {
+        //     let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updatePayload, { new: true });
+        //     if (!updateMechanic) {
+        //         return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        //     };
+        // };
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const bookingPipeline = [
+            {
+                $match: {
+                    mechanicId: new ObjectId(mechanicId),
+                    status: Constants.BOOKING_STATUS.PENDING,
+                },
+            },
+            {
+                $sort: {
+                    createdAt: -1,
+                },
+            },
+            {
+                $facet: {
+                    items: [
+                        { $limit: 5 },
+                        { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
+                        { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+                        { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
+                        { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+                        { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
+                        { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+                        { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
+                    ],
+                    totalRecords: [{ $count: "count" }],
+                }
+            },
+        ];
+
+        const [todayJobs, totalPendingRequests, todayEarnings, mechanic, upComingBooking] = await Promise.all([
+            Booking.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                date: { $gte: today, $lt: tomorrow },
+                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED] },
+            }),
+
+            Booking.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                status: Constants.BOOKING_STATUS.PENDING,
+            }),
+
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: today, $lt: tomorrow },
+                    },
+                },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+            ]),
+
+            Mechanic.findById(mechanicId).select("earningBalance isOnline"),
+
+            Booking.aggregate(bookingPipeline).allowDiskUse(true),
+        ]);
+
+        const response = {
+            todayJobs,
+            totalPendingRequests,
+            todayEarnings: todayEarnings[0]?.total || 0,
+            earningBalance: mechanic?.earningBalance || 0,
+            isOnline: mechanic?.isOnline,
+            upComingBookingList: upComingBooking,
         };
 
-        log1(["getHomeDetails updatePayload------>", updatePayload]);
-
-        if (Object.keys(updatePayload).length > 0) {
-            let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updatePayload, { new: true });
-            if (!updateMechanic) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
-            };
-        };
-
-        return res.status(200).json(successResponse("Home details success"));
+        return res.status(200).json(successResponse("Home details fetched successfully.", response));
     } catch (error) {
-        log1(["Error in getHomeDetails ----->", error]);
+        log1(["Error in postHomeDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -1241,124 +1334,20 @@ export const postBookingUpdateStatus = async (req, res) => {
     };
 };
 
-export const postVerifyRazorpayPayment = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-
-        if (!bookingId || !ObjectId.isValid(bookingId)) {
-            return res.status(400).json(errorResponse("Invalid booking id."));
-        };
-
-        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-            return res.status(400).json(errorResponse("Missing Razorpay payment details."));
-        };
-
-        const booking = await Booking.findOne({
-            _id: new ObjectId(bookingId),
-            mechanicId: new ObjectId(mechanicId),
-        });
-
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found."));
-        };
-
-        const body = razorpayOrderId + "|" + razorpayPaymentId;
-
-        const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body)
-            .digest("hex");
-
-        const isAuthentic = expectedSignature === razorpaySignature;
-
-        if (!isAuthentic) {
-            log1(["postVerifyRazorpayPayment Signature mismatch----->"]);
-            return res.status(400).json(errorResponse("Payment verification failed. Invalid signature."));
-        };
-
-        await Booking.findByIdAndUpdate(bookingId, {
-            razorpayOrderId: razorpayOrderId,
-            razorpayPaymentId: razorpayPaymentId,
-            razorpaySignature: razorpaySignature,
-            status: Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
-        });
-
-        const transaction = await Transaction.findOne({ bookingId: new ObjectId(bookingId) });
-
-        if (transaction) {
-            await Transaction.findByIdAndUpdate(transaction._id, {
-                trxId: razorpayPaymentId,
-                status: Constants.TRANSACTION_STATUS.SUCCESS,
-                description: `Razorpay Payment - ${razorpayPaymentId}`,
-            });
-        }
-
-        if (booking.ownerId) {
-            const ownerData = await (await import("../models/owner.model.js")).default.findById(booking.ownerId);
-            if (
-                ownerData &&
-                ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                ownerData.deviceToken &&
-                ownerData.deviceToken !== ""
-            ) {
-                let notificationObject = {
-                    title: "Payment",
-                    description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
-                    ownerId: booking.ownerId,
-                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-                };
-                await sendPushNotification(ownerData.deviceToken, notificationObject);
-            }
-        }
-
-        const mechanicData = await Mechanic.findById(mechanicId);
-        if (
-            mechanicData &&
-            mechanicData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-            mechanicData.deviceToken &&
-            mechanicData.deviceToken !== ""
-        ) {
-            let notificationObject = {
-                title: "Payment Received",
-                description: `Payment of ₹${booking.totalAmount} received successfully via Razorpay.`,
-                mechanicId: mechanicId,
-                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-            };
-            await sendPushNotification(mechanicData.deviceToken, notificationObject);
-        }
-
-        if (io) {
-            io.emit(Constants.SOCKET_EVENTS.CHANGE_BOOKING_STATUS, {
-                bookingId: booking._id,
-                status: Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
-                mechanicId: mechanicId,
-            });
-        }
-
-        return res.status(200).json(successResponse("Payment verified successfully.", {
-            bookingId: bookingId,
-            razorpayPaymentId: razorpayPaymentId,
-            status: "verified",
-        }));
-    } catch (error) {
-        log1(["Error in postVerifyRazorpayPayment ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    }
-};
-
 export const postNotificationList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
 
         log1(["postNotificationList mechanicId----->", mechanicId]);
-        log1(["postNotificationList param----->", param]);
+        log1(["postNotificationList req.body----->", req.body]);
 
-        const currentPage = param?.currentPage || Constants.DEFAULT_PAGE;
-        const itemPerPage = param?.itemPerPage || Constants.DEFAULT_LIMIT;
-
-        const skip = (Number(currentPage) - 1) * Number(itemPerPage);
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
         const result = await Notification.aggregate([
             { $match: { mechanicId: new ObjectId(mechanicId) } },
@@ -1366,19 +1355,19 @@ export const postNotificationList = async (req, res) => {
             {
                 $facet: {
                     totalCount: [{ $count: "count" }],
-                    notifications: [{ $skip: skip }, { $limit: itemPerPage }]
-                }
-            }
+                    notifications: [{ $skip: skip }, { $limit: limit }]
+                },
+            },
         ]);
 
         const totalCount = result[0].totalCount[0] ? result[0].totalCount[0].count : 0;
         const notificationList = result[0].notifications;
 
         const response = {
+            page: page,
+            limit: limit,
+            totalRecords: totalCount,
             items: notificationList,
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
-            totalRecords: totalCount
         };
 
         return res.status(200).json(successResponse("Notification List.", response));
@@ -1396,14 +1385,19 @@ export const postUpdateNotification = async (req, res) => {
         log1(["postUpdateNotification mechanicId----->", mechanicId]);
         log1(["postUpdateNotification param----->", param]);
 
+        if (Object.keys(param).length > 0) {
+            return res.status(200).json(errorResponse("Invalid payload data."));
+        };
+
         if (param.allRead === true) {
             await Notification.updateMany({ mechanicId: new ObjectId(mechanicId), isRead: false }, { isRead: true });
         } else if (param.singleRead === true) {
             if (!mongoose.Types.ObjectId.isValid(param.notificationId)) {
                 return res.status(400).json(errorResponse("Invalid notification id."));
-            }
+            };
+
             await Notification.findOneAndUpdate({ _id: new ObjectId(param.notificationId), mechanicId: new ObjectId(mechanicId) }, { isRead: true });
-        }
+        };
 
         return res.status(200).json(successResponse("Notification Read Successfully."));
     } catch (error) {
@@ -1870,7 +1864,7 @@ export const postSendMessageToChat = async (req, res) => {
 
         const currentTime = moment().utc().toDate();
 
-        const validate = await custom_validation(param, "mechanic.sendMessageToChat");
+        const validate = await custom_validation(param, "mechanic.send_message_to_chat");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -2089,6 +2083,45 @@ export const postSubmitKYC = async (req, res) => {
         log1(["postSubmitKYC param----->", param]);
         log1(["postSubmitKYC req.files----->", req.files]);
 
+        const validate = await custom_validation(param, "mechanic.submit_kyc");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        if (!req.files?.["aadhaarFront"]) {
+            return res.status(400).json(errorResponse("Front aadhar card image is required."));
+        };
+
+        if (!req.files?.["aadhaarBack"]) {
+            return res.status(400).json(errorResponse("Back aadhar card image is required."));
+        };
+
+        if (!req.files?.["panCard"]) {
+            return res.status(400).json(errorResponse("Pan card image is required."));
+        };
+
+        if (!req.files?.["drivingLicense"]) {
+            return res.status(400).json(errorResponse("Driving license image is required."));
+        };
+
+        if (!req.files?.["selfie"]) {
+            return res.status(400).json(errorResponse("Your Selfie image is required."));
+        };
+
+        let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
+        log1(["postSubmitKYC existingKYC----->", existingKYC]);
+
+        if (existingKYC) {
+            // If KYC is already APPROVED, don't allow resubmission
+            if (existingKYC.status === Constants.KYC_STATUS.PENDING) {
+                return res.status(400).json(errorResponse("Your KYC is already pending. No changes allowed."));
+            };
+
+            if (existingKYC.status === Constants.KYC_STATUS.APPROVED) {
+                return res.status(400).json(errorResponse("Your KYC is already approved. No changes allowed."));
+            };
+        };
+
         if (param.bankAccountHolderName && param.bankAccountHolderName.trim() !== "") {
             const trimmedName = param.bankAccountHolderName.trim();
             const nameRegex = /^[a-zA-Z\s]+$/;
@@ -2144,9 +2177,6 @@ export const postSubmitKYC = async (req, res) => {
         updateObj.rejectReason = "";
         updateObj.reviewedAt = null;
 
-        let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
-        log1(["postSubmitKYC existingKYC----->", existingKYC]);
-
         if (updateObj.bankAccountHolderName) {
             const existingName = await KYC.findOne({ bankAccountHolderName: updateObj.bankAccountHolderName, _id: { $ne: existingKYC?._id } });
             if (existingName) {
@@ -2170,12 +2200,7 @@ export const postSubmitKYC = async (req, res) => {
 
         let kycData;
 
-        if (existingKYC) {
-            // If KYC is already APPROVED, don't allow resubmission
-            if (existingKYC.status === Constants.KYC_STATUS.APPROVED) {
-                return res.status(400).json(errorResponse("Your KYC is already approved. No changes allowed."));
-            };
-
+        if (existingKYC && existingKYC.status === Constants.KYC_STATUS.REJECTED) {
             kycData = await KYC.findOneAndUpdate(
                 { mechanicId: new ObjectId(mechanicId) },
                 updateObj,
@@ -2195,139 +2220,354 @@ export const postSubmitKYC = async (req, res) => {
     };
 };
 
-export const postKYCStatus = async (req, res) => {
+export const postEarningOverview = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        log1(["postKYCStatus mechanicId----->", mechanicId]);
+        const {
+            filterType = "this_month",
+            startDate,
+            endDate,
+        } = req.body;
 
-        const kycData = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
-        log1(["postKYCStatus kycData----->", kycData]);
+        let startPeriod, endPeriod;
+        let startPrevPeriod, endPrevPeriod;
 
-        return res.status(200).json(successResponse("KYC status retrieved successfully.", kycData || null));
-    } catch (error) {
-        log1(["Error in postKYCStatus ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
+        if (filterType === "this_month") {
+            startPeriod = moment().startOf('month');
+            endPeriod = moment().endOf('month');
 
-export const postToggleAvailability = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        log1(["postToggleAvailability mechanicId----->", mechanicId]);
+            startPrevPeriod = moment().subtract(1, 'months').startOf('month');
+            endPrevPeriod = moment().subtract(1, 'months').endOf('month');
+        } else if (filterType === "last_month") {
+            startPeriod = moment().subtract(1, 'months').startOf('month');
+            endPeriod = moment().subtract(1, 'months').endOf('month');
 
-        const mechanic = await Mechanic.findById(mechanicId);
-        if (!mechanic) {
-            return res.status(400).json(errorResponse("Mechanic not found."));
+            startPrevPeriod = moment().subtract(2, 'months').startOf('month');
+            endPrevPeriod = moment().subtract(2, 'months').endOf('month');
+        } else if (filterType === "custom") {
+            if (!startDate || !endDate) {
+                return res.status(400).json(errorResponse("startDate and endDate are required for custom filter type."));
+            };
+
+            startPeriod = moment(startDate).startOf('day');
+            endPeriod = moment(endDate).endOf('day');
+
+            if (!startPeriod.isValid() || !endPeriod.isValid()) {
+                return res.status(400).json(errorResponse("Invalid startDate or endDate format."));
+            };
+
+            const durationDays = endPeriod.diff(startPeriod, 'days') + 1;
+
+            startPrevPeriod = moment(startPeriod).subtract(durationDays, 'days').startOf('day');
+            endPrevPeriod = moment(startPeriod).subtract(1, 'days').endOf('day');
+        } else {
+            return res.status(400).json(errorResponse("Invalid filterType. Must be 'this_month', 'last_month', or 'custom'."));
         };
 
-        const newStatus = mechanic.isOnline === Constants.ONLINE_STATUS.TRUE
-            ? Constants.ONLINE_STATUS.FALSE
-            : Constants.ONLINE_STATUS.TRUE;
+        // 1. Earnings Overview calculations
+        const [currentPeriodEarningsStats, prevPeriodEarningsStats] = await Promise.all([
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: startPeriod.toDate(), $lte: endPeriod.toDate() }
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: {
+                            $sum: "$totalAmount",
+                        },
+                    },
+                },
+            ]),
 
-        const updateMechanic = await Mechanic.findByIdAndUpdate(
-            mechanicId,
-            { isOnline: newStatus },
-            { new: true },
-        );
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: {
+                            $gte: startPrevPeriod.toDate(),
+                            $lte: endPrevPeriod.toDate(),
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: {
+                            $sum: "$totalAmount",
+                        },
+                    },
+                },
+            ]),
+        ]);
 
-        return res.status(200).json(successResponse("Availability updated successfully.", {
-            isOnline: updateMechanic.isOnline,
+        const currentEarnings = currentPeriodEarningsStats[0]?.total || 0;
+        const prevEarnings = prevPeriodEarningsStats[0]?.total || 0;
+
+        const diff = currentEarnings - prevEarnings;
+        const pctChange = prevEarnings > 0 ? (diff / prevEarnings) * 100 : (currentEarnings > 0 ? 100 : 0);
+        const percentageChange = parseFloat(Math.abs(pctChange).toFixed(1));
+        const trend = pctChange >= 0 ? "up" : "down";
+
+        // 2. Weekly earnings breakout for graph (WK1 - WK5)
+        const durationDays = endPeriod.diff(startPeriod, 'days') + 1;
+        const weeks = [];
+        if (durationDays >= 28 && durationDays <= 31) {
+            const startOfMonth = moment(startPeriod).startOf('month');
+            weeks.push({ name: "WK1", start: moment(startOfMonth).date(1).startOf('day'), end: moment(startOfMonth).date(7).endOf('day') });
+            weeks.push({ name: "WK2", start: moment(startOfMonth).date(8).startOf('day'), end: moment(startOfMonth).date(14).endOf('day') });
+            weeks.push({ name: "WK3", start: moment(startOfMonth).date(15).startOf('day'), end: moment(startOfMonth).date(21).endOf('day') });
+            weeks.push({ name: "WK4", start: moment(startOfMonth).date(22).startOf('day'), end: moment(startOfMonth).date(28).endOf('day') });
+            weeks.push({ name: "WK5", start: moment(startOfMonth).date(29).startOf('day'), end: moment(startOfMonth).endOf('month') });
+        } else {
+            const interval = Math.max(1, Math.floor(durationDays / 5));
+            for (let i = 0; i < 5; i++) {
+                const wStart = moment(startPeriod).add(i * interval, 'days').startOf('day');
+                let wEnd;
+
+                if (i === 4) {
+                    wEnd = moment(endPeriod).endOf('day');
+                } else {
+                    wEnd = moment(wStart).add(interval - 1, 'days').endOf('day');
+                };
+
+                weeks.push({
+                    name: `WK${i + 1}`,
+                    start: wStart,
+                    end: wEnd,
+                });
+            };
+        };
+
+        const weeklyEarningsBreakdown = await Promise.all(weeks.map(async (w) => {
+            const stats = await Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: w.start.toDate(), $lte: w.end.toDate() }
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: {
+                            $sum: "$totalAmount",
+                        },
+                    },
+                },
+            ]);
+
+            return {
+                label: w.name,
+                amount: stats[0]?.total || 0,
+                dateRange: `${w.start.format("MMM D")} - ${w.end.format("MMM D")}`
+            };
         }));
-    } catch (error) {
-        log1(["Error in postToggleAvailability ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
 
-export const postUpdateWorkingHours = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const param = req.body;
-        log1(["postUpdateWorkingHours mechanicId----->", mechanicId]);
-        log1(["postUpdateWorkingHours param----->", param]);
+        // 3. Recent Day-wise Earnings (top 5)
+        const [recentEarningsGrouped, recentTransactionList] = await Promise.all([
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                    },
+                },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+                        },
+                        totalEarning: { $sum: "$totalAmount" },
+                    },
+                },
+                { $sort: { _id: -1 } },
+                { $limit: 5 },
+            ]),
 
-        const { workingHours } = param;
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: startPeriod.toDate(), $lte: endPeriod.toDate() }
+                    },
+                },
+                { $sort: { createdAt: -1 } },
+                { $limit: 5 },
+            ]),
+        ]);
 
-        if (!workingHours || typeof workingHours !== "object") {
-            return res.status(400).json(errorResponse("Please provide valid working hours."));
-        };
-
-        const updateMechanic = await Mechanic.findByIdAndUpdate(
-            mechanicId,
-            { workingHours: workingHours },
-            { new: true },
-        );
-
-        if (!updateMechanic) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        return res.status(200).json(successResponse("Working hours updated successfully.", {
-            workingHours: updateMechanic.workingHours,
+        const recentDayWiseEarnings = recentEarningsGrouped.map(item => ({
+            rawDate: item._id,
+            date: moment(item._id, "YYYY-MM-DD").format("MMMM D, YYYY"),
+            totalEarning: item.totalEarning,
         }));
-    } catch (error) {
-        log1(["Error in postUpdateWorkingHours ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
 
-export const postAvailabilityStatus = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        log1(["postAvailabilityStatus mechanicId----->", mechanicId]);
-
-        const mechanic = await Mechanic.findById(mechanicId).select("isOnline workingHours").lean();
-        if (!mechanic) {
-            return res.status(400).json(errorResponse("Mechanic not found."));
+        const response = {
+            earningsOverview: {
+                totalEarnings: currentEarnings,
+                percentageChange,
+                trend,
+                weeklyEarnings: weeklyEarningsBreakdown,
+            },
+            recentDayWiseEarnings,
+            recentTransactionList,
         };
 
-        return res.status(200).json(successResponse("Availability status retrieved successfully.", {
-            isOnline: mechanic.isOnline,
-            workingHours: mechanic.workingHours || {},
-        }));
+        return res.status(200).json(successResponse("Earning overview fetched successfully.", response));
     } catch (error) {
-        log1(["Error in postAvailabilityStatus ----->", error]);
+        log1(["Error in postEarningOverview ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
 
-export const postEarningHistory = async (req, res) => {
+export const postEarningList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            startDate,
+            endDate,
         } = req.body;
 
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const filter = { mechanicId: new ObjectId(mechanicId) };
+        const match = {
+            mechanicId: new ObjectId(mechanicId)
+        };
 
-        const [totalCount, items] = await Promise.all([
-            Earning.countDocuments(filter),
+        if (startDate && endDate) {
+            const start = moment(startDate).startOf('day').toDate();
+            const end = moment(endDate).endOf('day').toDate();
+            match.createdAt = { $gte: start, $lte: end };
+        };
 
-            Earning.aggregate([
-                {
-                    $match: filter,
+        const pipeline = [
+            {
+                $match: match,
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+                    },
+                    totalEarning: { $sum: "$totalAmount" },
+                    totalJobs: { $sum: 1 },
                 },
-                { $sort: { createdAt: -1 } },
-                { $skip: skip },
-                { $limit: limit },
-            ]),
-        ]);
+            },
+            {
+                $sort: { _id: -1 },
+            },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip },
+                        { $limit: limit },
+                    ],
+                    totalRecords: [
+                        { $count: "count" },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await Transaction.aggregate(pipeline).allowDiskUse(true);
+
+        const rawItems = result.items || [];
+        const items = rawItems.map(item => ({
+            rawDate: item._id,
+            date: moment(item._id, "YYYY-MM-DD").format("MMMM D, YYYY"),
+            totalEarning: item.totalEarning,
+            totalJobs: item.totalJobs,
+        }));
+
+        const totalRecords = result.totalRecords[0]?.count ?? 0;
 
         const response = {
             page,
             limit,
-            totalRecords: totalCount,
+            totalRecords,
             items,
         };
 
-        return res.status(200).json(successResponse("Earning history fetched successfully.", response));
+        return res.status(200).json(successResponse("Daily earning list fetched successfully.", response));
     } catch (error) {
-        log1(["Error in postEarningHistory ----->", error]);
+        log1(["Error in postEarningList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postEarningDetails = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { transactionId } = req.body;
+
+        if (!transactionId || !ObjectId.isValid(transactionId)) {
+            return res.status(400).json(errorResponse("Invalid transaction id."));
+        };
+
+        const match = {
+            _id: new ObjectId(transactionId),
+            mechanicId: new ObjectId(mechanicId),
+        };
+
+        const pipeline = [
+            {
+                $match: match,
+            },
+            {
+                $sort: { createdAt: -1, },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    amount: "$totalAmount",
+                    serviceName: "$serviceDetails.fullName",
+                    time: "$bookingDetails.time",
+                    location: "$bookingDetails.address",
+                    status: 1,
+                },
+            },
+        ];
+
+        const [items] = await Transaction.aggregate(pipeline);
+
+        return res.status(200).json(successResponse("Earning details fetched successfully.", items));
+    } catch (error) {
+        log1(["Error in postEarningDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -2382,163 +2622,6 @@ export const postPerformanceMetrics = async (req, res) => {
         }));
     } catch (error) {
         log1(["Error in postPerformanceMetrics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postDashboard = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const [todayJobs, pendingRequests, todayEarnings, mechanic] = await Promise.all([
-            Booking.countDocuments({
-                mechanicId: new ObjectId(mechanicId),
-                date: { $gte: today, $lt: tomorrow },
-                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED] },
-            }),
-
-            Booking.countDocuments({
-                mechanicId: new ObjectId(mechanicId),
-                status: Constants.BOOKING_STATUS.PENDING,
-            }),
-
-            Transaction.aggregate([
-                {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
-                        createdAt: { $gte: today, $lt: tomorrow },
-                    },
-                },
-                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-            ]),
-
-            Mechanic.findById(mechanicId).select("earningBalance isOnline serviceRadius"),
-        ]);
-
-        return res.status(200).json(successResponse("Dashboard data fetched successfully.", {
-            todayJobs,
-            pendingRequests,
-            todayEarnings: todayEarnings[0]?.total || 0,
-            earningBalance: mechanic?.earningBalance || 0,
-            isOnline: mechanic?.isOnline,
-            serviceRadius: mechanic?.serviceRadius || 10,
-        }));
-    } catch (error) {
-        log1(["Error in postDashboard ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postIncomingRequests = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { currentPage = Constants.DEFAULT_PAGE, itemPerPage = Constants.DEFAULT_LIMIT } = req.body;
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const match = { mechanicId: new ObjectId(mechanicId), status: Constants.BOOKING_STATUS.PENDING };
-        const pipeline = [
-            { $match: match },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    items: [
-                        { $skip: skip }, { $limit: limit },
-                        { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
-                        { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
-                        { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
-                        { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
-                        { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
-                    ],
-                    totalRecords: [{ $count: "count" }],
-                }
-            },
-        ];
-
-        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
-        return res.status(200).json(successResponse("Incoming requests fetched successfully.", {
-            items: result.items,
-            page, limit,
-            totalRecords: result.totalRecords[0]?.count ?? 0,
-        }));
-    } catch (error) {
-        log1(["Error in postIncomingRequests ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateServiceRadius = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { serviceRadius } = req.body;
-        if (!serviceRadius || serviceRadius <= 0) {
-            return res.status(400).json(errorResponse("Invalid service radius."));
-        };
-        await Mechanic.findByIdAndUpdate(mechanicId, { serviceRadius: parseFloat(serviceRadius) });
-        return res.status(200).json(successResponse("Service radius updated successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateServiceRadius ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateHolidays = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { holidays } = req.body;
-        if (!Array.isArray(holidays)) {
-            return res.status(400).json(errorResponse("Holidays must be an array of dates."));
-        };
-        await Mechanic.findByIdAndUpdate(mechanicId, { holidays: holidays.map(h => new Date(h)) });
-        return res.status(200).json(successResponse("Holidays updated successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateHolidays ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postBookingNavigationData = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { bookingId } = req.body;
-        if (!bookingId || !ObjectId.isValid(bookingId)) {
-            return res.status(400).json(errorResponse("Invalid booking id."));
-        };
-        const booking = await Booking.findOne({ _id: new ObjectId(bookingId), mechanicId: new ObjectId(mechanicId) })
-            .select("latitude longitude address ownerId")
-            .populate("ownerId", "fullName phoneNumber latitude longitude address");
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found."));
-        };
-        return res.status(200).json(successResponse("Navigation data fetched successfully.", booking));
-    } catch (error) {
-        log1(["Error in postBookingNavigationData ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postUpdateLocation = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { latitude, longitude } = req.body;
-        if (!latitude || !longitude) {
-            return res.status(400).json(errorResponse("Latitude and longitude are required."));
-        };
-        await Mechanic.findByIdAndUpdate(mechanicId, {
-            latitude: latitude,
-            longitude: longitude,
-            location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
-        });
-        return res.status(200).json(successResponse("Location updated successfully."));
-    } catch (error) {
-        log1(["Error in postUpdateLocation ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

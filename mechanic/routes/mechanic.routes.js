@@ -17,13 +17,12 @@ import {
     postSendEmailOTP,
     postVerifyEmail,
     postLogout,
-    getHomeDetails,
+    postHomeDetails,
     postAddService,
     postServiceList,
     postBookingList,
     postBookingDetails,
     postBookingUpdateStatus,
-    postVerifyRazorpayPayment,
     postNotificationList,
     postTransactionList,
     postUpdateNotification,
@@ -31,19 +30,12 @@ import {
     postChatMessagesList,
     postSendMessageToChat,
     postSubmitKYC,
-    postKYCStatus,
-    postToggleAvailability,
-    postUpdateWorkingHours,
-    postAvailabilityStatus,
-    postEarningHistory,
     postPerformanceMetrics,
     postReviewsReceived,
-    postDashboard,
-    postIncomingRequests,
-    postUpdateServiceRadius,
-    postUpdateHolidays,
     postUpdateLocation,
-    postBookingNavigationData,
+    postEarningOverview,
+    postEarningList,
+    postEarningDetails,
 } from "../controllers/mechanic.controller.js";
 
 const router = express.Router();
@@ -63,6 +55,7 @@ router.get("/profile-details", authMiddleware, getProfileDetails);
 router.post("/update-profile", authMiddleware, postUpdateMechanicProfile);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
+router.post("/update-location", authMiddleware, postUpdateLocation);
 
 // Email Verify
 router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
@@ -71,7 +64,7 @@ router.post("/verify-email", authMiddleware, postVerifyEmail);
 router.post("/logout", authMiddleware, postLogout);
 
 // Home API
-router.post("/home-details", authMiddleware, getHomeDetails);
+router.post("/home-details", authMiddleware, postHomeDetails);
 
 // Service API
 router.post("/add-service", authMiddleware, postAddService);
@@ -88,7 +81,6 @@ router.post("/notification-update", authMiddleware, postUpdateNotification);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);
-router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
 
 // Chat Routes
 router.post("/chat-list", authMiddleware, postChatList);
@@ -97,30 +89,14 @@ router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
 
 // KYC API
 router.post("/submit-kyc", authMiddleware, postSubmitKYC);
-router.post("/kyc-status", authMiddleware, postKYCStatus);
-
-// Availability API
-router.post("/toggle-availability", authMiddleware, postToggleAvailability);
-router.post("/update-working-hours", authMiddleware, postUpdateWorkingHours);
-router.post("/availability-status", authMiddleware, postAvailabilityStatus);
 
 // Earnings API
-router.post("/earning-history", authMiddleware, postEarningHistory);
+router.post("/earning-overview", authMiddleware, postEarningOverview);
+router.post("/earning-list", authMiddleware, postEarningList);
+router.post("/earning-details", authMiddleware, postEarningDetails);
 
 // Performance API
 router.post("/performance-metrics", authMiddleware, postPerformanceMetrics);
 router.post("/reviews-received", authMiddleware, postReviewsReceived);
-
-// Dashboard API
-router.post("/dashboard", authMiddleware, postDashboard);
-router.post("/incoming-requests", authMiddleware, postIncomingRequests);
-
-// Availability API (service radius, holidays, location)
-router.post("/update-service-radius", authMiddleware, postUpdateServiceRadius);
-router.post("/update-holidays", authMiddleware, postUpdateHolidays);
-router.post("/update-location", authMiddleware, postUpdateLocation);
-
-// Navigation API
-router.post("/booking-navigation-data", authMiddleware, postBookingNavigationData);
 
 export default router;

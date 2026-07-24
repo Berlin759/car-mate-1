@@ -27,10 +27,7 @@ const validate_rules = {
         add_car: {
             vehicleNumber: "required",
         },
-        addCard: {
-            cardToken: "required",
-        },
-        updateDeviceToken: {
+        update_device_token: {
             deviceToken: "required",
         },
         guest_booking: {
@@ -57,23 +54,14 @@ const validate_rules = {
             longitude: "required",
             totalAmount: "required",
         },
-        updateBooking: {
-            bookingId: "required",
-            totalHours: "required",
-        },
-        bookingDetails: {
+        update_booking: {
             bookingId: "required",
         },
-        verifyLocation: {
-            bookingId: "required",
-            latitude: "required",
-            longitude: "required",
-        },
-        cancelBooking: {
+        cancel_booking: {
             bookingId: "required",
             reason: "required",
         },
-        createRating: {
+        create_rating: {
             bookingId: "required",
             rating: "required",
         },
@@ -92,11 +80,25 @@ const validate_rules = {
         set_default_address: {
             addressId: "required",
         },
-        sendMessageToChat: {
+        send_message_to_chat: {
             mechanicId: "required",
         },
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+        },
+        verify_razorpay_payment: {
+            bookingId: "required",
+            razorpayOrderId: "required",
+            razorpayPaymentId: "required",
+            razorpaySignature: "required",
+        },
+        apply_coupon: {
+            couponCode: "required",
+            orderAmount: "required",
+        },
+        file_dispute: {
+            bookingId: "required",
+            reason: "required",
         },
     },
 };
