@@ -40,6 +40,8 @@ import Mechanic from "../models/mechanic.model.js";
 import Address from "../models/address.model.js";
 import Coupon from "../models/coupon.model.js";
 import Dispute from "../models/dispute.model.js";
+import Captcha from "../models/captcha.model.js";
+import CallLog from "../models/callLog.model.js";
 
 
 const razorpayInstance = new Razorpay({
@@ -2789,7 +2791,7 @@ export const postVerifyRazorpayPayment = async (req, res) => {
         const response = {
             bookingId: bookingId,
             razorpayPaymentId: razorpayPaymentId,
-            status: "verified",
+            status: Constants.TRANSACTION_STATUS.SUCCESS,
         };
 
         return res.status(200).json(successResponse("Payment verified successfully.", response));
@@ -3614,5 +3616,166 @@ export const postFileDispute = async (req, res) => {
     } catch (error) {
         log1(["Error in postFileDispute ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postGenerateCallCaptcha = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { mechanicId } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.generate_call_captcha");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid Mechanic Id."));
+        };
+
+        const mechanicDetails = await Mechanic.findById(mechanicId);
+        if (!mechanicDetails) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        // Generate a random 5-character uppercase alphanumeric captcha code
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let captchaCode = "";
+        for (let i = 0; i < 5; i++) {
+            captchaCode += chars.charAt(Math.floor(Math.random() * chars.length));
+        };
+
+        // Generate dynamic SVG
+        const width = 150;
+        const height = 50;
+        let noiseLines = '';
+        for (let i = 0; i < 4; i++) {
+            const x1 = Math.floor(Math.random() * width);
+            const y1 = Math.floor(Math.random() * height);
+            const x2 = Math.floor(Math.random() * width);
+            const y2 = Math.floor(Math.random() * height);
+            const strokeColor = `rgb(${Math.floor(Math.random() * 150)}, ${Math.floor(Math.random() * 150)}, ${Math.floor(Math.random() * 150)})`;
+
+            noiseLines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${strokeColor}" stroke-width="${1 + Math.random() * 2}" />`;
+        };
+
+        let charElements = '';
+        const charWidth = width / (captchaCode.length + 1);
+        for (let i = 0; i < captchaCode.length; i++) {
+            const char = captchaCode[i];
+            const x = (i + 0.5) * charWidth + (Math.random() - 0.5) * 10;
+            const y = 32 + (Math.random() - 0.5) * 8;
+            const angle = (Math.random() - 0.5) * 30;
+            const size = 22 + Math.floor(Math.random() * 8);
+            const color = `rgb(${Math.floor(Math.random() * 100)}, ${Math.floor(Math.random() * 100)}, ${Math.floor(Math.random() * 100)})`;
+
+            charElements += `<text x="${x}" y="${y}" font-family="Arial, sans-serif" font-size="${size}" font-weight="bold" fill="${color}" transform="rotate(${angle}, ${x}, ${y})">${char}</text>`;
+        };
+
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background-color: #e8eaf6; border-radius: 4px;">
+                ${noiseLines}
+                ${charElements}
+            </svg>
+        `;
+
+        const captchaSvg = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+
+        // Expires in 5 minutes
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Delete any existing active call captchas between this caller and receiver to keep DB clean
+        await Captcha.deleteMany({
+            callerId: new ObjectId(ownerId),
+            callerType: Constants.USER_ROLE.OWNER,
+            receiverId: new ObjectId(mechanicId),
+            receiverType: Constants.USER_ROLE.MECHANIC,
+        });
+
+        const newCaptcha = await Captcha.create({
+            code: captchaCode,
+            callerId: new ObjectId(ownerId),
+            callerType: Constants.USER_ROLE.OWNER,
+            receiverId: new ObjectId(mechanicId),
+            receiverType: Constants.USER_ROLE.MECHANIC,
+            expiresAt,
+        });
+
+        const response = {
+            captchaId: newCaptcha._id,
+            captchaSvg: captchaSvg
+        };
+
+        return res.status(200).json(successResponse("Captcha generated successfully.", response));
+    } catch (error) {
+        log1(["Error in postGenerateCallCaptcha ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postVerifyCallCaptcha = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { captchaId, captchaCode, mechanicId } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.verify_call_captcha");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(captchaId)) {
+            return res.status(400).json(errorResponse("Invalid Captcha Id."));
+        };
+
+        if (!ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid Mechanic Id."));
+        };
+
+        // Find and check captcha
+        const captcha = await Captcha.findOne({
+            _id: new ObjectId(captchaId),
+            callerId: new ObjectId(ownerId),
+            callerType: Constants.USER_ROLE.OWNER,
+            receiverId: new ObjectId(mechanicId),
+            receiverType: Constants.USER_ROLE.MECHANIC,
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (!captcha) {
+            return res.status(400).json(errorResponse("Invalid or expired captcha."));
+        };
+
+        // Compare case-insensitively
+        if (captcha.code.toUpperCase() !== captchaCode.trim().toUpperCase()) {
+            return res.status(400).json(errorResponse("Incorrect captcha code."));
+        };
+
+        // Successfully verified, delete the captcha so it can't be reused
+        await Captcha.deleteOne({ _id: captcha._id });
+
+        // Store Call Log
+        await CallLog.create({
+            callerId: new ObjectId(ownerId),
+            callerType: Constants.USER_ROLE.OWNER,
+            receiverId: new ObjectId(mechanicId),
+            receiverType: Constants.USER_ROLE.MECHANIC,
+            status: Constants.CALL_STATUS.VERIFIED,
+        });
+
+        // Get target's (mechanic) contact details
+        const mechanic = await Mechanic.findById(mechanicId).select("phoneNumber phoneCode");
+        if (!mechanic) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        const response = {
+            phoneCode: mechanic.phoneCode,
+            phoneNumber: mechanic.phoneNumber,
+        };
+
+        return res.status(200).json(successResponse("Captcha verified successfully.", response));
+    } catch (error) {
+        log1(["Error in postVerifyCallCaptcha ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
 };

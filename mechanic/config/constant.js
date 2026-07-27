@@ -174,6 +174,14 @@ const Constants = {
         SUCCESS: 2,
         FAILED: 3,
     },
+    USER_ROLE: {
+        OWNER: "owner",
+        MECHANIC: "mechanic",
+    },
+    CALL_STATUS: {
+        VERIFIED: 1,
+        FAILED: 2,
+    },
 };
 
 export default Constants;

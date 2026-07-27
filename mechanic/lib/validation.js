@@ -66,6 +66,14 @@ const validate_rules = {
             callId: "required",
             status: "required",
         },
+        generate_call_captcha: {
+            ownerId: "required",
+        },
+        verify_call_captcha: {
+            captchaId: "required",
+            captchaCode: "required",
+            ownerId: "required",
+        },
     },
 };
 

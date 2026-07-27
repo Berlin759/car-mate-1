@@ -177,6 +177,10 @@ const Constants = {
         OWNER: "owner",
         MECHANIC: "mechanic",
     },
+    CALL_STATUS: {
+        VERIFIED: 1,
+        FAILED: 2,
+    },
 };
 
 export default Constants;

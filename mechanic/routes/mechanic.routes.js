@@ -39,6 +39,8 @@ import {
     postEarningOverview,
     postEarningList,
     postEarningDetails,
+    postGenerateCallCaptcha,
+    postVerifyCallCaptcha,
 } from "../controllers/mechanic.controller.js";
 
 const router = express.Router();
@@ -104,5 +106,9 @@ router.post("/earning-details", authMiddleware, postEarningDetails);
 // Performance API
 router.post("/performance-metrics", authMiddleware, postPerformanceMetrics);
 router.post("/reviews-received", authMiddleware, postReviewsReceived);
+
+// Call Captcha Verification
+router.post("/generate-call-captcha", authMiddleware, postGenerateCallCaptcha);
+router.post("/verify-call-captcha", authMiddleware, postVerifyCallCaptcha);
 
 export default router;

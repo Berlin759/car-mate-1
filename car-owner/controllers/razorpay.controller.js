@@ -30,7 +30,7 @@ export const createRazorpayOrder = async (payload) => {
         if (!order) {
             log1(["createRazorpayOrder Error----->", order]);
             return errorResponse("Failed to create Razorpay order.");
-        }
+        };
 
         log1(["createRazorpayOrder order----->", order]);
 
@@ -42,8 +42,8 @@ export const createRazorpayOrder = async (payload) => {
         });
     } catch (error) {
         log1(["createRazorpayOrder Error----->", error.message]);
-        return errorResponse(error.message);
-    }
+        return errorResponse(messages.unexpectedDataError);
+    };
 };
 
 export const verifyRazorpayPayment = async (payload) => {
@@ -52,7 +52,7 @@ export const verifyRazorpayPayment = async (payload) => {
 
         if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
             return errorResponse("Missing Razorpay payment details.");
-        }
+        };
 
         const body = razorpayOrderId + "|" + razorpayPaymentId;
 
@@ -66,7 +66,7 @@ export const verifyRazorpayPayment = async (payload) => {
         if (!isAuthentic) {
             log1(["verifyRazorpayPayment Signature mismatch----->"]);
             return errorResponse("Payment verification failed. Invalid signature.");
-        }
+        };
 
         const booking = await Booking.findOne({
             _id: bookingId,
@@ -75,7 +75,7 @@ export const verifyRazorpayPayment = async (payload) => {
 
         if (!booking) {
             return errorResponse("Booking not found.");
-        }
+        };
 
         await Booking.findByIdAndUpdate(bookingId, {
             razorpayOrderId: razorpayOrderId,
@@ -91,7 +91,7 @@ export const verifyRazorpayPayment = async (payload) => {
                 status: Constants.TRANSACTION_STATUS.SUCCESS,
                 description: `Razorpay Payment - ${razorpayPaymentId}`,
             });
-        }
+        };
 
         const ownerData = await Owner.findById(ownerId);
         if (
@@ -107,16 +107,18 @@ export const verifyRazorpayPayment = async (payload) => {
                 type: Constants.NOTIFICATION_TYPE.TRANSACTION,
             };
             await sendPushNotification(ownerData.deviceToken, notificationObject);
-        }
+        };
 
-        return successResponse("Payment verified successfully.", {
+        const response = {
             razorpayPaymentId: razorpayPaymentId,
-            status: "verified",
-        });
+            status: Constants.TRANSACTION_STATUS.SUCCESS,
+        };
+
+        return successResponse("Payment verified successfully.", response);
     } catch (error) {
         log1(["verifyRazorpayPayment Error----->", error.message]);
-        return errorResponse(error.message);
-    }
+        return errorResponse(messages.unexpectedDataError);
+    };
 };
 
 export const razorpayRefund = async (payload) => {
@@ -125,7 +127,7 @@ export const razorpayRefund = async (payload) => {
 
         if (!razorpayPaymentId) {
             return errorResponse("Payment ID is required for refund.");
-        }
+        };
 
         const refundPayload = {
             payment_id: razorpayPaymentId,
@@ -133,14 +135,14 @@ export const razorpayRefund = async (payload) => {
 
         if (amount) {
             refundPayload.amount = Math.round(amount * 100);
-        }
+        };
 
         const refund = await razorpay.payments.refund(razorpayPaymentId, refundPayload);
 
         if (!refund) {
             log1(["razorpayRefund Error----->", refund]);
             return errorResponse("Failed to process refund.");
-        }
+        };
 
         log1(["razorpayRefund refund----->", refund]);
 
@@ -159,16 +161,18 @@ export const razorpayRefund = async (payload) => {
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
                 await sendPushNotification(ownerData.deviceToken, notificationObject);
-            }
-        }
+            };
+        };
 
-        return successResponse("Refund processed successfully.", {
+        const response = {
             refundId: refund.id,
             amount: refund.amount / 100,
             status: refund.status,
-        });
+        };
+
+        return successResponse("Refund processed successfully.", response);
     } catch (error) {
         log1(["razorpayRefund Error----->", error.message]);
-        return errorResponse(error.message);
-    }
+        return errorResponse(messages.unexpectedDataError);
+    };
 };

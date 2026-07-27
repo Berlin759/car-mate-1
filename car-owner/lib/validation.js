@@ -100,6 +100,14 @@ const validate_rules = {
             bookingId: "required",
             reason: "required",
         },
+        generate_call_captcha: {
+            mechanicId: "required",
+        },
+        verify_call_captcha: {
+            captchaId: "required",
+            captchaCode: "required",
+            mechanicId: "required",
+        },
     },
 };
 

@@ -49,6 +49,8 @@ import {
     postChatMessagesList,
     postSendMessageToChat,
     postFileDispute,
+    postGenerateCallCaptcha,
+    postVerifyCallCaptcha,
 } from "../controllers/owner.controller.js";
 
 const router = express.Router();
@@ -130,5 +132,9 @@ router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
 
 // Dispute
 router.post("/file-dispute", authMiddleware, postFileDispute);
+
+// Call Captcha Verification
+router.post("/generate-call-captcha", authMiddleware, postGenerateCallCaptcha);
+router.post("/verify-call-captcha", authMiddleware, postVerifyCallCaptcha);
 
 export default router;
