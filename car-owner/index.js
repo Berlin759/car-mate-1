@@ -28,11 +28,6 @@ const rootDir = path.join(__dirname, "..");
 const uploadsPath = path.join(rootDir, "uploads");
 const assetsPath = path.join(__dirname, "assets");
 const viewsPath = path.join(__dirname, "views");
-const videoPath = path.join(uploadsPath, "videos");
-const thumbnailPath = path.join(uploadsPath, "thumbnails");
-const documentPath = path.join(uploadsPath, "documents");
-const imagesPath = path.join(uploadsPath, "images");
-const audioPath = path.join(uploadsPath, "audio");
 
 export const io = new Server(httpServer, {
     cors: {
@@ -124,11 +119,14 @@ app.use("/public", express.static(assetsPath + "/public"));
 app.use("/css", express.static(assetsPath + "/css"));
 app.use("/js", express.static(assetsPath + "/js"));
 app.use("/img", express.static(assetsPath + "/image"));
-app.use("/videos", express.static(videoPath));
-app.use("/thumbnails", express.static(thumbnailPath));
-app.use("/documents", express.static(documentPath));
-app.use("/images", express.static(imagesPath));
-app.use("/audio", express.static(audioPath));
+
+// Upload Path
+app.use("/upload_images", express.static(uploadsPath + "/upload_images"));
+app.use("/upload_videos", express.static(uploadsPath + "/upload_videos"));
+app.use("/upload_thumbnails", express.static(uploadsPath + "/upload_thumbnails"));
+app.use("/upload_documents", express.static(uploadsPath + "/upload_documents"));
+app.use("/upload_audio", express.static(uploadsPath + "/upload_audio"));
+app.use("/upload_invoice", express.static(uploadsPath + "/upload_invoice"));
 
 app.set("view engine", "ejs");
 app.set("views", viewsPath);

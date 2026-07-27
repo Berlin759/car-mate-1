@@ -71,6 +71,7 @@ app.use("/upload_videos", express.static(uploadsPath + "/upload_videos"));
 app.use("/upload_thumbnails", express.static(uploadsPath + "/upload_thumbnails"));
 app.use("/upload_documents", express.static(uploadsPath + "/upload_documents"));
 app.use("/upload_audio", express.static(uploadsPath + "/upload_audio"));
+app.use("/upload_invoice", express.static(uploadsPath + "/upload_invoice"));
 
 app.set("view engine", "ejs");
 app.set("views", viewsPath);

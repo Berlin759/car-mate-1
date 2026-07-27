@@ -19,6 +19,7 @@ import {
     getTimeFormatFromMilliseconds,
 } from "../lib/general.js";
 import { sendMail } from "../utils/mailSend.helper.js";
+import { generateInvoicePDF } from "../utils/pdf.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
 
 import { io } from "../index.js";
@@ -350,17 +351,23 @@ export const postUpdatePreferences = async (req, res) => {
 export const postUpdateLocation = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const { latitude, longitude } = req.body;
+        const { latitude, longitude, address } = req.body;
 
         if (!latitude || !longitude) {
             return res.status(400).json(errorResponse("Latitude and longitude are required."));
         };
 
-        await Mechanic.findByIdAndUpdate(mechanicId, {
+        const updatePayload = {
             latitude: latitude,
             longitude: longitude,
             location: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
-        });
+        };
+
+        if (address !== undefined && address !== null) {
+            updatePayload.address = address;
+        };
+
+        await Mechanic.findByIdAndUpdate(mechanicId, updatePayload);
 
         return res.status(200).json(successResponse("Location updated successfully."));
     } catch (error) {
@@ -514,46 +521,14 @@ export const postHomeDetails = async (req, res) => {
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails mechanicId----->", mechanicId]);
 
-        // let mechanicData = await Mechanic.findById(mechanicId);
-        // log1(["postHomeDetails mechanicData----->", mechanicData]);
-        // let updatePayload = {};
-
-        // const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
-        // simpleFields.forEach((field) => {
-        //     if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
-        //         updatePayload[field] = param[field];
-        //     };
-        // });
-
-        // if (
-        //     param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&
-        //     param["longitude"] !== undefined && param["longitude"] !== null && param["longitude"] !== ""
-        // ) {
-        //     updatePayload["location"] = {
-        //         type: "Point",
-        //         coordinates: [
-        //             param["longitude"],
-        //             param["latitude"]
-        //         ]
-        //     };
-        // };
-
-        // log1(["postHomeDetails updatePayload------>", updatePayload]);
-
-        // if (Object.keys(updatePayload).length > 0) {
-        //     let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updatePayload, { new: true });
-        //     if (!updateMechanic) {
-        //         return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        //     };
-        // };
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const bookingPipeline = [
+        // Pipelines for bookings
+        const newJobRequestsPipeline = [
             {
                 $match: {
                     mechanicId: new ObjectId(mechanicId),
@@ -565,35 +540,86 @@ export const postHomeDetails = async (req, res) => {
                     createdAt: -1,
                 },
             },
-            {
-                $facet: {
-                    items: [
-                        { $limit: 5 },
-                        { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
-                        { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
-                        { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
-                        { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
-                        { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
-                    ],
-                    totalRecords: [{ $count: "count" }],
-                }
-            },
+            { $limit: 5 },
+            { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
+            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
+            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
+            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
         ];
 
-        const [todayJobs, totalPendingRequests, todayEarnings, mechanic, upComingBooking] = await Promise.all([
+        const upcomingBookingsPipeline = [
+            {
+                $match: {
+                    mechanicId: new ObjectId(mechanicId),
+                    status: {
+                        $in: [
+                            Constants.BOOKING_STATUS.ACCEPTED,
+                            Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                            Constants.BOOKING_STATUS.ARRIVED,
+                            Constants.BOOKING_STATUS.SERVICE_STARTED,
+                        ],
+                    },
+                },
+            },
+            {
+                $sort: {
+                    date: 1,
+                    time: 1,
+                },
+            },
+            { $limit: 5 },
+            { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
+            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
+            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
+            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
+        ];
+
+        const [
+            todayJobsCount,
+            todayCompletedJobsCount,
+            totalPendingRequestsCount,
+            todayTransactionsSum,
+            mechanicProfile,
+            newJobRequests,
+            upcomingBookings,
+            ratingStats,
+            unreadNotificationsCount,
+            pendingPayoutsSum,
+            allTimeTotalEarningsSum
+        ] = await Promise.all([
+            // Today's total scheduled jobs
             Booking.countDocuments({
                 mechanicId: new ObjectId(mechanicId),
                 date: { $gte: today, $lt: tomorrow },
-                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED] },
+                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED, 11] }, // 11 represents REJECTED status
             }),
 
+            // Today's completed jobs
+            Booking.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                date: { $gte: today, $lt: tomorrow },
+                status: {
+                    $in: [
+                        Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                        Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+                        Constants.BOOKING_STATUS.CLOSED
+                    ]
+                },
+            }),
+
+            // Total pending requests count
             Booking.countDocuments({
                 mechanicId: new ObjectId(mechanicId),
                 status: Constants.BOOKING_STATUS.PENDING,
             }),
 
+            // Today's earnings sum
             Transaction.aggregate([
                 {
                     $match: {
@@ -604,23 +630,121 @@ export const postHomeDetails = async (req, res) => {
                 { $group: { _id: null, total: { $sum: "$totalAmount" } } },
             ]),
 
-            Mechanic.findById(mechanicId).select("earningBalance isOnline"),
+            // Mechanic profile details
+            Mechanic.findById(mechanicId).select("fullName email phoneNumber phoneCode profileImage address latitude longitude earningBalance isOnline consultantFee"),
 
-            Booking.aggregate(bookingPipeline).allowDiskUse(true),
+            // Lists
+            Booking.aggregate(newJobRequestsPipeline).allowDiskUse(true),
+            Booking.aggregate(upcomingBookingsPipeline).allowDiskUse(true),
+
+            // Average rating
+            Rating.aggregate([
+                { $match: { mechanicId: new ObjectId(mechanicId) } },
+                { $group: { _id: null, avgRating: { $avg: "$rating" } } }
+            ]),
+
+            // Unread notifications count
+            Notification.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                isRead: false
+            }),
+
+            // Pending payouts sum (from Earning model)
+            Earning.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        status: Constants.EARNING_STATUS.PENDING
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+
+            // All time total earnings sum
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        status: Constants.TRANSACTION_STATUS.SUCCESS
+                    },
+                },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+            ])
         ]);
 
+        const avgRating = ratingStats[0]?.avgRating ? parseFloat(ratingStats[0].avgRating.toFixed(1)) : 0;
+        const todayEarnings = todayTransactionsSum[0]?.total || 0;
+        const pendingPayouts = pendingPayoutsSum[0]?.total || 0;
+        const totalEarnings = allTimeTotalEarningsSum[0]?.total || 0;
+
         const response = {
-            todayJobs,
-            totalPendingRequests,
-            todayEarnings: todayEarnings[0]?.total || 0,
-            earningBalance: mechanic?.earningBalance || 0,
-            isOnline: mechanic?.isOnline,
-            upComingBookingList: upComingBooking,
+            todayJobs: todayJobsCount,
+            totalCompletedJobs: todayCompletedJobsCount,
+            totalPendingRequests: totalPendingRequestsCount,
+            todayEarnings,
+            totalEarnings,
+            pendingPayouts,
+            rating: avgRating,
+            unreadNotificationsCount,
+            mechanic: mechanicProfile,
+            newJobRequests,
+            upcomingBookings,
         };
 
         return res.status(200).json(successResponse("Home details fetched successfully.", response));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAllServicesList = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const mechanic = await Mechanic.findById(mechanicId).select("serviceIds consultantFee").lean();
+        if (!mechanic) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        const parentServices = await Service.find({ parentId: null, status: Constants.SERVICE_STATUS.ACTIVE }).lean();
+        const subServices = await Service.find({ parentId: { $ne: null }, status: Constants.SERVICE_STATUS.ACTIVE }).lean();
+
+        const serviceMap = subServices.map(sub => {
+            const mechanicEntry = (sub.mechanicIds || []).find(
+                m => m.mechanicId?.toString() === mechanicId.toString()
+            );
+            const isSelected = (mechanic.serviceIds || []).some(
+                id => id.toString() === sub._id.toString()
+            );
+            return {
+                subServiceId: sub._id,
+                parentId: sub.parentId,
+                fullName: sub.fullName,
+                description: sub.description,
+                price: mechanicEntry?.price || 0,
+                customDescription: mechanicEntry?.description || "",
+                isSelected,
+            };
+        });
+
+        const items = parentServices.map(parent => {
+            const children = serviceMap.filter(sub => sub.parentId?.toString() === parent._id.toString());
+            const isSelected = children.some(c => c.isSelected);
+            return {
+                categoryId: parent._id,
+                categoryName: parent.fullName,
+                description: parent.description,
+                isSelected,
+                subServices: children,
+            };
+        });
+
+        return res.status(200).json(successResponse("All services fetched successfully.", {
+            consultantFee: mechanic.consultantFee || 0,
+            categories: items,
+        }));
+    } catch (error) {
+        log1(["Error in postAllServicesList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -632,7 +756,7 @@ export const postAddService = async (req, res) => {
         log1(["postAddService mechanicId----->", mechanicId]);
         log1(["postAddService req.body----->", req.body]);
 
-        const { services } = req.body;
+        const { services, consultantFee } = req.body;
 
         const validate = await custom_validation(req.body, "mechanic.add_service");
         if (validate.flag !== 1) {
@@ -666,9 +790,14 @@ export const postAddService = async (req, res) => {
 
         const servicesToRemove = oldServiceIds.filter(id => !newServiceIds.includes(id));
 
+        const mechanicUpdateObj = { serviceIds: serviceIds };
+        if (consultantFee !== undefined && consultantFee !== null) {
+            mechanicUpdateObj.consultantFee = Number(consultantFee);
+        };
+
         await Mechanic.findByIdAndUpdate(
             mechanicId,
-            { serviceIds: serviceIds },
+            mechanicUpdateObj,
         );
 
         for (const service of services) {
@@ -742,12 +871,12 @@ export const postOldAddService = async (req, res) => {
     };
 };
 
-export const postServiceList = async (req, res) => {
+export const postMyServiceList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
 
-        log1(["postServiceList mechanicId----->", mechanicId]);
-        log1(["postServiceList req.body----->", req.body]);
+        log1(["postMyServiceList mechanicId----->", mechanicId]);
+        log1(["postMyServiceList req.body----->", req.body]);
 
         const {
             currentPage = Constants.DEFAULT_PAGE,
@@ -811,7 +940,7 @@ export const postServiceList = async (req, res) => {
 
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
     } catch (error) {
-        log1(["Error in postServiceList ----->", error]);
+        log1(["Error in postMyServiceList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -847,7 +976,42 @@ export const postBookingList = async (req, res) => {
         };
 
         if (status !== undefined && status !== null && status !== "") {
-            match.status = Number(status);
+            if (Array.isArray(status)) {
+                match.status = { $in: status.map(Number) };
+            } else if (typeof status === 'string' && status.includes(',')) {
+                match.status = { $in: status.split(',').map(Number) };
+            } else if (typeof status === 'string') {
+                const lowerStatus = status.toLowerCase();
+                if (lowerStatus === 'pending') {
+                    match.status = Constants.BOOKING_STATUS.PENDING;
+                } else if (lowerStatus === 'in_progress' || lowerStatus === 'inprogress') {
+                    match.status = Constants.BOOKING_STATUS.SERVICE_STARTED;
+                } else if (lowerStatus === 'upcoming') {
+                    match.status = {
+                        $in: [
+                            Constants.BOOKING_STATUS.ACCEPTED,
+                            Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                            Constants.BOOKING_STATUS.ARRIVED
+                        ]
+                    };
+                } else if (lowerStatus === 'completed') {
+                    match.status = {
+                        $in: [
+                            Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                            Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
+                            Constants.BOOKING_STATUS.CLOSED
+                        ]
+                    };
+                } else if (lowerStatus === 'cancelled') {
+                    match.status = Constants.BOOKING_STATUS.CANCELLED;
+                } else if (lowerStatus === 'rejected') {
+                    match.status = Constants.BOOKING_STATUS.REJECTED;
+                } else {
+                    match.status = Number(status);
+                }
+            } else {
+                match.status = Number(status);
+            };
         };
 
         // ---------- AGGREGATE ----------
@@ -933,6 +1097,12 @@ export const postBookingList = async (req, res) => {
                                 totalAmount: 1,
                                 status: 1,
                                 createdAt: 1,
+                                consultantFee: 1,
+                                checklist: 1,
+                                quotation: 1,
+                                basePrice: 1,
+                                discountAmount: 1,
+                                taxAmount: 1,
                                 serviceDetails: {
                                     _id: "$serviceDetails._id",
                                     fullName: "$serviceDetails.fullName",
@@ -986,7 +1156,7 @@ export const postBookingList = async (req, res) => {
                     statusMap.Pending = item.count;
                     break;
 
-                case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED:
+                case Constants.BOOKING_STATUS.ACCEPTED:
                     statusMap.Accepted = item.count;
                     break;
 
@@ -1097,15 +1267,42 @@ export const postBookingDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "ratings",
+                    localField: "_id",
+                    foreignField: "bookingId",
+                    as: "ratingDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ratingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
                     time: 1,
                     latitude: 1,
                     longitude: 1,
+                    basePrice: 1,
+                    distanceCharge: 1,
+                    peakHourFee: 1,
+                    materialCost: 1,
+                    consultantFee: 1,
+                    taxAmount: 1,
+                    discountAmount: 1,
                     totalAmount: 1,
+                    checklist: 1,
+                    quotation: 1,
                     status: 1,
                     createdAt: 1,
+                    feedback: {
+                        rating: "$ratingDetails.rating",
+                        description: "$ratingDetails.description",
+                    },
                     serviceDetails: {
                         _id: "$serviceDetails._id",
                         fullName: "$serviceDetails.fullName",
@@ -1173,13 +1370,17 @@ export const postBookingUpdateStatus = async (req, res) => {
         };
 
         let updatePayload = { status: newStatus };
+        if (param.checklist && Array.isArray(param.checklist)) {
+            updatePayload.checklist = param.checklist;
+        };
+
         let notificationTitle = "";
         let notificationDescription = "";
 
         const mechanicDetails = await Mechanic.findById(mechanicId).select("fullName");
 
         switch (newStatus) {
-            case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED: {
+            case Constants.BOOKING_STATUS.ACCEPTED: {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PENDING) {
                     return res.status(400).json(errorResponse("Booking can only be accepted from PENDING status."));
                 };
@@ -1187,7 +1388,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     mechanicId: new ObjectId(mechanicId),
                     date: new Date(bookingDetails.date),
                     time: bookingDetails.time,
-                    status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                    status: Constants.BOOKING_STATUS.ACCEPTED,
                 });
                 if (alreadyBooked) {
                     return res.status(400).json(errorResponse("You have already accepted another booking for this time."));
@@ -1195,6 +1396,17 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 notificationTitle = "Booking Accepted";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has accepted your booking.`;
+
+                break;
+            }
+
+            case Constants.BOOKING_STATUS.REJECTED: {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.PENDING) {
+                    return res.status(400).json(errorResponse("Booking can only be rejected from PENDING status."));
+                };
+
+                notificationTitle = "Booking Rejected";
+                notificationDescription = `${mechanicDetails?.fullName || "Provider"} has rejected your booking request.`;
 
                 break;
             }
@@ -1212,7 +1424,7 @@ export const postBookingUpdateStatus = async (req, res) => {
             }
 
             case Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_ACCEPTED) {
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.ACCEPTED) {
                     return res.status(400).json(errorResponse("Can only mark as en route after accepting booking."));
                 };
 
@@ -1334,12 +1546,105 @@ export const postBookingUpdateStatus = async (req, res) => {
     };
 };
 
+export const postBookingSendQuote = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { bookingId, quotation } = req.body;
+
+        const validate = await custom_validation(req.body, "mechanic.booking_send_quote");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        const booking = await Booking.findOne({ _id: new ObjectId(bookingId), mechanicId: new ObjectId(mechanicId) });
+        if (!booking) {
+            return res.status(404).json(errorResponse("Booking not found."));
+        };
+
+        if (!Array.isArray(quotation)) {
+            return res.status(400).json(errorResponse("Quotation must be an array of items."));
+        };
+
+        const formattedQuotation = quotation.map(item => ({
+            serviceName: item.serviceName,
+            price: Number(item.price) || 0,
+        }));
+
+        booking.quotation = formattedQuotation;
+
+        // Re-calculate pricing breakdown
+        const quoteSum = formattedQuotation.reduce((sum, item) => sum + item.price, 0);
+        const consultantFee = booking.consultantFee || 0;
+        const basePrice = booking.basePrice || 0;
+        const discountAmount = booking.discountAmount || 0;
+
+        const subTotal = (basePrice + consultantFee + quoteSum) - discountAmount;
+        const taxAmount = Math.round(subTotal * 0.18);
+        const totalAmount = subTotal + taxAmount;
+
+        booking.taxAmount = taxAmount;
+        booking.totalAmount = totalAmount;
+
+        await booking.save();
+
+        return res.status(200).json(successResponse("Quotation sent successfully.", booking));
+    } catch (error) {
+        log1(["Error in postBookingSendQuote ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getBookingInvoice = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        const booking = await Booking.findById(bookingId)
+            .populate("serviceId")
+            .populate("ownerId")
+            .populate("mechanicId");
+
+        if (!booking) {
+            return res.status(404).json(errorResponse("Booking not found."));
+        };
+
+        const subTotal = (booking.basePrice || 0) + (booking.consultantFee || 0) +
+            ((booking.quotation || []).reduce((sum, item) => sum + item.price, 0)) - (booking.discountAmount || 0);
+
+        const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
+
+        log1(["getBookingInvoice fileName ----->", fileName]);
+        log1(["getBookingInvoice filePath ----->", filePath]);
+        log1(["getBookingInvoice folder ----->", folder]);
+
+        if (!fileName || !folder) {
+            return res.status(500).json(errorResponse("Error generating invoice."));
+        };
+
+        const invoicePath = `/${folder}/${fileName}`;
+        log1(["getBookingInvoice invoicePath ----->", invoicePath]);
+
+        return res.status(200).json(successResponse("Invoice PDF generated successfully.", {
+            invoicePath,
+            fileName,
+            bookingId: booking._id,
+            invoiceNo: booking.invoiceNo || null,
+        }));
+    } catch (error) {
+        log1(["Error in getBookingInvoice ----->", error]);
+        return res.status(500).json(errorResponse("Error generating invoice."));
+    };
+};
+
 export const postNotificationList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            category,
         } = req.body;
 
         log1(["postNotificationList mechanicId----->", mechanicId]);
@@ -1349,8 +1654,21 @@ export const postNotificationList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
+        const match = { mechanicId: new ObjectId(mechanicId) };
+
+        if (category) {
+            const lowerCategory = category.toLowerCase();
+            if (lowerCategory === "bookings" || lowerCategory === "booking") {
+                match.type = Constants.NOTIFICATION_TYPE.BOOKING;
+            } else if (lowerCategory === "payments" || lowerCategory === "payment") {
+                match.type = Constants.NOTIFICATION_TYPE.TRANSACTION;
+            } else if (lowerCategory === "reviews" || lowerCategory === "review") {
+                match.type = Constants.NOTIFICATION_TYPE.DEFAULT;
+            }
+        };
+
         const result = await Notification.aggregate([
-            { $match: { mechanicId: new ObjectId(mechanicId) } },
+            { $match: match },
             { $sort: { createdAt: -1 } },
             {
                 $facet: {
@@ -1385,8 +1703,8 @@ export const postUpdateNotification = async (req, res) => {
         log1(["postUpdateNotification mechanicId----->", mechanicId]);
         log1(["postUpdateNotification param----->", param]);
 
-        if (Object.keys(param).length > 0) {
-            return res.status(200).json(errorResponse("Invalid payload data."));
+        if (Object.keys(param).length === 0) {
+            return res.status(400).json(errorResponse("Invalid payload data."));
         };
 
         if (param.allRead === true) {
@@ -2077,35 +2395,15 @@ export const postSendMessageToChat = async (req, res) => {
 export const postSubmitKYC = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        let { bankAccountHolderName, bankIfscCode, bankAccountNumber, bankName } = req.body;
 
         log1(["postSubmitKYC mechanicId----->", mechanicId]);
-        log1(["postSubmitKYC param----->", param]);
+        log1(["postSubmitKYC req.body----->", req.body]);
         log1(["postSubmitKYC req.files----->", req.files]);
 
-        const validate = await custom_validation(param, "mechanic.submit_kyc");
+        const validate = await custom_validation(req.body, "mechanic.submit_kyc");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
-        };
-
-        if (!req.files?.["aadhaarFront"]) {
-            return res.status(400).json(errorResponse("Front aadhar card image is required."));
-        };
-
-        if (!req.files?.["aadhaarBack"]) {
-            return res.status(400).json(errorResponse("Back aadhar card image is required."));
-        };
-
-        if (!req.files?.["panCard"]) {
-            return res.status(400).json(errorResponse("Pan card image is required."));
-        };
-
-        if (!req.files?.["drivingLicense"]) {
-            return res.status(400).json(errorResponse("Driving license image is required."));
-        };
-
-        if (!req.files?.["selfie"]) {
-            return res.status(400).json(errorResponse("Your Selfie image is required."));
         };
 
         let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
@@ -2122,36 +2420,69 @@ export const postSubmitKYC = async (req, res) => {
             };
         };
 
-        if (param.bankAccountHolderName && param.bankAccountHolderName.trim() !== "") {
-            const trimmedName = param.bankAccountHolderName.trim();
-            const nameRegex = /^[a-zA-Z\s]+$/;
-            if (!nameRegex.test(trimmedName)) {
-                return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
-            };
-            if (trimmedName.length < 2 || trimmedName.length > 100) {
-                return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
-            };
+        if (!req.files?.["aadhaarFront"] && (!existingKYC || !existingKYC.aadhaarFront)) {
+            return res.status(400).json(errorResponse("Front aadhar card image is required."));
         };
 
-        if (param.bankIfscCode && param.bankIfscCode.trim() !== "") {
-            const trimmedIfsc = param.bankIfscCode.trim().toUpperCase();
-            const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
-            if (!ifscRegex.test(trimmedIfsc)) {
-                return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
-            };
-            param.bankIfscCode = trimmedIfsc;
+        if (!req.files?.["aadhaarBack"] && (!existingKYC || !existingKYC.aadhaarBack)) {
+            return res.status(400).json(errorResponse("Back aadhar card image is required."));
         };
 
-        if (param.bankAccountNumber && param.bankAccountNumber.trim() !== "") {
-            const trimmedAccNo = param.bankAccountNumber.trim();
-            const accNoRegex = /^[0-9]+$/;
-            if (!accNoRegex.test(trimmedAccNo)) {
-                return res.status(400).json(errorResponse("Account Number must contain only digits."));
-            };
-            if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
-                return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
-            };
-            param.bankAccountNumber = trimmedAccNo;
+        if (!req.files?.["panCard"] && (!existingKYC || !existingKYC.panCard)) {
+            return res.status(400).json(errorResponse("Pan card image is required."));
+        };
+
+        // Note: drivingLicense is optional based on the Figma "Professional Certificate/ license (Optional)" label
+        // So we do not check its presence in req.files if it is missing.
+
+        if (!req.files?.["selfie"] && (!existingKYC || !existingKYC.selfie)) {
+            return res.status(400).json(errorResponse("Your Selfie image is required."));
+        };
+
+        // Bank Account Holder Name
+        const trimmedName = bankAccountHolderName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedName.length < 2 || trimmedName.length > 100) {
+            return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
+        };
+
+        // Bank IfSC Code
+        const trimmedIfsc = bankIfscCode.trim().toUpperCase();
+        const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+
+        if (!ifscRegex.test(trimmedIfsc)) {
+            return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
+        };
+        bankIfscCode = trimmedIfsc;
+
+        // Bank Account Number
+        const trimmedAccNo = bankAccountNumber.trim();
+        const accNoRegex = /^[0-9]+$/;
+
+        if (!accNoRegex.test(trimmedAccNo)) {
+            return res.status(400).json(errorResponse("Account Number must contain only digits."));
+        };
+
+        if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
+            return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
+        };
+        bankAccountNumber = trimmedAccNo;
+
+        // Bank Name
+        const trimmedBankName = bankName.trim();
+        const nameByBankRegex = /^[a-zA-Z\s]+$/;
+
+        if (!nameByBankRegex.test(trimmedBankName)) {
+            return res.status(400).json(errorResponse("Bank Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedBankName.length < 2 || trimmedBankName.length > 100) {
+            return res.status(400).json(errorResponse("Bank Name must be between 2 and 100 characters."));
         };
 
         let updateObj = {};
@@ -2168,8 +2499,8 @@ export const postSubmitKYC = async (req, res) => {
 
         const bankFields = ["bankAccountNumber", "bankIfscCode", "bankAccountHolderName", "bankName"];
         bankFields.forEach(field => {
-            if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
-                updateObj[field] = field === "bankAccountHolderName" ? param[field].trim() : param[field];
+            if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== "") {
+                updateObj[field] = field === "bankAccountHolderName" ? req.body[field].trim() : req.body[field];
             };
         });
 
@@ -2265,7 +2596,12 @@ export const postEarningOverview = async (req, res) => {
         };
 
         // 1. Earnings Overview calculations
-        const [currentPeriodEarningsStats, prevPeriodEarningsStats] = await Promise.all([
+        const [
+            currentPeriodEarningsStats,
+            prevPeriodEarningsStats,
+            allTimeEarningsStats,
+            pendingPayoutsStats
+        ] = await Promise.all([
             Transaction.aggregate([
                 {
                     $match: {
@@ -2302,10 +2638,46 @@ export const postEarningOverview = async (req, res) => {
                     },
                 },
             ]),
+
+            Transaction.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        status: Constants.TRANSACTION_STATUS.SUCCESS
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: {
+                            $sum: "$totalAmount",
+                        },
+                    },
+                },
+            ]),
+
+            Earning.aggregate([
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        status: Constants.EARNING_STATUS.PENDING
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: {
+                            $sum: "$amount",
+                        },
+                    },
+                },
+            ])
         ]);
 
         const currentEarnings = currentPeriodEarningsStats[0]?.total || 0;
         const prevEarnings = prevPeriodEarningsStats[0]?.total || 0;
+        const allTimeTotalEarnings = allTimeEarningsStats[0]?.total || 0;
+        const pendingPayouts = pendingPayoutsStats[0]?.total || 0;
 
         const diff = currentEarnings - prevEarnings;
         const pctChange = prevEarnings > 0 ? (diff / prevEarnings) * 100 : (currentEarnings > 0 ? 100 : 0);
@@ -2407,7 +2779,9 @@ export const postEarningOverview = async (req, res) => {
 
         const response = {
             earningsOverview: {
-                totalEarnings: currentEarnings,
+                totalEarnings: allTimeTotalEarnings,
+                periodEarnings: currentEarnings,
+                pendingPayouts: pendingPayouts,
                 percentageChange,
                 trend,
                 weeklyEarnings: weeklyEarningsBreakdown,
@@ -2431,6 +2805,8 @@ export const postEarningList = async (req, res) => {
             itemPerPage = Constants.DEFAULT_LIMIT,
             startDate,
             endDate,
+            serviceId,
+            filterType,
         } = req.body;
 
         const page = Math.max(1, Number(currentPage));
@@ -2441,9 +2817,40 @@ export const postEarningList = async (req, res) => {
             mechanicId: new ObjectId(mechanicId)
         };
 
-        if (startDate && endDate) {
-            const start = moment(startDate).startOf('day').toDate();
-            const end = moment(endDate).endOf('day').toDate();
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+            match.serviceId = new ObjectId(serviceId);
+        };
+
+        let start, end;
+        if (filterType) {
+            const lowerFilter = filterType.toLowerCase();
+            if (lowerFilter === "last_1_month" || lowerFilter === "last_1_months") {
+                start = moment().subtract(1, "months").startOf("day").toDate();
+                end = moment().endOf("day").toDate();
+            } else if (lowerFilter === "last_3_months") {
+                start = moment().subtract(3, "months").startOf("day").toDate();
+                end = moment().endOf("day").toDate();
+            } else if (lowerFilter === "last_6_months") {
+                start = moment().subtract(6, "months").startOf("day").toDate();
+                end = moment().endOf("day").toDate();
+            } else if (lowerFilter === "last_1_year") {
+                start = moment().subtract(1, "years").startOf("day").toDate();
+                end = moment().endOf("day").toDate();
+            } else if (lowerFilter === "custom" || lowerFilter === "choose_date") {
+                if (startDate && endDate) {
+                    start = moment(startDate).startOf("day").toDate();
+                    end = moment(endDate).endOf("day").toDate();
+                };
+            };
+        } else if (startDate && endDate) {
+            start = moment(startDate).startOf("day").toDate();
+            end = moment(endDate).endOf("day").toDate();
+        };
+
+        if (start && end) {
             match.createdAt = { $gte: start, $lte: end };
         };
 
@@ -2552,20 +2959,56 @@ export const postEarningDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     _id: 1,
-                    amount: "$totalAmount",
-                    serviceName: "$serviceDetails.fullName",
-                    time: "$bookingDetails.time",
-                    location: "$bookingDetails.address",
+                    invoiceId: 1,
+                    trxId: 1,
+                    totalAmount: 1,
+                    createdAt: 1,
                     status: 1,
+                    serviceName: "$serviceDetails.fullName",
+                    bookingDetails: {
+                        _id: "$bookingDetails._id",
+                        invoiceNo: "$bookingDetails.invoiceNo",
+                        date: "$bookingDetails.date",
+                        time: "$bookingDetails.time",
+                        address: "$bookingDetails.address",
+                        consultantFee: "$bookingDetails.consultantFee",
+                        discountAmount: "$bookingDetails.discountAmount",
+                        taxAmount: "$bookingDetails.taxAmount",
+                        basePrice: "$bookingDetails.basePrice",
+                    },
+                    customer: {
+                        fullName: "$ownerDetails.fullName",
+                        phoneNumber: "$ownerDetails.phoneNumber",
+                        profileImage: "$ownerDetails.profileImage",
+                    },
+                    pricingSummary: {
+                        earnings: "$totalAmount",
+                        consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
+                        netAmount: { $add: ["$totalAmount", { $ifNull: ["$bookingDetails.consultantFee", 0] }] }
+                    }
                 },
             },
         ];
 
         const [items] = await Transaction.aggregate(pipeline);
 
-        return res.status(200).json(successResponse("Earning details fetched successfully.", items));
+        return res.status(200).json(successResponse("Earning details fetched successfully.", items || null));
     } catch (error) {
         log1(["Error in postEarningDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -2579,7 +3022,7 @@ export const postPerformanceMetrics = async (req, res) => {
         const totalBookings = await Booking.countDocuments({ mechanicId: new ObjectId(mechanicId) });
         const acceptedBookings = await Booking.countDocuments({
             mechanicId: new ObjectId(mechanicId),
-            status: { $in: [Constants.BOOKING_STATUS.PROVIDER_ACCEPTED, Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE, Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
+            status: { $in: [Constants.BOOKING_STATUS.ACCEPTED, Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE, Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
         });
         const completedBookings = await Booking.countDocuments({
             mechanicId: new ObjectId(mechanicId),

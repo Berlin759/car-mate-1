@@ -1833,7 +1833,7 @@ export const postAddBooking = async (req, res) => {
                 mechanicId: mechanicDetails._id,
                 date: new Date(param.date),
                 time: param.time,
-                status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                status: Constants.BOOKING_STATUS.ACCEPTED,
             });
             log1(["postAddBooking existingBooking----->", existingBooking]);
 
@@ -1862,7 +1862,7 @@ export const postAddBooking = async (req, res) => {
                 mechanicId: { $in: mechanics.map(m => m._id) },
                 date: new Date(param.date),
                 time: param.time,
-                status: Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                status: Constants.BOOKING_STATUS.ACCEPTED,
             });
 
             const availableMechanics = mechanics.filter(
@@ -1886,7 +1886,7 @@ export const postAddBooking = async (req, res) => {
             status: {
                 $in: [
                     Constants.BOOKING_STATUS.PENDING,
-                    Constants.BOOKING_STATUS.PROVIDER_ACCEPTED
+                    Constants.BOOKING_STATUS.ACCEPTED
                 ]
             },
         });
@@ -2210,7 +2210,7 @@ export const postBookingList = async (req, res) => {
                     statusMap.Pending = item.count;
                     break;
 
-                case Constants.BOOKING_STATUS.PROVIDER_ACCEPTED:
+                case Constants.BOOKING_STATUS.ACCEPTED:
                     statusMap.Accepted = item.count;
                     break;
 
@@ -2450,7 +2450,7 @@ export const postCancelBooking = async (req, res) => {
         let cancellationFee = 0;
         let refundAmount = parseFloat(bookingDetails.finalPayAmount || bookingDetails.totalAmount);
 
-        if (bookingDetails.status >= Constants.BOOKING_STATUS.PROVIDER_ACCEPTED) {
+        if (bookingDetails.status >= Constants.BOOKING_STATUS.ACCEPTED) {
             cancellationFee = Math.round(refundAmount * 0.10);
             refundAmount = refundAmount - cancellationFee;
         };

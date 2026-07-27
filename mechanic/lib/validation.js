@@ -54,6 +54,18 @@ const validate_rules = {
             bankAccountNumber: "required",
             bankName: "required",
         },
+        booking_send_quote: {
+            bookingId: "required",
+            quotation: "required",
+        },
+        call_initiate: {
+            ownerId: "required",
+            callType: "required",
+        },
+        call_status_update: {
+            callId: "required",
+            status: "required",
+        },
     },
 };
 

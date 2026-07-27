@@ -61,7 +61,7 @@ export const getDashboardPage = async (req, res) => {
                 status: {
                     $in: [
                         Constants.BOOKING_STATUS.PENDING,
-                        Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                        Constants.BOOKING_STATUS.ACCEPTED,
                         Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
                         Constants.BOOKING_STATUS.ARRIVED,
                         Constants.BOOKING_STATUS.SERVICE_STARTED,
@@ -3815,7 +3815,7 @@ export const postDashboardKPIs = async (req, res) => {
                 status: {
                     $in: [
                         Constants.BOOKING_STATUS.PENDING,
-                        Constants.BOOKING_STATUS.PROVIDER_ACCEPTED,
+                        Constants.BOOKING_STATUS.ACCEPTED,
                         Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
                         Constants.BOOKING_STATUS.ARRIVED,
                         Constants.BOOKING_STATUS.SERVICE_STARTED,

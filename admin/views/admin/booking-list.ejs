@@ -43,8 +43,10 @@
                     <td>
                         <% if(booking?.status === 1) { %>
                             <span class="bet-status alert-pending">Pending</span>
-                        <% } else if(booking?.status === 3) { %>
+                        <% } else if(booking?.status === 2) { %>
                             <span class="bet-status alert-accept">Accepted</span>
+                        <% } else if(booking?.status === 3) { %>
+                            <span class="bet-status alert-end">Rejected</span>
                         <% } else if(booking?.status === 4) { %>
                             <span class="bet-status alert-accept">En Route</span>
                         <% } else if(booking?.status === 5) { %>
@@ -53,7 +55,7 @@
                             <span class="bet-status alert-accept">In Progress</span>
                         <% } else if(booking?.status === 7 || booking?.status === 8 || booking?.status === 9) { %>
                             <span class="bet-status alert-success">Completed</span>
-                        <% } else if(booking?.status === 2) { %>
+                        <% } else if(booking?.status === 11) { %>
                             <span class="bet-status alert-end">Cancelled</span>
                         <% } else { %>
                             <span class="bet-status alert-gray">Unknown</span>

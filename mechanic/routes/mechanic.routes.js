@@ -18,11 +18,14 @@ import {
     postVerifyEmail,
     postLogout,
     postHomeDetails,
+    postAllServicesList,
     postAddService,
-    postServiceList,
+    postMyServiceList,
     postBookingList,
     postBookingDetails,
     postBookingUpdateStatus,
+    postBookingSendQuote,
+    getBookingInvoice,
     postNotificationList,
     postTransactionList,
     postUpdateNotification,
@@ -67,13 +70,16 @@ router.post("/logout", authMiddleware, postLogout);
 router.post("/home-details", authMiddleware, postHomeDetails);
 
 // Service API
+router.post("/all-services", authMiddleware, postAllServicesList);
 router.post("/add-service", authMiddleware, postAddService);
-router.post("/service-list", authMiddleware, postServiceList);
+router.post("/my-service-list", authMiddleware, postMyServiceList);
 
 // Booking API
 router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/booking-update-status", authMiddleware, postBookingUpdateStatus);
+router.post("/booking-send-quote", authMiddleware, postBookingSendQuote);
+router.get("/booking-invoice/:bookingId", authMiddleware, getBookingInvoice);
 
 // Notification API
 router.post("/notification-list", authMiddleware, postNotificationList);

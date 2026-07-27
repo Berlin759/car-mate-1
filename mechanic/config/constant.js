@@ -121,8 +121,8 @@ const Constants = {
     },
     BOOKING_STATUS: {
         PENDING: 1,
-        CANCELLED: 2,
-        PROVIDER_ACCEPTED: 3,
+        ACCEPTED: 2,
+        REJECTED: 3,
         PROVIDER_EN_ROUTE: 4,
         ARRIVED: 5,
         SERVICE_STARTED: 6,
@@ -130,6 +130,7 @@ const Constants = {
         PAYMENT_COMPLETED: 8,
         CLOSED: 9,
         FAILED: 10,
+        CANCELLED: 11,
     },
     CHECK_IN_OUT_STATUS: {
         BOOKED: 1,

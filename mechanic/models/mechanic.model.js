@@ -99,6 +99,10 @@ const mechanicSchema = new Schema(
             type: Number,
             default: 0,
         },
+        consultantFee: {
+            type: Number,
+            default: 0,
+        },
         isOnline: {
             type: Number,
             enum: Object.values(Constants.ONLINE_STATUS),

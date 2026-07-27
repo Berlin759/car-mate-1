@@ -79,6 +79,36 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
+        consultantFee: {
+            type: Number,
+            default: 0,
+        },
+        checklist: [
+            {
+                _id: false,
+                title: {
+                    type: String,
+                    default: "",
+                },
+                isChecked: {
+                    type: Boolean,
+                    default: false,
+                },
+            },
+        ],
+        quotation: [
+            {
+                _id: false,
+                serviceName: {
+                    type: String,
+                    default: "",
+                },
+                price: {
+                    type: Number,
+                    default: 0,
+                },
+            },
+        ],
         taxAmount: {
             type: Number,
             default: 0,
