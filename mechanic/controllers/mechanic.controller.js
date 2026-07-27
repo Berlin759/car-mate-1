@@ -1008,7 +1008,7 @@ export const postBookingList = async (req, res) => {
                     match.status = Constants.BOOKING_STATUS.REJECTED;
                 } else {
                     match.status = Number(status);
-                }
+                };
             } else {
                 match.status = Number(status);
             };
