@@ -23,6 +23,7 @@ const callLogSchema = new Schema(
             default: Constants.USER_ROLE.OWNER,
         },
         status: {
+            type: String,
             enum: Object.values(Constants.CALL_STATUS),
             default: Constants.CALL_STATUS.VERIFIED,
         },
