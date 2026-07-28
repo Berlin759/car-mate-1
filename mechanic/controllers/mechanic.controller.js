@@ -522,6 +522,34 @@ export const postLogout = async (req, res) => {
     };
 };
 
+export const postLanguageList = async (req, res) => {
+    try {
+        const languages = await Language.find({ isActive: true }).sort({ createdAt: -1 }).select("_id name nativeName languageCode isActive");
+
+        return res.status(200).json(successResponse("Languages fetched successfully.", languages));
+    } catch (error) {
+        log1(["Error in postLanguageList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAppVersion = async (req, res) => {
+    try {
+        const appVersionData = await Setting.findOne({ name: "app_version" });
+
+        const response = {
+            currentAppVersion: appVersionData ? appVersionData.currentMechanicAppVersion : "",
+            latestAppVersion: appVersionData ? appVersionData.latestMechanicAppVersion : "",
+            isVersionMandatory: appVersionData ? parseInt(appVersionData.isMechanicVersionMandatory) : Constants.APP_VERSION_UPDATE.OPTIONAL,
+        };
+
+        return res.status(200).json(successResponse("App version fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postAppVersion ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postHomeDetails = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
@@ -3268,15 +3296,5 @@ export const postVerifyCallCaptcha = async (req, res) => {
     } catch (error) {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postLanguageList = async (req, res) => {
-    try {
-        const languages = await Language.find({ isActive: true }).sort({ createdAt: -1 });
-        return res.status(200).json(successResponse("Languages fetched successfully.", languages));
-    } catch (error) {
-        log1(["Error in postLanguageList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

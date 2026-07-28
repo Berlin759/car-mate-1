@@ -3388,6 +3388,15 @@ export const getSettingsPage = async (req, res) => {
         let settingData = await Setting.findOne({ name: "maintenance" });
         let maintenance = settingData ? settingData.value : "";
 
+        let appVersionData = await Setting.findOne({ name: "app_version" });
+
+        let currentOwnerAppVersion = appVersionData ? appVersionData.currentOwnerAppVersion : "";
+        let latestOwnerAppVersion = appVersionData ? appVersionData.latestOwnerAppVersion : "";
+        let currentMechanicAppVersion = appVersionData ? appVersionData.currentMechanicAppVersion : "";
+        let latestMechanicAppVersion = appVersionData ? appVersionData.latestMechanicAppVersion : "";
+        let isOwnerVersionMandatory = appVersionData ? appVersionData.isOwnerVersionMandatory : Constants.APP_VERSION_UPDATE.OPTIONAL;
+        let isMechanicVersionMandatory = appVersionData ? appVersionData.isMechanicVersionMandatory : Constants.APP_VERSION_UPDATE.OPTIONAL;
+
         return res.render("admin/settings", {
             header: {
                 page: "Settings",
@@ -3398,8 +3407,13 @@ export const getSettingsPage = async (req, res) => {
             },
             body: {
                 secret: secretTokenData ? secretTokenData.value : "",
-                adminCharge: secretTokenData ? secretTokenData.adminCharge : 0,
                 maintenance: maintenance,
+                currentOwnerAppVersion: currentOwnerAppVersion,
+                latestOwnerAppVersion: latestOwnerAppVersion,
+                currentMechanicAppVersion: currentMechanicAppVersion,
+                latestMechanicAppVersion: latestMechanicAppVersion,
+                isOwnerVersionMandatory: isOwnerVersionMandatory,
+                isMechanicVersionMandatory: isMechanicVersionMandatory,
             },
             footer: {
                 js: ["admin/settings.js"],
@@ -3413,7 +3427,16 @@ export const getSettingsPage = async (req, res) => {
 
 export const postUpdateSettings = async (req, res) => {
     try {
-        const { login_secret_token, maintenance } = req.body;
+        const {
+            login_secret_token,
+            maintenance,
+            currentOwnerAppVersion,
+            latestOwnerAppVersion,
+            currentMechanicAppVersion,
+            latestMechanicAppVersion,
+            isOwnerVersionMandatory,
+            isMechanicVersionMandatory,
+        } = req.body;
 
         const validate = custom_validation(req?.body, "admin.update_settings");
         if (validate.flag !== 1) {
@@ -3426,6 +3449,19 @@ export const postUpdateSettings = async (req, res) => {
         );
 
         await Setting.findOneAndUpdate({ name: "maintenance" }, { value: maintenance });
+
+        await Setting.findOneAndUpdate(
+            { name: "app_version" },
+            {
+                currentOwnerAppVersion: currentOwnerAppVersion,
+                latestOwnerAppVersion: latestOwnerAppVersion,
+                currentMechanicAppVersion: currentMechanicAppVersion,
+                latestMechanicAppVersion: latestMechanicAppVersion,
+                isOwnerVersionMandatory: parseInt(isOwnerVersionMandatory || Constants.APP_VERSION_UPDATE.OPTIONAL),
+                isMechanicVersionMandatory: parseInt(isMechanicVersionMandatory || Constants.APP_VERSION_UPDATE.OPTIONAL),
+            },
+            { upsert: true, new: true }
+        );
 
         if (tokenDetails.value !== login_secret_token) {
             req.session.destroy();

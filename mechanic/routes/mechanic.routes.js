@@ -20,6 +20,7 @@ import {
     postHomeDetails,
     postAllServicesList,
     postLanguageList,
+    postAppVersion,
     postAddService,
     postMyServiceList,
     postBookingList,
@@ -50,7 +51,6 @@ const router = express.Router();
 router.post("/login", postLogin);
 router.post("/otp-verify", postVerifyOtp);
 router.post("/resend-otp", postResendOtp);
-router.post("/language-list", postLanguageList);
 
 router.get("/privacy-policy", getPrivacyPolicy);
 router.get("/terms-condition", getTermsCondition);
@@ -69,6 +69,10 @@ router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
 router.post("/verify-email", authMiddleware, postVerifyEmail);
 
 router.post("/logout", authMiddleware, postLogout);
+
+// Language API
+router.post("/language-list", postLanguageList);
+router.post("/app-version", postAppVersion);
 
 // Home API
 router.post("/home-details", authMiddleware, postHomeDetails);

@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import { DateInHumanReadableFormat } from "../lib/general.js";
+import Constants from "../config/constant.js";
 
 const settingsSchema = new Schema(
     {
@@ -11,9 +12,31 @@ const settingsSchema = new Schema(
             type: String,
             default: "",
         },
-        adminCharge: {
+        currentOwnerAppVersion: {
+            type: String,
+            default: "",
+        },
+        latestOwnerAppVersion: {
+            type: String,
+            default: "",
+        },
+        currentMechanicAppVersion: {
+            type: String,
+            default: "",
+        },
+        latestMechanicAppVersion: {
+            type: String,
+            default: "",
+        },
+        isOwnerVersionMandatory: {
             type: Number,
-            default: 0,
+            enum: Object.values(Constants.APP_VERSION_UPDATE),
+            default: Constants.APP_VERSION_UPDATE.OPTIONAL,
+        },
+        isMechanicVersionMandatory: {
+            type: Number,
+            enum: Object.values(Constants.APP_VERSION_UPDATE),
+            default: Constants.APP_VERSION_UPDATE.OPTIONAL,
         },
     },
     {

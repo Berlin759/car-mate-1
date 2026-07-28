@@ -20,6 +20,52 @@
                             </label>
                         </div>
                     </div>
+                    <hr>
+                    <h5 class="fs-20 mt-30 mb-30 fw-md stas-heading text-uppercase">Owner App Version</h5>
+                    <div class="g-items d-flex">
+                        <label>Current App Version</label>
+                        <div class="form-group">
+                            <input id="current_owner_app_version" type="text" class="form-control" value="<%= body?.currentOwnerAppVersion || "" %>">
+                        </div>
+                    </div>
+                    <div class="g-items d-flex">
+                        <label>Latest App Version</label>
+                        <div class="form-group">
+                            <input id="latest_owner_app_version" type="text" class="form-control" value="<%= body?.latestOwnerAppVersion || "" %>">
+                        </div>
+                    </div>
+                    <div class="g-items d-flex">
+                        <label>Mandatory Version Update</label>
+                        <div class="form-group">
+                            <label class="switch">
+                                <input id="is_owner_version_mandatory" class="form-check-input" type="checkbox" <%= body?.isOwnerVersionMandatory === 2 ? "checked" : "" %> value="<%= body?.isOwnerVersionMandatory || 1 %>">
+                                <span class="slider"> <span class="t-line"></span></span>
+                            </label>
+                        </div>
+                    </div>
+                    <hr>
+                    <h5 class="fs-20 mt-30 mb-30 fw-md stas-heading text-uppercase">Mechanic App Version</h5>
+                    <div class="g-items d-flex">
+                        <label>Current App Version</label>
+                        <div class="form-group">
+                            <input id="current_mechanic_app_version" type="text" class="form-control" value="<%= body?.currentMechanicAppVersion || "" %>">
+                        </div>
+                    </div>
+                    <div class="g-items d-flex">
+                        <label>Latest App Version</label>
+                        <div class="form-group">
+                            <input id="latest_mechanic_app_version" type="text" class="form-control" value="<%= body?.latestMechanicAppVersion || "" %>">
+                        </div>
+                    </div>
+                    <div class="g-items d-flex">
+                        <label>Mandatory Version Update</label>
+                        <div class="form-group">
+                            <label class="switch">
+                                <input id="is_mechanic_version_mandatory" class="form-check-input" type="checkbox" <%= body?.isMechanicVersionMandatory === 2 ? "checked" : "" %> value="<%= body?.isMechanicVersionMandatory || 1 %>">
+                                <span class="slider"> <span class="t-line"></span></span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="page-btn mt-20">

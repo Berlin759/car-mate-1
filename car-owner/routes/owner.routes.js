@@ -25,6 +25,7 @@ import {
     postDeleteCar,
     postServiceList,
     postLanguageList,
+    postAppVersion,
     postNearbyMechanics,
     postServiceHistory,
     postAddAddress,
@@ -81,6 +82,7 @@ router.post("/logout", authMiddleware, postLogout);
 
 // Language API
 router.post("/language-list", postLanguageList);
+router.post("/app-version", postAppVersion);
 
 // Home API (Public - no auth required)
 router.post("/home-details", postHomeDetails);

@@ -10,6 +10,12 @@ const validate_rules = {
         update_settings: {
             login_secret_token: "required",
             maintenance: "required",
+            currentOwnerAppVersion: "required",
+            latestOwnerAppVersion: "required",
+            currentMechanicAppVersion: "required",
+            latestMechanicAppVersion: "required",
+            isOwnerVersionMandatory: "required",
+            isMechanicVersionMandatory: "required",
         },
         update_passwords: {
             current_password: "required",

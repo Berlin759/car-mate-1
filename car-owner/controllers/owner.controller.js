@@ -526,6 +526,23 @@ export const postLanguageList = async (req, res) => {
     };
 };
 
+export const postAppVersion = async (req, res) => {
+    try {
+        const appVersionData = await Setting.findOne({ name: "app_version" });
+
+        const response = {
+            currentAppVersion: appVersionData ? appVersionData.currentOwnerAppVersion : "",
+            latestAppVersion: appVersionData ? appVersionData.latestOwnerAppVersion : "",
+            isVersionMandatory: appVersionData ? parseInt(appVersionData.isOwnerVersionMandatory) : Constants.APP_VERSION_UPDATE.OPTIONAL,
+        };
+
+        return res.status(200).json(successResponse("App version fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postAppVersion ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postHomeDetails = async (req, res) => {
     try {
         const ownerId = req.ownerId;

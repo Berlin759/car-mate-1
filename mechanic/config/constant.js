@@ -183,6 +183,10 @@ const Constants = {
         VERIFIED: 1,
         FAILED: 2,
     },
+    APP_VERSION_UPDATE: {
+        OPTIONAL: 1,
+        MANDATORY: 2,
+    },
 };
 
 export default Constants;

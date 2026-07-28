@@ -156,6 +156,10 @@ const Constants = {
         OWNER: "owner",
         MECHANIC: "mechanic",
     },
+    APP_VERSION_UPDATE: {
+        OPTIONAL: 1,
+        MANDATORY: 2,
+    },
 };
 
 export default Constants;

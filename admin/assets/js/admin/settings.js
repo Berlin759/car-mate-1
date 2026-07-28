@@ -6,15 +6,43 @@ $(document).on("change", "#maintenance", function () {
     };
 });
 
+$(document).on("change", "#is_owner_version_mandatory", function () {
+    if ($(this).is(":checked")) {
+        $(this).val("2");
+    } else {
+        $(this).val("1");
+    };
+});
+
+$(document).on("change", "#is_mechanic_version_mandatory", function () {
+    if ($(this).is(":checked")) {
+        $(this).val("2");
+    } else {
+        $(this).val("1");
+    };
+});
+
 $(document).on("click", "#updateSettings", function () {
     $("#update-settings-loader").removeClass("d-none");
 
     const maintenance = $("#maintenance").val();
     const login_secret_token = $("#login_secret_token").val();
+    const currentOwnerAppVersion = $("#current_owner_app_version").val();
+    const latestOwnerAppVersion = $("#latest_owner_app_version").val();
+    const currentMechanicAppVersion = $("#current_mechanic_app_version").val();
+    const latestMechanicAppVersion = $("#latest_mechanic_app_version").val();
+    const isOwnerVersionMandatory = $("#is_owner_version_mandatory").val();
+    const isMechanicVersionMandatory = $("#is_mechanic_version_mandatory").val();
 
     const data = {
         login_secret_token: login_secret_token,
         maintenance: maintenance,
+        currentOwnerAppVersion: currentOwnerAppVersion,
+        latestOwnerAppVersion: latestOwnerAppVersion,
+        currentMechanicAppVersion: currentMechanicAppVersion,
+        latestMechanicAppVersion: latestMechanicAppVersion,
+        isOwnerVersionMandatory: parseInt(isOwnerVersionMandatory),
+        isMechanicVersionMandatory: parseInt(isMechanicVersionMandatory),
     };
 
     postAjaxCall("/update-settings", data, function (response) {
