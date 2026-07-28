@@ -172,6 +172,8 @@ export const postVerifyOtp = async (req, res) => {
             fullName: mechanicData.fullName,
             phoneNumber: mechanicData.phoneNumber,
             loginToken: jwtToken,
+            languageCode: mechanicData.languageCode,
+            isAutoDetectLanguage: mechanicData.isAutoDetectLanguage,
         };
 
         return res.status(200).json(successResponse("Account verified successfully! Signing you in...", response));

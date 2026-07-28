@@ -153,6 +153,8 @@ export const getProfileDetails = async (req, res) => {
                     pushNotification: 1,
                     emailVerification: 1,
                     status: 1,
+                    languageCode: 1,
+                    isAutoDetectLanguage: 1,
                     createdAt: 1,
                     updatedAt: 1,
                 },
@@ -196,7 +198,7 @@ export const postUpdateMechanicProfile = async (req, res) => {
         let updateObj = {};
 
         // Simple string/number updates
-        const simpleFields = ["fullName", "phoneCode", "email", "latitude", "longitude", "address", "description"];
+        const simpleFields = ["fullName", "phoneCode", "email", "latitude", "longitude", "address", "description", "languageCode", "isAutoDetectLanguage"];
         simpleFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
                 updateObj[field] = param[field];
@@ -328,6 +330,9 @@ export const postUpdatePreferences = async (req, res) => {
 
         const simpleFields = [
             "pushNotification",
+            "bookingNotification",
+            "paymentNotification",
+            "smsNotification",
         ];
         simpleFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {

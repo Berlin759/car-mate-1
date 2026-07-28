@@ -109,6 +109,15 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.ONLINE_STATUS),
             default: Constants.ONLINE_STATUS.FALSE,
         },
+        languageCode: {
+            type: String,
+            default: "en",
+        },
+        isAutoDetectLanguage: {
+            type: Number,
+            enum: Object.values(Constants.PREFERENCES_STATUS),
+            default: Constants.PREFERENCES_STATUS.FALSE,
+        },
     },
     {
         versionKey: false,
