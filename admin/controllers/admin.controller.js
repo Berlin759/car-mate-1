@@ -6023,11 +6023,24 @@ export const postAddLanguage = async (req, res) => {
         if (!name || name.trim() === "") {
             return res.status(400).json(errorResponse("Language Name is required."));
         };
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(name.trim())) {
+            return res.status(400).json(errorResponse("Language name must contain only alphabetic characters and spaces."));
+        };
+
         if (!nativeName || nativeName.trim() === "") {
             return res.status(400).json(errorResponse("Native Name is required."));
         };
+        const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
+        if (!nativeNameRegex.test(nativeName.trim())) {
+            return res.status(400).json(errorResponse("Language native name must contain only letters and spaces."));
+        };
+
         if (!languageCode || languageCode.trim() === "") {
             return res.status(400).json(errorResponse("Language Code is required."));
+        };
+        if (!nameRegex.test(languageCode.trim())) {
+            return res.status(400).json(errorResponse("Language code must contain only alphabetic characters and spaces."));
         };
 
         // Check if language code already exists
@@ -6117,11 +6130,24 @@ export const postUpdateLanguage = async (req, res) => {
         if (!name || name.trim() === "") {
             return res.status(400).json(errorResponse("Language Name is required."));
         };
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(name.trim())) {
+            return res.status(400).json(errorResponse("Language name must contain only alphabetic characters and spaces."));
+        };
+
         if (!nativeName || nativeName.trim() === "") {
             return res.status(400).json(errorResponse("Native Name is required."));
         };
+        const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
+        if (!nativeNameRegex.test(nativeName.trim())) {
+            return res.status(400).json(errorResponse("Language native name must contain only letters and spaces."));
+        };
+
         if (!languageCode || languageCode.trim() === "") {
             return res.status(400).json(errorResponse("Language Code is required."));
+        };
+        if (!nameRegex.test(languageCode.trim())) {
+            return res.status(400).json(errorResponse("Language code must contain only alphabetic characters and spaces."));
         };
 
         // Check if language code already exists for another record

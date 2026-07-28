@@ -42,6 +42,7 @@ import Coupon from "../models/coupon.model.js";
 import Dispute from "../models/dispute.model.js";
 import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
+import Language from "../models/language.model.js";
 
 
 const razorpayInstance = new Razorpay({
@@ -510,6 +511,17 @@ export const postLogout = async (req, res) => {
         return res.status(200).json(successResponse("Logout successfully."));
     } catch (error) {
         log1(["Error in postLogout ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postLanguageList = async (req, res) => {
+    try {
+        const languages = await Language.find({ isActive: true }).sort({ createdAt: -1 }).select("_id name nativeName languageCode isActive");
+
+        return res.status(200).json(successResponse("Languages fetched successfully.", languages));
+    } catch (error) {
+        log1(["Error in postLanguageList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

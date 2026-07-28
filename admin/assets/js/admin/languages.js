@@ -17,6 +17,7 @@ $(document).on("click", "#save_language", function () {
     const languageCode = $("#language_code").val().trim();
 
     const nameRegex = /^[a-zA-Z\s]+$/;
+    const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
 
     let validationMessage = "";
     if (!name) {
@@ -25,7 +26,7 @@ $(document).on("click", "#save_language", function () {
         validationMessage = "Language name must contain only alphabetic characters and spaces.";
     } else if (!nativeName) {
         validationMessage = "Language native name is required.";
-    } else if (!nameRegex.test(nativeName)) {
+    } else if (!nativeNameRegex.test(nativeName)) {
         validationMessage = "Language native name must contain only alphabetic characters and spaces.";
     } else if (!languageCode) {
         validationMessage = "Language language code is required.";
@@ -91,6 +92,7 @@ $(document).on("click", "#update_language", function () {
     const languageCode = $("#language_code").val().trim();
 
     const nameRegex = /^[a-zA-Z\s]+$/;
+    const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
 
     let validationMessage = "";
     if (!languageId) {
@@ -101,7 +103,7 @@ $(document).on("click", "#update_language", function () {
         validationMessage = "Language name must contain only alphabetic characters and spaces.";
     } else if (!nativeName) {
         validationMessage = "Language native name is required.";
-    } else if (!nameRegex.test(nativeName)) {
+    } else if (!nativeNameRegex.test(nativeName)) {
         validationMessage = "Language native name must contain only alphabetic characters and spaces.";
     } else if (!languageCode) {
         validationMessage = "Language language code is required.";
@@ -178,7 +180,7 @@ function initLanguageValidation() {
     });
 
     $(document).on("input", "#language_native_name", function () {
-        this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
+        this.value = this.value.replace(/[^\p{L}\p{M}\s]/gu, "");
     });
 
     $(document).on("input", "#language_code", function () {

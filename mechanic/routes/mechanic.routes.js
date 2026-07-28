@@ -19,6 +19,7 @@ import {
     postLogout,
     postHomeDetails,
     postAllServicesList,
+    postLanguageList,
     postAddService,
     postMyServiceList,
     postBookingList,
@@ -49,6 +50,7 @@ const router = express.Router();
 router.post("/login", postLogin);
 router.post("/otp-verify", postVerifyOtp);
 router.post("/resend-otp", postResendOtp);
+router.post("/language-list", postLanguageList);
 
 router.get("/privacy-policy", getPrivacyPolicy);
 router.get("/terms-condition", getTermsCondition);

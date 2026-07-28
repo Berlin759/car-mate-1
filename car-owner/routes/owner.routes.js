@@ -24,6 +24,7 @@ import {
     postUpdateCar,
     postDeleteCar,
     postServiceList,
+    postLanguageList,
     postNearbyMechanics,
     postServiceHistory,
     postAddAddress,
@@ -77,6 +78,9 @@ router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
 router.post("/verify-email", authMiddleware, postVerifyEmail);
 
 router.post("/logout", authMiddleware, postLogout);
+
+// Language API
+router.post("/language-list", postLanguageList);
 
 // Home API (Public - no auth required)
 router.post("/home-details", postHomeDetails);
