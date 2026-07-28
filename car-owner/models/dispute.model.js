@@ -6,7 +6,7 @@ const disputeSchema = new Schema(
     {
         bookingId: {
             type: Schema.Types.ObjectId,
-            ref: "bookings",
+            ref: "Booking",
             required: true,
         },
         filedBy: {

@@ -1507,7 +1507,7 @@ export const postBookingUpdateStatus = async (req, res) => {
         if (notificationTitle && bookingDetails.ownerId) {
             const owner = bookingDetails.ownerId;
 
-            if (owner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            if (owner.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 owner.deviceToken && owner.deviceToken !== "") {
                 let notificationObject = {
                     title: notificationTitle,
@@ -1518,15 +1518,6 @@ export const postBookingUpdateStatus = async (req, res) => {
                 };
 
                 await sendPushNotification(owner.deviceToken, notificationObject);
-
-                await Notification.create({
-                    ownerId: owner._id,
-                    mechanicId: mechanicId,
-                    title: notificationTitle,
-                    description: notificationDescription,
-                    bookingId: bookingDetails._id,
-                    type: Constants.NOTIFICATION_TYPE.BOOKING,
-                });
             };
         };
 
@@ -1646,7 +1637,7 @@ export const postNotificationList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            category,
+            type,
         } = req.body;
 
         log1(["postNotificationList mechanicId----->", mechanicId]);
@@ -1656,17 +1647,17 @@ export const postNotificationList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const match = { mechanicId: new ObjectId(mechanicId) };
+        const match = {
+            mechanicId: new ObjectId(mechanicId),
+        };
 
-        if (category) {
-            const lowerCategory = category.toLowerCase();
-            if (lowerCategory === "bookings" || lowerCategory === "booking") {
-                match.type = Constants.NOTIFICATION_TYPE.BOOKING;
-            } else if (lowerCategory === "payments" || lowerCategory === "payment") {
-                match.type = Constants.NOTIFICATION_TYPE.TRANSACTION;
-            } else if (lowerCategory === "reviews" || lowerCategory === "review") {
-                match.type = Constants.NOTIFICATION_TYPE.DEFAULT;
-            }
+        if (type) {
+            const validType = Object.values(Constants.NOTIFICATION_TYPE);
+            if (!validType.includes(parseInt(type))) {
+                return res.status(400).json(errorResponse("Invalid type."));
+            };
+
+            match.type = parseInt(type);
         };
 
         const result = await Notification.aggregate([

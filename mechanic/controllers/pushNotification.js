@@ -78,6 +78,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
         return admin.messaging().send(message).then(async (response) => {
             if (!payload.chatId) {
                 let objectPayload = {
+                    ownerId: payload.ownerId ? payload.ownerId : null,
                     mechanicId: payload.mechanicId ? payload.mechanicId : null,
                     bookingId: payload.bookingId ? payload.bookingId : null,
                     transactionId: payload.transactionId ? payload.transactionId : null,

@@ -5,7 +5,7 @@ const addressSchema = new Schema(
     {
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: true,
         },
         label: {

@@ -6,27 +6,27 @@ const transactionSchema = new Schema(
     {
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: true,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: true,
         },
         serviceId: {
             type: Schema.Types.ObjectId,
-            ref: "services",
+            ref: "Service",
             required: true,
         },
         bookingId: {
             type: Schema.Types.ObjectId,
-            ref: "bookings",
+            ref: "Booking",
             required: true,
         },
         carId: {
             type: Schema.Types.ObjectId,
-            ref: "cars",
+            ref: "Car",
             required: false,
         },
         invoiceId: {

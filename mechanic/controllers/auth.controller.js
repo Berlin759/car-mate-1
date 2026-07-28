@@ -16,6 +16,7 @@ import {
 import { sendOtp } from "../lib/twilioHelper.js";
 import Mechanic from "../models/mechanic.model.js";
 import OTP from "../models/otp.model.js";
+import { sendPushNotification } from "./pushNotification.js";
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();
@@ -83,9 +84,30 @@ export const postLogin = async (req, res) => {
             return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
         };
 
+        let mechanicDetails;
         if (!mechanic) {
             const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number, phoneCode: phone_code });
             log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
+
+            mechanicDetails = createNewMechanic;
+        } else {
+            mechanicDetails = mechanic;
+        };
+
+        if (
+            mechanicDetails.smsNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            mechanicDetails.deviceToken &&
+            mechanicDetails.deviceToken !== "" &&
+            mechanicDetails.deviceToken !== null &&
+            mechanicDetails.deviceToken !== undefined
+        ) {
+            let notificationObject = {
+                title: mechanicDetails.fullName,
+                description: "Login OTP",
+                mechanicId: mechanicDetails._id,
+                type: Constants.NOTIFICATION_TYPE.DEFAULT,
+            };
+            await sendPushNotification(mechanicDetails.deviceToken, notificationObject);
         };
 
         let response = {
@@ -207,6 +229,22 @@ export const postResendOtp = async (req, res) => {
 
         if (!sendOtpResult.success) {
             return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
+        };
+
+        if (
+            mechanic.smsNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            mechanic.deviceToken &&
+            mechanic.deviceToken !== "" &&
+            mechanic.deviceToken !== null &&
+            mechanic.deviceToken !== undefined
+        ) {
+            let notificationObject = {
+                title: mechanic.fullName,
+                description: "Resend Login OTP",
+                mechanicId: mechanic._id,
+                type: Constants.NOTIFICATION_TYPE.DEFAULT,
+            };
+            await sendPushNotification(mechanic.deviceToken, notificationObject);
         };
 
         let response = {

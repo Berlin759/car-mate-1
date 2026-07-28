@@ -96,9 +96,11 @@ export const verifyRazorpayPayment = async (payload) => {
         const ownerData = await Owner.findById(ownerId);
         if (
             ownerData &&
-            ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
             ownerData.deviceToken &&
-            ownerData.deviceToken !== ""
+            ownerData.deviceToken !== "" &&
+            ownerData.deviceToken !== null &&
+            ownerData.deviceToken !== undefined
         ) {
             let notificationObject = {
                 title: "Payment",
@@ -150,9 +152,11 @@ export const razorpayRefund = async (payload) => {
             const ownerData = await Owner.findById(ownerId);
             if (
                 ownerData &&
-                ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 ownerData.deviceToken &&
-                ownerData.deviceToken !== ""
+                ownerData.deviceToken !== "" &&
+                ownerData.deviceToken !== null &&
+                ownerData.deviceToken !== undefined
             ) {
                 let notificationObject = {
                     title: "Refund",

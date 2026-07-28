@@ -16,6 +16,7 @@ import {
 import { sendOtp } from "../lib/twilioHelper.js";
 import Owner from "../models/owner.model.js";
 import OTP from "../models/otp.model.js";
+import { sendPushNotification } from "./pushNotification.js";
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();
@@ -83,9 +84,30 @@ export const postLogin = async (req, res) => {
             return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
         };
 
+        let ownerDetails;
         if (!owner) {
             const createNewOwner = await Owner.create({ phoneNumber: phone_number, phoneCode: phone_code });
             log1(["PostLogin createNewOwner ----->", createNewOwner]);
+
+            ownerDetails = createNewOwner;
+        } else {
+            ownerDetails = owner;
+        };
+
+        if (
+            ownerDetails.smsNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerDetails.deviceToken &&
+            ownerDetails.deviceToken !== "" &&
+            ownerDetails.deviceToken !== null &&
+            ownerDetails.deviceToken !== undefined
+        ) {
+            let notificationObject = {
+                title: ownerDetails.fullName,
+                description: "Login OTP",
+                ownerId: ownerDetails._id,
+                type: Constants.NOTIFICATION_TYPE.DEFAULT,
+            };
+            await sendPushNotification(ownerDetails.deviceToken, notificationObject);
         };
 
         let response = {
@@ -207,6 +229,22 @@ export const postResendOtp = async (req, res) => {
 
         if (!sendOtpResult.success) {
             return res.status(400).json(errorResponse("Failed to send OTP. Please try again."));
+        };
+
+        if (
+            owner.smsNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            owner.deviceToken &&
+            owner.deviceToken !== "" &&
+            owner.deviceToken !== null &&
+            owner.deviceToken !== undefined
+        ) {
+            let notificationObject = {
+                title: owner.fullName,
+                description: "Resend Login OTP",
+                ownerId: owner._id,
+                type: Constants.NOTIFICATION_TYPE.DEFAULT,
+            };
+            await sendPushNotification(owner.deviceToken, notificationObject);
         };
 
         let response = {

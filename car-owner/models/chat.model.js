@@ -7,22 +7,22 @@ const chatSchema = new Schema(
 
         ownerIds: {
             type: [Schema.Types.ObjectId],
-            ref: "owners",
+            ref: "Owner",
             required: false,
         },
         ownerDetailsPageIds: {
             type: [Schema.Types.ObjectId],
-            ref: "owners",
+            ref: "Owner",
             required: false,
         },
         mechanicIds: {
             type: [Schema.Types.ObjectId],
-            ref: "mechanics",
+            ref: "Mechanic",
             required: false,
         },
         mechanicDetailsPageIds: {
             type: [Schema.Types.ObjectId],
-            ref: "mechanics",
+            ref: "Mechanic",
             required: false,
         },
         bookingId: {

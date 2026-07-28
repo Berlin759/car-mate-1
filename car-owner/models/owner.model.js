@@ -79,6 +79,21 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
             default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
         },
+        bookingNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
+        paymentNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
+        smsNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
         emailVerification: {
             type: Number,
             enum: Object.values(Constants.EMAIL_VERIFICATION_STATUS),

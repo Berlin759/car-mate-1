@@ -85,6 +85,21 @@ const mechanicSchema = new Schema(
             enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
             default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
         },
+        bookingNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
+        paymentNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
+        smsNotification: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
+            default: Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE,
+        },
         emailVerification: {
             type: Number,
             enum: Object.values(Constants.EMAIL_VERIFICATION_STATUS),
@@ -96,6 +111,10 @@ const mechanicSchema = new Schema(
             default: Constants.MECHANIC_STATUS.PENDING,
         },
         earningBalance: {
+            type: Number,
+            default: 0,
+        },
+        consultantFee: {
             type: Number,
             default: 0,
         },

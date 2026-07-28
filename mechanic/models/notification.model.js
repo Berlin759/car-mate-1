@@ -6,12 +6,12 @@ const notificationSchema = new Schema(
     {
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: false,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: false,
         },
         title: {

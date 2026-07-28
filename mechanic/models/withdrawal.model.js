@@ -6,7 +6,7 @@ const withdrawalSchema = new Schema(
     {
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: true,
         },
         amount: {

@@ -9,6 +9,11 @@ const invoiceSchema = new Schema(
             unique: true,
             required: true,
         },
+        bookingId: {
+            type: Schema.Types.ObjectId,
+            ref: "Booking",
+            required: true,
+        },
         chatId: {
             type: Schema.Types.ObjectId,
             ref: "Chat",
@@ -16,12 +21,12 @@ const invoiceSchema = new Schema(
         },
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: true,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: true,
         },
         credits: {
@@ -32,54 +37,6 @@ const invoiceSchema = new Schema(
             type: String,
             default: null,
         },
-        products: [
-            {
-                _id: false,
-                id: {
-                    type: Schema.Types.ObjectId,
-                    ref: "Product",
-                    required: true,
-                },
-                quantity: {
-                    type: Number,
-                    required: true,
-                },
-                price: {
-                    type: Number,
-                    required: true,
-                },
-                // paymentType: {
-                //     type: Number,
-                //     enum: Object.values(Constants.PRODUCT_PAYMENT_TYPE),
-                // },
-                total: {
-                    type: Number,
-                    required: true,
-                },
-            },
-        ],
-        customPackages: [
-            {
-                _id: false,
-                id: {
-                    type: Schema.Types.ObjectId,
-                    ref: "CustomPackage",
-                    required: true,
-                },
-                quantity: {
-                    type: Number,
-                    required: true,
-                },
-                price: {
-                    type: Number,
-                    required: true,
-                },
-                total: {
-                    type: Number,
-                    required: true,
-                },
-            },
-        ],
         totalAmount: {
             type: Number,
             required: true,

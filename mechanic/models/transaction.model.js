@@ -10,22 +10,22 @@ const transactionSchema = new Schema(
         },
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: false,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: false,
         },
         serviceId: {
             type: Schema.Types.ObjectId,
-            ref: "services",
+            ref: "Service",
             required: false,
         },
         bookingId: {
             type: Schema.Types.ObjectId,
-            ref: "bookings",
+            ref: "Booking",
             required: false,
         },
         trxId: {

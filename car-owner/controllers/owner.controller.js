@@ -2775,7 +2775,7 @@ export const postVerifyRazorpayPayment = async (req, res) => {
         const ownerData = await Owner.findById(ownerId);
         if (
             ownerData &&
-            ownerData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
             ownerData.deviceToken &&
             ownerData.deviceToken !== ""
         ) {
@@ -2855,7 +2855,11 @@ export const postRazorpayWebhook = async (req, res) => {
 
             if (referenceId && referenceId.startsWith("booking_")) {
                 const invoiceNo = referenceId.replace("booking_", "");
-                const booking = await Booking.findOne({ invoiceNo: invoiceNo });
+
+                const booking = await Booking.findOne({ invoiceNo: invoiceNo, }).populate([
+                    { path: "ownerId", select: "_id fullName pushNotification deviceToken" },
+                    { path: "mechanicId", select: "_id pushNotification deviceToken" },
+                ]);
 
                 if (booking) {
                     await Booking.findByIdAndUpdate(booking._id, {
@@ -2874,6 +2878,22 @@ export const postRazorpayWebhook = async (req, res) => {
                     );
 
                     log1(["postRazorpayWebhook Payment success for booking----->", booking._id]);
+
+                    if (
+                        booking.mechanicId.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                        booking.mechanicId.deviceToken &&
+                        booking.mechanicId.deviceToken !== "" &&
+                        booking.mechanicId.deviceToken !== null &&
+                        booking.mechanicId.deviceToken !== undefined
+                    ) {
+                        let notificationObject = {
+                            title: booking.ownerId.fullName,
+                            description: "Car owner send request for service booking.",
+                            mechanicId: booking.mechanicId._id,
+                            type: Constants.NOTIFICATION_TYPE.BOOKING,
+                        };
+                        await sendPushNotification(booking.mechanicId.deviceToken, notificationObject);
+                    };
                 };
             };
         };
@@ -2969,7 +2989,7 @@ export const postAddRating = async (req, res) => {
         let ownerData = await Owner.findById(ownerId);
         if (!ownerData) {
             return res.status(400).json(errorResponse("Owner not found."));
-        }
+        };
 
         let filter = {
             _id: new ObjectId(bookingId),
@@ -2978,6 +2998,7 @@ export const postAddRating = async (req, res) => {
 
         const bookingDetails = await Booking.findOne({ ...filter }).populate([
             { path: "ownerId", select: "_id pushNotification deviceToken" },
+            { path: "mechanicId", select: "_id pushNotification deviceToken" },
         ]);
         log1(["postAddRating bookingDetails----->", bookingDetails]);
 
@@ -2999,6 +3020,23 @@ export const postAddRating = async (req, res) => {
         log1(["postAddRating createRating----->", createRating]);
         if (!createRating) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        if (
+            parseInt(bookingDetails.mechanicId.pushNotification) === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            bookingDetails.mechanicId.deviceToken &&
+            bookingDetails.mechanicId.deviceToken !== "" &&
+            bookingDetails.mechanicId.deviceToken !== null &&
+            bookingDetails.mechanicId.deviceToken !== undefined
+        ) {
+            let notificationObject = {
+                title: ownerData.fullName,
+                description: description,
+                ownerId: ownerData._id,
+                mechanicId: bookingDetails.mechanicId._id,
+                type: Constants.NOTIFICATION_TYPE.REVIEWS,
+            };
+            await sendPushNotification(bookingDetails.mechanicId.deviceToken, notificationObject);
         };
 
         return res.status(200).json(successResponse("Rating Add Successfully!"));

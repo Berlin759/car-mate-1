@@ -95,9 +95,11 @@ export const verifyRazorpayPayment = async (payload) => {
         const mechanicData = await Mechanic.findById(mechanicId);
         if (
             mechanicData &&
-            mechanicData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            mechanicData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
             mechanicData.deviceToken &&
-            mechanicData.deviceToken !== ""
+            mechanicData.deviceToken !== "" &&
+            mechanicData.deviceToken !== null &&
+            mechanicData.deviceToken !== undefined
         ) {
             let notificationObject = {
                 title: "Payment",
@@ -149,9 +151,11 @@ export const razorpayRefund = async (payload) => {
             const mechanicData = await Mechanic.findById(mechanicId);
             if (
                 mechanicData &&
-                mechanicData.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                mechanicData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 mechanicData.deviceToken &&
-                mechanicData.deviceToken !== ""
+                mechanicData.deviceToken !== "" &&
+                mechanicData.deviceToken !== null &&
+                mechanicData.deviceToken !== undefined
             ) {
                 let notificationObject = {
                     title: "Refund",

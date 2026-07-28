@@ -114,6 +114,7 @@ const Constants = {
         BOOKING: 2,
         TRANSACTION: 3,
         CHAT: 4,
+        REVIEWS: 5,
     },
     SECURITY_SETTING_STATUS: {
         FALSE: 1,

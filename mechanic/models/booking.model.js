@@ -6,37 +6,37 @@ const bookingSchema = new Schema(
     {
         ownerId: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: true,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
-            ref: "mechanics",
+            ref: "Mechanic",
             required: true,
         },
         serviceId: {
             type: Schema.Types.ObjectId,
-            ref: "services",
+            ref: "Service",
             required: true,
         },
         carId: {
             type: Schema.Types.ObjectId,
-            ref: "cars",
+            ref: "Car",
             required: false,
         },
         addressId: {
             type: Schema.Types.ObjectId,
-            ref: "addresses",
+            ref: "Addresse",
             required: false,
         },
         cancelById: {
             type: Schema.Types.ObjectId,
-            ref: "owners",
+            ref: "Owner",
             required: false,
         },
         couponId: {
             type: Schema.Types.ObjectId,
-            ref: "coupons",
+            ref: "Coupon",
             required: false,
         },
         invoiceNo: {
