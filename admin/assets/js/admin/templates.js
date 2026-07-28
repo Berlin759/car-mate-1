@@ -124,14 +124,16 @@ $(document).on("click", "#save_template", function () {
         return;
     };
 
-    postAjaxCall("/add-template", {
+    const payload = {
         name: name,
         type: type,
         subject: subject,
         body: body,
         targetAudience: targetAudience,
         placeholders: templatePlaceholders,
-    }, function (response) {
+    };
+
+    postAjaxCall("/add-template", payload, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -224,14 +226,16 @@ $(document).on("click", "#update_template", function () {
         return;
     };
 
-    postAjaxCall("/update-template", {
+    const payload = {
         templateId: templateId,
         subject: subject,
         body: body,
         type: type,
         targetAudience: targetAudience,
         placeholders: templatePlaceholders,
-    }, function (response) {
+    };
+
+    postAjaxCall("/update-template", payload, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {

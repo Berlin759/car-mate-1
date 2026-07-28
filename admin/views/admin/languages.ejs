@@ -1,0 +1,75 @@
+<%- include('../header.ejs') %>
+    <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
+        <div class="filter-area d-flex align-items-center gap-2 flex-wrap" id="language-filter-section">
+            <!-- No filters for Languages -->
+        </div>
+        <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+            <!-- <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#languageModal" id="add_new_language_btn">
+                <i class="fa-solid fa-plus me-1"></i> Add Language
+            </button> -->
+            <div class="pagination-show d-flex align-items-center" id="pagination-div-language-list-table-data">
+                Show
+                <select id="recordPerPage-language-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/language-list', 'language-list-table-data')">
+                    <option selected="">10</option>
+                    <option value="20">20</option>
+                    <option value="40">40</option>
+                </select>
+            </div>
+            <div class="page navigation example">
+                <ul class="pagination justify-content-end mb-0 gap-0"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="admin-table language-list-table mt-30" id="language-list-table-data"></div>
+
+    <div class="container">
+        <div id="add_new_language_btn" class="add-list" data-bs-toggle="modal" data-bs-target="#languageModal">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_460_20805)">
+                    <path d="M20 8.33337V31.6667" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M8.32812 20H31.6615" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                </g>
+                <defs>
+                    <clipPath id="clip0_460_20805">
+                        <rect width="40" height="40" fill="white"></rect>
+                    </clipPath>
+                </defs>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Add/Edit Language Modal -->
+    <div class="modal custom-popup fade" id="languageModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center mt-3">
+                    <h5 class="modal-title" id="languageModalLabel">Add Language</h5>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <input type="hidden" id="language_id" value="">
+                    <div class="row g-3">
+                        <div class="col-lg-12">
+                            <label class="form-label text-dark">Language Name</label>
+                            <input class="form-control" type="text" id="language_name" placeholder="Enter language name (e.g. English)">
+                        </div>
+                        <div class="col-lg-12">
+                            <label class="form-label text-dark">Native Name</label>
+                            <input class="form-control" type="text" id="language_native_name" placeholder="Enter native name (e.g. हिंदी)">
+                        </div>
+                        <div class="col-lg-12">
+                            <label class="form-label text-dark">Language Code</label>
+                            <input class="form-control" type="text" id="language_code" placeholder="Enter language code (e.g. en)">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 d-flex justify-content-end">
+                    <button type="button" class="btn btn-primary btn-transparent" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save_language">Save Language</button>
+                    <button type="button" class="btn btn-primary d-none" id="update_language">Update Language</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<%- include('../footer.ejs') %>

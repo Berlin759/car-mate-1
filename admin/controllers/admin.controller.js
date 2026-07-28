@@ -22,6 +22,7 @@ import Dispute from "../models/dispute.model.js";
 import Coupon from "../models/coupon.model.js";
 import Banner from "../models/banner.model.js";
 import FAQ from "../models/faq.model.js";
+import Language from "../models/language.model.js";
 import Announcement from "../models/announcement.model.js";
 import Pricing from "../models/pricing.model.js";
 import Template from "../models/template.model.js";
@@ -5987,6 +5988,204 @@ export const postSeedDefaultTemplates = async (req, res) => {
         return res.status(200).json(successResponse(`Seeded ${created} templates, ${skipped} already existed.`));
     } catch (error) {
         log1(["Error in postSeedDefaultTemplates ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getLanguagePage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const languages = await Language.find().sort({ createdAt: -1 });
+
+        return res.render("admin/languages", {
+            header: {
+                page: "Language",
+                admin: admin,
+                title: "Language Management",
+                description: "Manage app languages",
+                id: "languages",
+            },
+            body: { languages },
+            footer: {
+                js: ["admin/languages.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getLanguagePage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postAddLanguage = async (req, res) => {
+    try {
+        const { name, nativeName, languageCode } = req.body;
+
+        if (!name || name.trim() === "") {
+            return res.status(400).json(errorResponse("Language Name is required."));
+        };
+        if (!nativeName || nativeName.trim() === "") {
+            return res.status(400).json(errorResponse("Native Name is required."));
+        };
+        if (!languageCode || languageCode.trim() === "") {
+            return res.status(400).json(errorResponse("Language Code is required."));
+        };
+
+        // Check if language code already exists
+        const existing = await Language.findOne({ languageCode: languageCode.trim() });
+        if (existing) {
+            return res.status(400).json(errorResponse("Language Code already exists."));
+        };
+
+        const payload = {
+            name: name.trim(),
+            nativeName: nativeName.trim(),
+            languageCode: languageCode.trim(),
+            isActive: true,
+        };
+
+        const language = await Language.create(payload);
+
+        return res.status(200).json(successResponse("Language created successfully.", language));
+    } catch (error) {
+        log1(["Error in postAddLanguage ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postLanguageList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const [items, total] = await Promise.all([
+            Language.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Language.countDocuments(),
+        ]);
+
+        let response = successResponse();
+
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/language-list.ejs"), {
+            body: {
+                payload: req.body,
+                languageList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["payload"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postLanguageList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postLanguageDetails = async (req, res) => {
+    try {
+        const { languageId } = req.body;
+
+        if (!languageId || !ObjectId.isValid(languageId)) {
+            return res.status(400).json(errorResponse("Invalid Language ID."));
+        };
+
+        const language = await Language.findById(languageId);
+        if (!language) {
+            return res.status(400).json(errorResponse("Language not found."));
+        };
+
+        return res.status(200).json(successResponse("Language details fetched successfully.", language));
+    } catch (error) {
+        log1(["Error in postLanguageDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateLanguage = async (req, res) => {
+    try {
+        const { languageId, name, nativeName, languageCode } = req.body;
+
+        if (!languageId || !ObjectId.isValid(languageId)) {
+            return res.status(400).json(errorResponse("Invalid Language ID."));
+        };
+        if (!name || name.trim() === "") {
+            return res.status(400).json(errorResponse("Language Name is required."));
+        };
+        if (!nativeName || nativeName.trim() === "") {
+            return res.status(400).json(errorResponse("Native Name is required."));
+        };
+        if (!languageCode || languageCode.trim() === "") {
+            return res.status(400).json(errorResponse("Language Code is required."));
+        };
+
+        // Check if language code already exists for another record
+        const existing = await Language.findOne({
+            languageCode: languageCode.trim(),
+            _id: { $ne: new ObjectId(languageId) }
+        });
+        if (existing) {
+            return res.status(400).json(errorResponse("Language Code already exists for another language."));
+        };
+
+        const updateObj = {
+            name: name.trim(),
+            nativeName: nativeName.trim(),
+            languageCode: languageCode.trim(),
+        };
+
+        const language = await Language.findByIdAndUpdate(languageId, updateObj, { new: true });
+        if (!language) {
+            return res.status(400).json(errorResponse("Language not found."));
+        };
+
+        return res.status(200).json(successResponse("Language updated successfully.", language));
+    } catch (error) {
+        log1(["Error in postUpdateLanguage ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteLanguage = async (req, res) => {
+    try {
+        const { languageId } = req.body;
+
+        if (!languageId || !ObjectId.isValid(languageId)) {
+            return res.status(400).json(errorResponse("Invalid Language ID."));
+        };
+
+        await Language.findByIdAndDelete(languageId);
+
+        return res.status(200).json(successResponse("Language deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteLanguage ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postToggleLanguageStatus = async (req, res) => {
+    try {
+        const { languageId, isActive } = req.body;
+
+        if (!languageId || !ObjectId.isValid(languageId)) {
+            return res.status(400).json(errorResponse("Invalid Language ID."));
+        };
+
+        const language = await Language.findById(languageId);
+        if (!language) {
+            return res.status(400).json(errorResponse("Language not found."));
+        };
+
+        await Language.findByIdAndUpdate(languageId, { isActive: isActive === "true" || isActive === true });
+
+        return res.status(200).json(successResponse(`Language ${isActive === "true" || isActive === true ? "activated" : "deactivated"} successfully.`));
+    } catch (error) {
+        log1(["Error in postToggleLanguageStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

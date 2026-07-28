@@ -100,6 +100,13 @@ import {
     postPendingKYCList,
     postApproveKYC,
     postRejectKYC,
+    getLanguagePage,
+    postAddLanguage,
+    postLanguageList,
+    postLanguageDetails,
+    postUpdateLanguage,
+    postDeleteLanguage,
+    postToggleLanguageStatus,
 } from "../controllers/admin.controller.js";
 
 const adminRouter = express.Router();
@@ -241,5 +248,14 @@ adminRouter.post("/update-template", authMiddleware, postUpdateTemplate);
 adminRouter.post("/delete-template", authMiddleware, postDeleteTemplate);
 adminRouter.post("/toggle-template-status", authMiddleware, postToggleTemplateStatus);
 adminRouter.post("/seed-default-templates", authMiddleware, postSeedDefaultTemplates);
+
+// Language Management
+adminRouter.get("/languages", authMiddleware, getLanguagePage);
+adminRouter.post("/add-language", authMiddleware, postAddLanguage);
+adminRouter.post("/language-list", authMiddleware, postLanguageList);
+adminRouter.post("/language-details", authMiddleware, postLanguageDetails);
+adminRouter.post("/update-language", authMiddleware, postUpdateLanguage);
+adminRouter.post("/delete-language", authMiddleware, postDeleteLanguage);
+adminRouter.post("/toggle-language-status", authMiddleware, postToggleLanguageStatus);
 
 export default adminRouter;

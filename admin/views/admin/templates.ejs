@@ -25,9 +25,9 @@
             <!-- <button class="btn btn-outline-primary btn-sm" id="seed-default-templates-btn">
                 <i class="fa-solid fa-seedling me-1"></i> Seed Defaults
             </button> -->
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#templateModal" id="add_new_template_btn">
+            <!-- <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#templateModal" id="add_new_template_btn">
                 <i class="fa-solid fa-plus me-1"></i> Add Template
-            </button>
+            </button> -->
             <div class="pagination-show d-flex align-items-center" id="pagination-div-template-list-table-data">
                 Show
                 <select id="recordPerPage-template-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/template-list', 'template-list-table-data')">
@@ -42,6 +42,24 @@
         </div>
     </div>
     <div class="admin-table template-list-table mt-30" id="template-list-table-data"></div>
+
+    <div class="container">
+        <div id="add_new_template_btn" class="add-list" data-bs-toggle="modal" data-bs-target="#templateModal">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_460_20805)">
+                    <path d="M20 8.33337V31.6667" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M8.32812 20H31.6615" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                </g>
+                <defs>
+                    <clipPath id="clip0_460_20805">
+                        <rect width="40" height="40" fill="white"></rect>
+                    </clipPath>
+                </defs>
+            </svg>
+        </div>
+    </div>
 
     <!-- Add/Edit Template Modal -->
     <div class="modal custom-popup fade" id="templateModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
