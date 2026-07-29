@@ -18,6 +18,7 @@ import Constants from "./config/constant.js";
 import maintenanceMiddleware from "./middleware/maintenance.middleware.js";
 import Mechanic from "./models/mechanic.model.js";
 import Chat from "./models/chat.model.js";
+import Owner from "./models/owner.model.js";
 
 const app = express();
 const PORT = process.env.PORT || 7878;
@@ -137,7 +138,14 @@ app.use("/mechanic", mechanicRouter);
 
 errorHandler(app);
 
-connectDB().then(() => {
+connectDB().then(async () => {
+    try {
+        await Owner.createIndexes();
+        log1(["Mechanic indexes created successfully."]);
+    } catch (error) {
+        log1(["Error creating indexes ----->", error.message]);
+    };
+
     httpServer.listen(PORT, () => {
         log1(["App is running on PORT ----->", process.env.PORT]);
         log1(["App URL -----> ", process.env.APP_URL]);

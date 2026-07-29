@@ -614,7 +614,7 @@ export const postHomeDetails = async (req, res) => {
 
             const nearbyMechanics = await Mechanic.find({
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                "location.coordinates": {
+                "location": {
                     $near: {
                         $geometry: {
                             type: "Point",
@@ -1019,7 +1019,7 @@ export const postServiceList = async (req, res) => {
 
             const nearbyMechanics = await Mechanic.find({
                 status: Constants.MECHANIC_STATUS.ACTIVE,
-                "location.coordinates": {
+                "location": {
                     $near: {
                         $geometry: {
                             type: "Point",
@@ -1182,7 +1182,7 @@ export const postNearbyMechanics = async (req, res) => {
 
         let matchFilter = {
             status: Constants.MECHANIC_STATUS.ACTIVE,
-            "location.coordinates": {
+            "location": {
                 $near: {
                     $geometry: {
                         type: "Point",
@@ -1216,6 +1216,8 @@ export const postNearbyMechanics = async (req, res) => {
                 Math.sin(dLng / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distance = R * c;
+            const avgSpeedKmph = 30;
+            const minutes = Math.round((distance / avgSpeedKmph) * 60);
 
             return {
                 _id: mechanic._id,
@@ -1226,7 +1228,9 @@ export const postNearbyMechanics = async (req, res) => {
                 latitude: mechanic.latitude,
                 longitude: mechanic.longitude,
                 address: mechanic.address,
+                consultantFee: mechanic.consultantFee,
                 distance: Math.round(distance * 100) / 100,
+                minutes,
             };
         });
 
