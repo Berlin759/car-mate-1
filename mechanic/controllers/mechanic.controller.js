@@ -627,7 +627,8 @@ export const postHomeDetails = async (req, res) => {
             ratingStats,
             unreadNotificationsCount,
             pendingPayoutsSum,
-            allTimeTotalEarningsSum
+            allTimeTotalEarningsSum,
+            kycRecord
         ] = await Promise.all([
             // Today's total scheduled jobs
             Booking.countDocuments({
@@ -667,7 +668,7 @@ export const postHomeDetails = async (req, res) => {
             ]),
 
             // Mechanic profile details
-            Mechanic.findById(mechanicId).select("fullName email phoneNumber phoneCode profileImage address latitude longitude earningBalance isOnline consultantFee"),
+            Mechanic.findById(mechanicId).select("fullName email phoneNumber phoneCode profileImage address latitude longitude earningBalance isOnline consultantFee serviceIds"),
 
             // Lists
             Booking.aggregate(newJobRequestsPipeline).allowDiskUse(true),
@@ -705,13 +706,40 @@ export const postHomeDetails = async (req, res) => {
                     },
                 },
                 { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-            ])
+            ]),
+
+            // KYC record for profile completion
+            KYC.findOne({ mechanicId: new ObjectId(mechanicId) }).lean(),
         ]);
 
         const avgRating = ratingStats[0]?.avgRating ? parseFloat(ratingStats[0].avgRating.toFixed(1)) : 0;
         const todayEarnings = todayTransactionsSum[0]?.total || 0;
         const pendingPayouts = pendingPayoutsSum[0]?.total || 0;
         const totalEarnings = allTimeTotalEarningsSum[0]?.total || 0;
+
+        let profileCompletionCount = 0;
+
+        if (kycRecord?.status === Constants.KYC_STATUS.APPROVED) {
+            profileCompletionCount++;
+        };
+
+        if (mechanicProfile?.address || (mechanicProfile?.latitude && mechanicProfile?.longitude && mechanicProfile.latitude !== "0" && mechanicProfile.longitude !== "0")) {
+            profileCompletionCount++;
+        };
+
+        if (mechanicProfile?.fullName && mechanicProfile?.profileImage) {
+            profileCompletionCount++;
+        };
+
+        if (mechanicProfile?.serviceIds?.length > 0) {
+            profileCompletionCount++;
+        };
+
+        if (kycRecord?.bankAccountNumber && kycRecord?.bankIfscCode && kycRecord?.bankAccountHolderName && kycRecord?.bankName) {
+            profileCompletionCount++;
+        };
+
+        const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
 
         const response = {
             todayJobs: todayJobsCount,
@@ -725,6 +753,8 @@ export const postHomeDetails = async (req, res) => {
             mechanic: mechanicProfile,
             newJobRequests,
             upcomingBookings,
+            profileCompletionCount,
+            profileCompletionPercentage,
         };
 
         return res.status(200).json(successResponse("Home details fetched successfully.", response));
