@@ -36,10 +36,10 @@
                             <strong><%= item?.mechanicDetails?.fullName || "-" %></strong>
                             <div class="text-muted fs-12"><%= item?.mechanicDetails?.phoneNumber || "" %></div>
                         </td>
-                        <td><%= item?.bankAccountHolderName || "-" %></td>
-                        <td><%= item?.bankName || "-" %></td>
-                        <td><%= item?.bankAccountNumber || "-" %></td>
-                        <td><%= item?.bankIfscCode || "-" %></td>
+                        <td><%= item?.mechanicDetails?.bankAccountHolderName || "-" %></td>
+                        <td><%= item?.mechanicDetails?.bankName || "-" %></td>
+                        <td><%= item?.mechanicDetails?.bankAccountNumber || "-" %></td>
+                        <td><%= item?.mechanicDetails?.bankIfscCode || "-" %></td>
                         <td>
                             <% if(item?.status === 2) { %>
                                 <span class="bet-status alert-success">Approved</span>

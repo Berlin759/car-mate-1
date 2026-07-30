@@ -108,6 +108,9 @@ const validate_rules = {
             captchaCode: "required",
             mechanicId: "required",
         },
+        delete_account: {
+            reasonCategory: "required",
+        },
     },
 };
 

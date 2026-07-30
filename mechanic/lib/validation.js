@@ -48,12 +48,6 @@ const validate_rules = {
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
         },
-        submit_kyc: {
-            bankAccountHolderName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
-            bankIfscCode: "required",
-            bankAccountNumber: "required",
-            bankName: "required",
-        },
         booking_send_quote: {
             bookingId: "required",
             quotation: "required",
@@ -73,6 +67,21 @@ const validate_rules = {
             captchaId: "required",
             captchaCode: "required",
             ownerId: "required",
+        },
+        delete_account: {
+            reasonCategory: "required",
+        },
+        add_bank: {
+            bankAccountHolderName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            bankIfscCode: "required",
+            bankAccountNumber: "required",
+            bankName: "required",
+        },
+        update_bank_details: {
+            bankAccountHolderName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
+            bankIfscCode: "required",
+            bankAccountNumber: "required",
+            bankName: "required",
         },
     },
 };

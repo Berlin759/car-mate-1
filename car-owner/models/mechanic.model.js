@@ -80,6 +80,44 @@ const mechanicSchema = new Schema(
             type: String,
             default: "",
         },
+        bankAccountNumber: {
+            type: String,
+            default: "",
+        },
+        bankIfscCode: {
+            type: String,
+            default: "",
+        },
+        bankAccountHolderName: {
+            type: String,
+            default: "",
+        },
+        bankName: {
+            type: String,
+            default: "",
+        },
+        earningBalance: {
+            type: Number,
+            default: 0,
+        },
+        consultantFee: {
+            type: Number,
+            default: 0,
+        },
+        languageCode: {
+            type: String,
+            default: "en",
+        },
+        isAutoDetectLanguage: {
+            type: Number,
+            enum: Object.values(Constants.PREFERENCES_STATUS),
+            default: Constants.PREFERENCES_STATUS.FALSE,
+        },
+        isOnline: {
+            type: Number,
+            enum: Object.values(Constants.ONLINE_STATUS),
+            default: Constants.ONLINE_STATUS.FALSE,
+        },
         pushNotification: {
             type: Number,
             enum: Object.values(Constants.NOTIFICATION_PREFERENCES_STATUS),
@@ -109,19 +147,6 @@ const mechanicSchema = new Schema(
             type: Number,
             enum: Object.values(Constants.MECHANIC_STATUS),
             default: Constants.MECHANIC_STATUS.PENDING,
-        },
-        earningBalance: {
-            type: Number,
-            default: 0,
-        },
-        consultantFee: {
-            type: Number,
-            default: 0,
-        },
-        isOnline: {
-            type: Number,
-            enum: Object.values(Constants.ONLINE_STATUS),
-            default: Constants.ONLINE_STATUS.FALSE,
         },
     },
     {

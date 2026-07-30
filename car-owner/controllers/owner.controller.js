@@ -3855,3 +3855,38 @@ export const postVerifyCallCaptcha = async (req, res) => {
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
 };
+
+export const postDeleteOwnerAccount = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { reasonCategory, reasonDescription } = req.body;
+
+        log1(["postDeleteOwnerAccount ownerId ----->", ownerId]);
+        log1(["postDeleteOwnerAccount req.body ----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.delete_account");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        }
+
+        const owner = await Owner.findById(ownerId);
+        if (!owner) {
+            return res.status(404).json(errorResponse("Owner not found."));
+        }
+
+        // Delete associated records
+        await Car.deleteMany({ ownerId: new ObjectId(ownerId) });
+        await Address.deleteMany({ ownerId: new ObjectId(ownerId) });
+        if (owner.phoneNumber) {
+            await OTP.deleteMany({ phoneNumber: owner.phoneNumber });
+        }
+        
+        // Delete owner record
+        await Owner.findByIdAndDelete(ownerId);
+
+        return res.status(200).json(successResponse("Your account has been deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteOwnerAccount ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    }
+};

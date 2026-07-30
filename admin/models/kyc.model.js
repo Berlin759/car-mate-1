@@ -29,27 +29,6 @@ const kycSchema = new Schema(
             type: String,
             default: "",
         },
-        bankAccountNumber: {
-            type: String,
-            default: "",
-        },
-        bankIfscCode: {
-            type: String,
-            default: "",
-        },
-        bankAccountHolderName: {
-            type: String,
-            default: "",
-        },
-        bankName: {
-            type: String,
-            default: "",
-        },
-        status: {
-            type: Number,
-            enum: Object.values(Constants.KYC_STATUS),
-            default: Constants.KYC_STATUS.PENDING,
-        },
         rejectReason: {
             type: String,
             default: "",
@@ -57,6 +36,11 @@ const kycSchema = new Schema(
         reviewedAt: {
             type: Date,
             default: null,
+        },
+        status: {
+            type: Number,
+            enum: Object.values(Constants.KYC_STATUS),
+            default: Constants.KYC_STATUS.PENDING,
         },
     },
     {

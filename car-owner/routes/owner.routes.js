@@ -53,6 +53,7 @@ import {
     postFileDispute,
     postGenerateCallCaptcha,
     postVerifyCallCaptcha,
+    postDeleteOwnerAccount,
 } from "../controllers/owner.controller.js";
 
 const router = express.Router();
@@ -73,6 +74,7 @@ router.post("/update-profile", authMiddleware, postUpdateOwnerProfile);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
 router.post("/update-location", authMiddleware, postUpdateLocation);
+router.post("/delete-account", authMiddleware, postDeleteOwnerAccount);
 
 // Email Verify
 router.post("/send-email-otp", authMiddleware, postSendEmailOTP);

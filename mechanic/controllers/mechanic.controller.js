@@ -153,6 +153,10 @@ export const getProfileDetails = async (req, res) => {
                     lastLoginAt: 1,
                     pushNotification: 1,
                     emailVerification: 1,
+                    bankAccountNumber: 1,
+                    bankIfscCode: 1,
+                    bankAccountHolderName: 1,
+                    bankName: 1,
                     status: 1,
                     languageCode: 1,
                     isAutoDetectLanguage: 1,
@@ -668,7 +672,7 @@ export const postHomeDetails = async (req, res) => {
             ]),
 
             // Mechanic profile details
-            Mechanic.findById(mechanicId).select("fullName email phoneNumber phoneCode profileImage address latitude longitude earningBalance isOnline consultantFee serviceIds"),
+            Mechanic.findById(mechanicId).lean(),
 
             // Lists
             Booking.aggregate(newJobRequestsPipeline).allowDiskUse(true),
@@ -735,7 +739,7 @@ export const postHomeDetails = async (req, res) => {
             profileCompletionCount++;
         };
 
-        if (kycRecord?.bankAccountNumber && kycRecord?.bankIfscCode && kycRecord?.bankAccountHolderName && kycRecord?.bankName) {
+        if (mechanicProfile?.bankAccountNumber && mechanicProfile?.bankIfscCode && mechanicProfile?.bankAccountHolderName && mechanicProfile?.bankName) {
             profileCompletionCount++;
         };
 
@@ -1482,6 +1486,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                     bookingDetails.status === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
                     return res.status(400).json(errorResponse("Cannot cancel booking after service has started."));
                 };
+
+                updatePayload.cancelById = new ObjectId(mechanicId);
+                updatePayload.cancelReason = param.reason || "";
+                updatePayload.cancelTime = new Date();
 
                 notificationTitle = "Booking Cancelled";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has cancelled your booking.`;
@@ -2452,16 +2460,10 @@ export const postSendMessageToChat = async (req, res) => {
 export const postSubmitKYC = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        let { bankAccountHolderName, bankIfscCode, bankAccountNumber, bankName } = req.body;
 
         log1(["postSubmitKYC mechanicId----->", mechanicId]);
         log1(["postSubmitKYC req.body----->", req.body]);
         log1(["postSubmitKYC req.files----->", req.files]);
-
-        const validate = await custom_validation(req.body, "mechanic.submit_kyc");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
-        };
 
         let existingKYC = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) });
         log1(["postSubmitKYC existingKYC----->", existingKYC]);
@@ -2496,52 +2498,6 @@ export const postSubmitKYC = async (req, res) => {
             return res.status(400).json(errorResponse("Your Selfie image is required."));
         };
 
-        // Bank Account Holder Name
-        const trimmedName = bankAccountHolderName.trim();
-        const nameRegex = /^[a-zA-Z\s]+$/;
-
-        if (!nameRegex.test(trimmedName)) {
-            return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
-        };
-
-        if (trimmedName.length < 2 || trimmedName.length > 100) {
-            return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
-        };
-
-        // Bank IfSC Code
-        const trimmedIfsc = bankIfscCode.trim().toUpperCase();
-        const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
-
-        if (!ifscRegex.test(trimmedIfsc)) {
-            return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
-        };
-        bankIfscCode = trimmedIfsc;
-
-        // Bank Account Number
-        const trimmedAccNo = bankAccountNumber.trim();
-        const accNoRegex = /^[0-9]+$/;
-
-        if (!accNoRegex.test(trimmedAccNo)) {
-            return res.status(400).json(errorResponse("Account Number must contain only digits."));
-        };
-
-        if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
-            return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
-        };
-        bankAccountNumber = trimmedAccNo;
-
-        // Bank Name
-        const trimmedBankName = bankName.trim();
-        const nameByBankRegex = /^[a-zA-Z\s]+$/;
-
-        if (!nameByBankRegex.test(trimmedBankName)) {
-            return res.status(400).json(errorResponse("Bank Name must contain only alphabetic characters and spaces."));
-        };
-
-        if (trimmedBankName.length < 2 || trimmedBankName.length > 100) {
-            return res.status(400).json(errorResponse("Bank Name must be between 2 and 100 characters."));
-        };
-
         let updateObj = {};
 
         const fileFields = ["aadhaarFront", "aadhaarBack", "panCard", "drivingLicense", "selfie"];
@@ -2554,37 +2510,9 @@ export const postSubmitKYC = async (req, res) => {
             };
         };
 
-        const bankFields = ["bankAccountNumber", "bankIfscCode", "bankAccountHolderName", "bankName"];
-        bankFields.forEach(field => {
-            if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== "") {
-                updateObj[field] = field === "bankAccountHolderName" ? req.body[field].trim() : req.body[field];
-            };
-        });
-
         updateObj.status = Constants.KYC_STATUS.PENDING;
         updateObj.rejectReason = "";
         updateObj.reviewedAt = null;
-
-        if (updateObj.bankAccountHolderName) {
-            const existingName = await KYC.findOne({ bankAccountHolderName: updateObj.bankAccountHolderName, _id: { $ne: existingKYC?._id } });
-            if (existingName) {
-                return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
-            };
-        };
-
-        if (updateObj.bankIfscCode) {
-            const existingIfsc = await KYC.findOne({ bankIfscCode: updateObj.bankIfscCode, _id: { $ne: existingKYC?._id } });
-            if (existingIfsc) {
-                return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
-            };
-        };
-
-        if (updateObj.bankAccountNumber) {
-            const existingAccNo = await KYC.findOne({ bankAccountNumber: updateObj.bankAccountNumber, _id: { $ne: existingKYC?._id } });
-            if (existingAccNo) {
-                return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
-            };
-        };
 
         let kycData;
 
@@ -3143,7 +3071,8 @@ export const postReviewsReceived = async (req, res) => {
         const [items, totalCount] = await Promise.all([
             Rating.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
                 .populate("ownerId", "fullName profileImage")
-                .populate("serviceId", "fullName"),
+                .populate("serviceId", "fullName")
+                .lean(),
             Rating.countDocuments(filter),
         ]);
 
@@ -3152,13 +3081,52 @@ export const postReviewsReceived = async (req, res) => {
             { $group: { _id: null, avgRating: { $avg: "$rating" }, totalReviews: { $sum: 1 } } },
         ]);
 
+        const totalReviews = stats[0]?.totalReviews || 0;
+
+        const starCounts = await Rating.aggregate([
+            { $match: filter },
+            { $group: { _id: "$rating", count: { $sum: 1 } } }
+        ]);
+
+        const distribution = {
+            1: { count: 0, percentage: 0 },
+            2: { count: 0, percentage: 0 },
+            3: { count: 0, percentage: 0 },
+            4: { count: 0, percentage: 0 },
+            5: { count: 0, percentage: 0 }
+        };
+
+        starCounts.forEach(item => {
+            const ratingVal = Math.round(item._id);
+            if (distribution[ratingVal]) {
+                distribution[ratingVal].count = item.count;
+                if (totalReviews > 0) {
+                    distribution[ratingVal].percentage = parseFloat(((item.count / totalReviews) * 100).toFixed(1));
+                }
+            }
+        });
+
+        const mappedItems = items.map(item => {
+            let tag = "Negative";
+            if (item.rating >= 4) {
+                tag = "Positive";
+            } else if (item.rating === 3) {
+                tag = "Neutral";
+            }
+            return {
+                ...item,
+                tag
+            };
+        });
+
         const response = {
             page,
             limit,
             totalRecords: totalCount,
-            totalReviews: stats[0]?.totalReviews || 0,
-            avgRating: stats[0]?.avgRating || 0,
-            items,
+            totalReviews: totalReviews,
+            avgRating: parseFloat((stats[0]?.avgRating || 0).toFixed(1)),
+            starDistribution: distribution,
+            items: mappedItems,
         };
 
         return res.status(200).json(successResponse("Reviews fetched successfully.", response));
@@ -3325,6 +3293,261 @@ export const postVerifyCallCaptcha = async (req, res) => {
         return res.status(200).json(successResponse("Captcha verified successfully.", response));
     } catch (error) {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postDeleteMechanicAccount = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { reasonCategory, reasonDescription } = req.body;
+
+        log1(["postDeleteMechanicAccount mechanicId ----->", mechanicId]);
+        log1(["postDeleteMechanicAccount req.body ----->", req.body]);
+
+        const validate = await custom_validation(req.body, "mechanic.delete_account");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        }
+
+        const mechanic = await Mechanic.findById(mechanicId);
+        if (!mechanic) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        }
+
+        // Delete associated KYC
+        await KYC.deleteOne({ mechanicId: new ObjectId(mechanicId) });
+
+        if (mechanic.phoneNumber) {
+            await OTP.deleteMany({ phoneNumber: mechanic.phoneNumber });
+        };
+
+        // Delete mechanic record
+        await Mechanic.findByIdAndDelete(mechanicId);
+
+        return res.status(200).json(successResponse("Your account has been deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteMechanicAccount ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
+export const addBank = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        let { bankAccountHolderName, bankIfscCode, bankAccountNumber, bankName } = req.body;
+
+        log1(["addBank mechanicId----->", mechanicId]);
+        log1(["addBank req.body----->", req.body]);
+        log1(["addBank req.files----->", req.files]);
+
+        const validate = await custom_validation(req.body, "mechanic.add_bank");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        // Bank Account Holder Name
+        const trimmedName = bankAccountHolderName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedName.length < 2 || trimmedName.length > 100) {
+            return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
+        };
+
+        // Bank IfSC Code
+        const trimmedIfsc = bankIfscCode.trim().toUpperCase();
+        const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+
+        if (!ifscRegex.test(trimmedIfsc)) {
+            return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
+        };
+        bankIfscCode = trimmedIfsc;
+
+        // Bank Account Number
+        const trimmedAccNo = bankAccountNumber.trim();
+        const accNoRegex = /^[0-9]+$/;
+
+        if (!accNoRegex.test(trimmedAccNo)) {
+            return res.status(400).json(errorResponse("Account Number must contain only digits."));
+        };
+
+        if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
+            return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
+        };
+        bankAccountNumber = trimmedAccNo;
+
+        // Bank Name
+        const trimmedBankName = bankName.trim();
+        const nameByBankRegex = /^[a-zA-Z\s]+$/;
+
+        if (!nameByBankRegex.test(trimmedBankName)) {
+            return res.status(400).json(errorResponse("Bank Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedBankName.length < 2 || trimmedBankName.length > 100) {
+            return res.status(400).json(errorResponse("Bank Name must be between 2 and 100 characters."));
+        };
+
+        let updateObj = {};
+
+        const bankFields = ["bankAccountNumber", "bankIfscCode", "bankAccountHolderName", "bankName"];
+        bankFields.forEach(field => {
+            if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== "") {
+                updateObj[field] = field === "bankAccountHolderName" ? req.body[field].trim() : req.body[field];
+            };
+        });
+
+        if (updateObj.bankAccountHolderName) {
+            const existingName = await Mechanic.findOne({ bankAccountHolderName: updateObj.bankAccountHolderName, _id: { $ne: mechanicId } });
+            if (existingName) {
+                return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
+            };
+        };
+
+        if (updateObj.bankIfscCode) {
+            const existingIfsc = await Mechanic.findOne({ bankIfscCode: updateObj.bankIfscCode, _id: { $ne: mechanicId } });
+            if (existingIfsc) {
+                return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
+            };
+        };
+
+        if (updateObj.bankAccountNumber) {
+            const existingAccNo = await Mechanic.findOne({ bankAccountNumber: updateObj.bankAccountNumber, _id: { $ne: mechanicId } });
+            if (existingAccNo) {
+                return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
+            };
+        };
+
+        let updateData = await Mechanic.findOneAndUpdate(
+            { _id: new ObjectId(mechanicId) },
+            updateObj,
+            { new: true },
+        );
+
+        log1(["addBank updateData----->", updateData]);
+
+        return res.status(200).json(successResponse("Bank added successfully."));
+    } catch (error) {
+        log1(["Error in addBank ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getBankDetails = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        log1(["getBankDetails mechanicId ----->", mechanicId]);
+
+        const mechanicDetails = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
+
+        const bankDetails = {
+            bankAccountNumber: mechanicDetails?.bankAccountNumber || "",
+            bankIfscCode: mechanicDetails?.bankIfscCode || "",
+            bankAccountHolderName: mechanicDetails?.bankAccountHolderName || "",
+            bankName: mechanicDetails?.bankName || ""
+        };
+
+        return res.status(200).json(successResponse("Bank details fetched successfully.", bankDetails));
+    } catch (error) {
+        log1(["Error in getBankDetails ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postUpdateBankDetails = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        let { bankAccountHolderName, bankIfscCode, bankAccountNumber, bankName } = req.body;
+
+        log1(["postUpdateBankDetails mechanicId ----->", mechanicId]);
+        log1(["postUpdateBankDetails req.body ----->", req.body]);
+
+        const validate = await custom_validation(req.body, "mechanic.update_bank_details");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        let existingMechanic = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
+        if (!existingMechanic) {
+            return res.status(400).json(errorResponse("Invalid Mechanic Id."));
+        };
+
+        // Bank Account Holder Name
+        const trimmedName = bankAccountHolderName.trim();
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(trimmedName)) {
+            return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedName.length < 2 || trimmedName.length > 100) {
+            return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
+        };
+
+        // Bank IFSC Code
+        const trimmedIfsc = bankIfscCode.trim().toUpperCase();
+        const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+
+        if (!ifscRegex.test(trimmedIfsc)) {
+            return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
+        };
+        bankIfscCode = trimmedIfsc;
+
+        // Bank Account Number
+        const trimmedAccNo = bankAccountNumber.trim();
+        const accNoRegex = /^[0-9]+$/;
+
+        if (!accNoRegex.test(trimmedAccNo)) {
+            return res.status(400).json(errorResponse("Account Number must contain only digits."));
+        };
+
+        if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
+            return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
+        };
+        bankAccountNumber = trimmedAccNo;
+
+        // Bank Name
+        const trimmedBankName = bankName.trim();
+        const nameByBankRegex = /^[a-zA-Z\s]+$/;
+        if (!nameByBankRegex.test(trimmedBankName)) {
+            return res.status(400).json(errorResponse("Bank Name must contain only alphabetic characters and spaces."));
+        };
+
+        if (trimmedBankName.length < 2 || trimmedBankName.length > 100) {
+            return res.status(400).json(errorResponse("Bank Name must be between 2 and 100 characters."));
+        };
+
+        // Check for duplicates
+        const existingName = await Mechanic.findOne({ bankAccountHolderName: trimmedName, _id: { $ne: existingMechanic?._id } });
+        if (existingName) {
+            return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
+        };
+
+        const existingIfsc = await Mechanic.findOne({ bankIfscCode: bankIfscCode, _id: { $ne: existingMechanic?._id } });
+        if (existingIfsc) {
+            return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
+        };
+
+        const existingAccNo = await Mechanic.findOne({ bankAccountNumber: bankAccountNumber, _id: { $ne: existingMechanic?._id } });
+        if (existingAccNo) {
+            return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
+        };
+
+        const updateData = {
+            bankAccountHolderName: trimmedName,
+            bankIfscCode,
+            bankAccountNumber,
+            bankName: trimmedBankName,
+        };
+
+        await Mechanic.findByIdAndUpdate(existingMechanic._id, updateData);
+
+        return res.status(200).json(successResponse("Bank details updated successfully."));
+    } catch (error) {
+        log1(["Error in postUpdateBankDetails ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
 };

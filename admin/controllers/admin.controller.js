@@ -4036,6 +4036,10 @@ export const getKYCDetailPage = async (req, res) => {
                                 email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
+                                bankAccountNumber: 1,
+                                bankIfscCode: 1,
+                                bankAccountHolderName: 1,
+                                bankName: 1,
                             },
                         },
                     ],
@@ -4056,10 +4060,6 @@ export const getKYCDetailPage = async (req, res) => {
                     panCard: 1,
                     drivingLicense: 1,
                     selfie: 1,
-                    bankAccountNumber: 1,
-                    bankIfscCode: 1,
-                    bankAccountHolderName: 1,
-                    bankName: 1,
                     status: 1,
                     rejectReason: 1,
                     reviewedAt: 1,
@@ -4145,13 +4145,7 @@ export const getAddKYCPage = async (req, res) => {
 
 export const postSubmitKYC = async (req, res) => {
     try {
-        const {
-            mechanicId,
-            bankAccountHolderName,
-            bankName,
-            bankAccountNumber,
-            bankIfscCode,
-        } = req.body;
+        const { mechanicId } = req.body;
 
         if (!mechanicId || !ObjectId.isValid(mechanicId)) {
             return res.status(400).json(errorResponse("Invalid mechanic Id."));
@@ -4167,97 +4161,38 @@ export const postSubmitKYC = async (req, res) => {
             return res.status(400).json(errorResponse("KYC already submitted for this mechanic."));
         };
 
-        if (bankAccountHolderName && bankAccountHolderName.trim() !== "") {
-            const trimmedName = bankAccountHolderName.trim();
-            const nameRegex = /^[a-zA-Z\s]+$/;
-            if (!nameRegex.test(trimmedName)) {
-                return res.status(400).json(errorResponse("Account Holder Name must contain only alphabetic characters and spaces."));
-            };
-
-            if (trimmedName.length < 2 || trimmedName.length > 100) {
-                return res.status(400).json(errorResponse("Account Holder Name must be between 2 and 100 characters."));
-            };
-
-            const existingName = await KYC.findOne({ bankAccountHolderName: trimmedName, _id: { $ne: existingKyc?._id } });
-            if (existingName) {
-                return res.status(400).json(errorResponse("This Account Holder Name is already registered. Please use a different name."));
-            };
+        if (!req.files?.["aadhaarFront"]) {
+            return res.status(400).json(errorResponse("Front aadhar card image is required."));
         };
 
-        if (bankIfscCode && bankIfscCode.trim() !== "") {
-            const trimmedIfsc = bankIfscCode.trim().toUpperCase();
-            const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
-            if (!ifscRegex.test(trimmedIfsc)) {
-                return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
-            };
+        if (!req.files?.["aadhaarBack"]) {
+            return res.status(400).json(errorResponse("Back aadhar card image is required."));
+        };
 
-            const existingIfsc = await KYC.findOne({ bankIfscCode: trimmedIfsc, _id: { $ne: existingKyc?._id } });
-            if (existingIfsc) {
-                return res.status(400).json(errorResponse("This IFSC code is already registered. Please use a different IFSC code."));
+        if (!req.files?.["panCard"]) {
+            return res.status(400).json(errorResponse("Pan card image is required."));
+        };
+
+        if (!req.files?.["selfie"]) {
+            return res.status(400).json(errorResponse("Your Selfie image is required."));
+        };
+
+        let payload = {};
+
+        const fileFields = ["aadhaarFront", "aadhaarBack", "panCard", "selfie"];
+
+        for (const field of fileFields) {
+            if (req.files?.[field]) {
+                const uploadedFile = await uploadFile(req.files[field]);
+                if (uploadedFile.flag === 0) return res.status(400).json(uploadedFile);
+                payload[field] = uploadedFile.data.url;
             };
         };
 
-        if (bankAccountNumber && bankAccountNumber.trim() !== "") {
-            const trimmedAccNo = bankAccountNumber.trim();
-            const accNoRegex = /^[0-9]+$/;
-            if (!accNoRegex.test(trimmedAccNo)) {
-                return res.status(400).json(errorResponse("Account Number must contain only digits."));
-            };
-
-            if (trimmedAccNo.length < 6 || trimmedAccNo.length > 20) {
-                return res.status(400).json(errorResponse("Account Number must be between 6 and 20 digits."));
-            };
-
-            const existingAccNo = await KYC.findOne({ bankAccountNumber: trimmedAccNo, _id: { $ne: existingKyc?._id } });
-            if (existingAccNo) {
-                return res.status(400).json(errorResponse("This Account Number is already registered. Please use a different account number."));
-            };
-        };
-
-        let aadhaarFrontUrl = "";
-        let aadhaarBackUrl = "";
-        let panCardUrl = "";
-        let drivingLicenseUrl = "";
-        let selfieUrl = "";
-
-        if (req.files?.aadhaarFront) {
-            const uploaded = await uploadFile(req.files.aadhaarFront);
-            if (uploaded.flag !== 0) aadhaarFrontUrl = uploaded.data.url;
-        };
-
-        if (req.files?.aadhaarBack) {
-            const uploaded = await uploadFile(req.files.aadhaarBack);
-            if (uploaded.flag !== 0) aadhaarBackUrl = uploaded.data.url;
-        };
-
-        if (req.files?.panCard) {
-            const uploaded = await uploadFile(req.files.panCard);
-            if (uploaded.flag !== 0) panCardUrl = uploaded.data.url;
-        };
-
-        if (req.files?.drivingLicense) {
-            const uploaded = await uploadFile(req.files.drivingLicense);
-            if (uploaded.flag !== 0) drivingLicenseUrl = uploaded.data.url;
-        };
-
-        if (req.files?.selfie) {
-            const uploaded = await uploadFile(req.files.selfie);
-            if (uploaded.flag !== 0) selfieUrl = uploaded.data.url;
-        };
-
-        let payload = {
-            mechanicId: new ObjectId(mechanicId),
-            aadhaarFront: aadhaarFrontUrl,
-            aadhaarBack: aadhaarBackUrl,
-            panCard: panCardUrl,
-            drivingLicense: drivingLicenseUrl,
-            selfie: selfieUrl,
-            bankAccountHolderName: bankAccountHolderName ? bankAccountHolderName.trim() : "",
-            bankName: bankName || "",
-            bankAccountNumber: bankAccountNumber || "",
-            bankIfscCode: bankIfscCode ? bankIfscCode.trim().toUpperCase() : "",
-            status: Constants.KYC_STATUS.PENDING,
-        };
+        payload.status = Constants.KYC_STATUS.PENDING;
+        payload.rejectReason = "";
+        payload.reviewedAt = null;
+        payload.mechanicId = new ObjectId(mechanicId);
 
         let newKyc = await KYC.create(payload);
         if (!newKyc) {
@@ -4307,6 +4242,10 @@ export const postPendingKYCList = async (req, res) => {
                                 email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
+                                bankAccountNumber: 1,
+                                bankIfscCode: 1,
+                                bankAccountHolderName: 1,
+                                bankName: 1,
                                 status: 1,
                             },
                         },
@@ -4328,10 +4267,6 @@ export const postPendingKYCList = async (req, res) => {
                     panCard: 1,
                     drivingLicense: 1,
                     selfie: 1,
-                    bankAccountNumber: 1,
-                    bankIfscCode: 1,
-                    bankAccountHolderName: 1,
-                    bankName: 1,
                     status: 1,
                     rejectReason: 1,
                     reviewedAt: 1,

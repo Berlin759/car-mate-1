@@ -91,19 +91,19 @@
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block">Account Holder Name</span>
-                    <span class="fw-md"><%= body?.kyc?.bankAccountHolderName || "-" %></span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.bankAccountHolderName || "-" %></span>
                 </div>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block">Bank Name</span>
-                    <span class="fw-md"><%= body?.kyc?.bankName || "-" %></span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.bankName || "-" %></span>
                 </div>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block">Account Number</span>
-                    <span class="fw-md"><%= body?.kyc?.bankAccountNumber || "-" %></span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.bankAccountNumber || "-" %></span>
                 </div>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block">IFSC Code</span>
-                    <span class="fw-md"><%= body?.kyc?.bankIfscCode || "-" %></span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?.bankIfscCode || "-" %></span>
                 </div>
             </div>
         </div>

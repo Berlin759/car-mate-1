@@ -43,6 +43,10 @@ import {
     postEarningDetails,
     postGenerateCallCaptcha,
     postVerifyCallCaptcha,
+    postDeleteMechanicAccount,
+    addBank,
+    getBankDetails,
+    postUpdateBankDetails,
 } from "../controllers/mechanic.controller.js";
 
 const router = express.Router();
@@ -63,6 +67,12 @@ router.post("/update-profile", authMiddleware, postUpdateMechanicProfile);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
 router.post("/update-location", authMiddleware, postUpdateLocation);
+router.post("/delete-account", authMiddleware, postDeleteMechanicAccount);
+
+// Bank API
+router.post("/add-bank", authMiddleware, addBank);
+router.get("/bank-details", authMiddleware, getBankDetails);
+router.post("/update-bank-details", authMiddleware, postUpdateBankDetails);
 
 // Email Verify
 router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
