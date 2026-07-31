@@ -45,6 +45,11 @@ const Constants = {
         ACTIVE: 1,
         INACTIVE: 2,
     },
+    KYC_STATUS: {
+        PENDING: 1,
+        APPROVED: 2,
+        REJECTED: 3,
+    },
     GENDER_STATUS: {
         MALE: 1,
         FEMALE: 2,

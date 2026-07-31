@@ -43,6 +43,7 @@ import Dispute from "../models/dispute.model.js";
 import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
+import KYC from "../models/kyc.model.js";
 
 
 const razorpayInstance = new Razorpay({
@@ -1197,10 +1198,18 @@ export const postNearbyMechanics = async (req, res) => {
             matchFilter.serviceIds = new ObjectId(serviceId);
         };
 
-        const mechanics = await Mechanic.find(matchFilter)
-            .select("fullName email phoneNumber profileImage latitude longitude address serviceIds")
-            .limit(50)
+        const mechanics = await Mechanic.find(matchFilter).limit(50).lean();
+
+        const mechanicIds = mechanics.map((mechanic) => mechanic._id);
+
+        const kycRecords = await KYC.find({
+            mechanicId: { $in: mechanicIds },
+            status: Constants.KYC_STATUS.APPROVED,
+        })
+            .select("mechanicId")
             .lean();
+
+        const approvedKycMechanicIds = new Set(kycRecords.map((record) => record.mechanicId.toString()));
 
         const response = mechanics.map((mechanic) => {
             const mLat = parseFloat(mechanic.latitude) || 0;
@@ -1219,6 +1228,30 @@ export const postNearbyMechanics = async (req, res) => {
             const avgSpeedKmph = 30;
             const minutes = Math.round((distance / avgSpeedKmph) * 60);
 
+            let profileCompletionCount = 0;
+
+            if (approvedKycMechanicIds.has(mechanic._id.toString())) {
+                profileCompletionCount++;
+            };
+
+            if (mechanic.address || (mechanic.latitude && mechanic.longitude && mechanic.latitude !== "0" && mechanic.longitude !== "0")) {
+                profileCompletionCount++;
+            };
+
+            if (mechanic.fullName && mechanic.profileImage) {
+                profileCompletionCount++;
+            };
+
+            if (mechanic.serviceIds?.length > 0) {
+                profileCompletionCount++;
+            };
+
+            if (mechanic.bankAccountNumber && mechanic.bankIfscCode && mechanic.bankAccountHolderName && mechanic.bankName) {
+                profileCompletionCount++;
+            };
+
+            const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
+
             return {
                 _id: mechanic._id,
                 fullName: mechanic.fullName,
@@ -1231,10 +1264,12 @@ export const postNearbyMechanics = async (req, res) => {
                 consultantFee: mechanic.consultantFee,
                 distance: Math.round(distance * 100) / 100,
                 minutes,
+                profileCompletionCount,
+                profileCompletionPercentage,
             };
         });
 
-        response.sort((a, b) => a.distance - b.distance);
+        response.sort((a, b) => b.profileCompletionPercentage - a.profileCompletionPercentage || a.distance - b.distance);
 
         return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", {
             items: response,
@@ -3880,7 +3915,7 @@ export const postDeleteOwnerAccount = async (req, res) => {
         if (owner.phoneNumber) {
             await OTP.deleteMany({ phoneNumber: owner.phoneNumber });
         }
-        
+
         // Delete owner record
         await Owner.findByIdAndDelete(ownerId);
 
