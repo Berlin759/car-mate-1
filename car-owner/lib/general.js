@@ -179,7 +179,6 @@ export const generateDirectSlots = (timeBlocks, hours, date, timezone) => {
     return slots;
 };
 
-
 export const generateRandomToken = async () => {
     try {
         const token = crypto.randomBytes(16).toString("hex");
@@ -209,6 +208,25 @@ export const generateOtp = async () => {
         return otp;
     } catch (error) {
         log1(["Error in generateOtp ----->", error]);
+        return "";
+    };
+};
+
+export const generateUniqueUsername = async () => {
+    try {
+        let username;
+        let exists = true;
+
+        while (exists) {
+            const randomNumber = crypto.randomInt(1000, 10000); // 1000 - 9999
+            username = `user${randomNumber}`;
+
+            exists = await Owner.exists({ fullName: username });
+        };
+
+        return username;
+    } catch (error) {
+        log1(["Error in generateUniqueUsername ----->", error]);
         return "";
     };
 };

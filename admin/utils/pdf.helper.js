@@ -90,7 +90,7 @@ export function generateTransactionPDF(transaction, res) {
         y += 28;
 
         drawField(doc, "Booking Date:", formatDate(transaction?.bookingDetails?.date), ML, y);
-        drawField(doc, "Booking Time:", transaction?.bookingDetails?.time || "-", 320, y);
+        drawField(doc, "Booking Slot:", transaction?.bookingDetails?.slot || "-", 320, y);
         y += 28;
     });
 

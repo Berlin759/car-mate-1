@@ -10,6 +10,7 @@ import {
     generateLoginToken,
     generateOtp,
     generateRandomToken,
+    generateUniqueUsername,
     log1,
     successResponse,
 } from "../lib/general.js";
@@ -41,15 +42,6 @@ export const postLogin = async (req, res) => {
 
         const mechanic = await Mechanic.findOne({ phoneNumber: phone_number });
         log1(["PostLogin mechanic ----->", mechanic]);
-
-        // if (!mechanic) {
-        //     const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number });
-        //     log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
-        // } else if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
-        //     return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
-        // } else if (mechanic.status === Constants.MECHANIC_STATUS.SUSPENDED) {
-        //     return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
-        // };
 
         if (mechanic) {
             if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
@@ -86,7 +78,13 @@ export const postLogin = async (req, res) => {
 
         let mechanicDetails;
         if (!mechanic) {
-            const createNewMechanic = await Mechanic.create({ phoneNumber: phone_number, phoneCode: phone_code });
+            const full_name = await generateUniqueUsername();
+
+            const createNewMechanic = await Mechanic.create({
+                fullName: full_name,
+                phoneNumber: phone_number,
+                phoneCode: phone_code,
+            });
             log1(["PostLogin createNewMechanic ----->", createNewMechanic]);
 
             mechanicDetails = createNewMechanic;

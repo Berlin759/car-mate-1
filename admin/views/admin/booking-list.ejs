@@ -23,7 +23,7 @@
                 <th>Mechanic</th>
                 <th>Service Name</th>
                 <th>Car Name</th>
-                <th>Date | Time</th>
+                <th>Date | Slot</th>
                 <th>Total Amount</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -38,7 +38,7 @@
                     <td><%= booking?.mechanicDetails?.fullName || "-" %></td>
                     <td><%= booking?.serviceDetails?.fullName || "-" %></td>
                     <td><%= booking?.carDetails?.fullName || "-" %></td>
-                    <td><%= formatDate(booking?.date) || "-" %> | <%= booking?.time || "-" %></td>
+                    <td><%= formatDate(booking?.date) || "-" %> | <%= booking?.slot || "-" %></td>
                     <td><%= booking?.totalAmount || 0 %></td>
                     <td>
                         <% if(booking?.status === 1) { %>

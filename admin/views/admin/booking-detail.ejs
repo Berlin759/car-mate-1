@@ -126,9 +126,9 @@
                     <i class="fa-solid fa-calendar text-success"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Date & Time</span>
+                    <span class="fs-14 text-gray d-block">Date & Slot</span>
                     <span class="fw-md"><%= formatDateFull(booking.date) || "-" %></span>
-                    <span class="text-gray fs-12 d-block"><%= booking.time || "" %></span>
+                    <span class="text-gray fs-12 d-block"><%= booking.slot || "" %></span>
                 </div>
             </div>
         </div>
@@ -171,28 +171,20 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Base Price</span>
-            <span class="fw-md">&#8377; <%= booking.basePrice || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Distance Charge</span>
-            <span class="fw-md">&#8377; <%= booking.distanceCharge || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Peak Hour Fee</span>
-            <span class="fw-md">&#8377; <%= booking.peakHourFee || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Material Cost</span>
-            <span class="fw-md">&#8377; <%= booking.materialCost || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Tax Amount</span>
-            <span class="fw-md">&#8377; <%= booking.taxAmount || 0 %></span>
+            <span class="text-gray fs-14 d-block">Consultant Fee</span>
+            <span class="fw-md">&#8377; <%= booking.consultantFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Discount Amount</span>
             <span class="fw-md">&#8377; <%= booking.discountAmount || 0 %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Sub Total</span>
+            <span class="fw-md">&#8377; <%= booking.subTotal || 0 %></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block">Tax Amount</span>
+            <span class="fw-md">&#8377; <%= booking.taxAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Cancel Fee</span>

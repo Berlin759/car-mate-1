@@ -2156,7 +2156,7 @@ export const postAllBookingList = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 latitude: 1,
                                 longitude: 1,
                                 totalAmount: 1,
@@ -2336,7 +2336,7 @@ export const postBookingDetails = async (req, res) => {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
-                    time: 1,
+                    slot: 1,
                     latitude: 1,
                     longitude: 1,
                     totalAmount: 1,
@@ -2613,7 +2613,7 @@ export const postAllTransactionList = async (req, res) => {
                                     _id: "$bookingDetails._id",
                                     invoiceNo: "$bookingDetails.invoiceNo",
                                     date: "$bookingDetails.date",
-                                    time: "$bookingDetails.time",
+                                    slot: "$bookingDetails.slot",
                                     status: "$bookingDetails.status",
                                 },
                             },
@@ -2813,7 +2813,7 @@ export const postTransactionDetails = async (req, res) => {
                         _id: "$bookingDetails._id",
                         invoiceNo: "$bookingDetails.invoiceNo",
                         date: "$bookingDetails.date",
-                        time: "$bookingDetails.time",
+                        slot: "$bookingDetails.slot",
                         status: "$bookingDetails.status",
                     },
                 },
@@ -2905,7 +2905,7 @@ export const getTransactionDownload = async (req, res) => {
                         _id: "$bookingDetails._id",
                         invoiceNo: "$bookingDetails.invoiceNo",
                         date: "$bookingDetails.date",
-                        time: "$bookingDetails.time",
+                        slot: "$bookingDetails.slot",
                         status: "$bookingDetails.status",
                     },
                 },
@@ -3108,15 +3108,12 @@ export const getBookingDetailPage = async (req, res) => {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
-                    time: 1,
+                    slot: 1,
                     address: 1,
                     latitude: 1,
                     longitude: 1,
-                    basePrice: 1,
-                    distanceCharge: 1,
-                    peakHourFee: 1,
-                    materialCost: 1,
                     taxAmount: 1,
+                    subTotal: 1,
                     discountAmount: 1,
                     cancelFee: 1,
                     totalAmount: 1,
@@ -3281,7 +3278,7 @@ export const getTransactionDetailPage = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 totalAmount: 1,
                                 status: 1,
                             },
@@ -3632,7 +3629,7 @@ export const postAllReviewList = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 totalAmount: 1,
                                 status: 1,
                             },
@@ -3790,7 +3787,7 @@ export const postReviewDetails = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 totalAmount: 1,
                                 status: 1,
                             },
@@ -3938,7 +3935,7 @@ export const postDashboardKPIs = async (req, res) => {
                     $project: {
                         invoiceNo: 1,
                         date: 1,
-                        time: 1,
+                        slot: 1,
                         totalAmount: 1,
                         status: 1,
                         createdAt: 1,
@@ -4533,17 +4530,17 @@ export const postAssignProvider = async (req, res) => {
 
 export const postRescheduleBooking = async (req, res) => {
     try {
-        const { bookingId, date, time } = req.body;
+        const { bookingId, date, slot } = req.body;
 
         if (!bookingId || !ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid Booking ID."));
         };
 
-        if (!date || !time) {
-            return res.status(400).json(errorResponse("Booking ID, date, and time required."));
+        if (!date || !slot) {
+            return res.status(400).json(errorResponse("Booking ID, date and slot required."));
         };
 
-        await Booking.findByIdAndUpdate(bookingId, { date: new Date(date), time: time });
+        await Booking.findByIdAndUpdate(bookingId, { date: new Date(date), slot: slot });
 
         return res.status(200).json(successResponse("Booking rescheduled successfully."));
     } catch (error) {
@@ -5872,9 +5869,9 @@ export const postSeedDefaultTemplates = async (req, res) => {
                 name: "booking_confirmation",
                 type: "email",
                 subject: "Booking Confirmed - {{bookingId}}",
-                body: "Dear {{ownerName}},\n\nYour booking #{{bookingId}} has been confirmed.\nService: {{serviceName}}\nDate: {{bookingDate}}\nTime: {{bookingTime}}\nMechanic: {{mechanicName}}\n\nThank you for choosing Car Mate!",
+                body: "Dear {{ownerName}},\n\nYour booking #{{bookingId}} has been confirmed.\nService: {{serviceName}}\nDate: {{bookingDate}}\nSlot: {{bookingSlot}}\nMechanic: {{mechanicName}}\n\nThank you for choosing Car Mate!",
                 targetAudience: "owner",
-                placeholders: ["ownerName", "bookingId", "serviceName", "bookingDate", "bookingTime", "mechanicName"],
+                placeholders: ["ownerName", "bookingId", "serviceName", "bookingDate", "bookingSlot", "mechanicName"],
                 isDefault: true,
             },
             {
@@ -5899,9 +5896,9 @@ export const postSeedDefaultTemplates = async (req, res) => {
                 name: "new_booking_request",
                 type: "push_notification",
                 subject: "New Booking Request",
-                body: "You have a new booking request from {{ownerName}} for {{serviceName}} on {{bookingDate}} at {{bookingTime}}.",
+                body: "You have a new booking request from {{ownerName}} for {{serviceName}} on {{bookingDate}} at {{bookingSlot}}.",
                 targetAudience: "mechanic",
-                placeholders: ["ownerName", "serviceName", "bookingDate", "bookingTime"],
+                placeholders: ["ownerName", "serviceName", "bookingDate", "bookingSlot"],
                 isDefault: true,
             },
             {

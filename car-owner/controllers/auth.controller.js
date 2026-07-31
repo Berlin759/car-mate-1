@@ -10,6 +10,7 @@ import {
     generateLoginToken,
     generateOtp,
     generateRandomToken,
+    generateUniqueUsername,
     log1,
     successResponse,
 } from "../lib/general.js";
@@ -41,15 +42,6 @@ export const postLogin = async (req, res) => {
 
         const owner = await Owner.findOne({ phoneNumber: phone_number });
         log1(["PostLogin owner ----->", owner]);
-
-        // if (!owner) {
-        //     const createNewOwner = await Owner.create({ phoneNumber: phone_number, phoneCode: phone_code });
-        //     log1(["PostLogin createNewOwner ----->", createNewOwner]);
-        // } else if (owner.status === Constants.OWNER_STATUS.PENDING) {
-        //     return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
-        // } else if (owner.status === Constants.OWNER_STATUS.SUSPENDED) {
-        //     return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
-        // };
 
         if (owner) {
             if (owner.status === Constants.OWNER_STATUS.PENDING) {
@@ -86,7 +78,13 @@ export const postLogin = async (req, res) => {
 
         let ownerDetails;
         if (!owner) {
-            const createNewOwner = await Owner.create({ phoneNumber: phone_number, phoneCode: phone_code });
+            const full_name = await generateUniqueUsername();
+
+            const createNewOwner = await Owner.create({
+                fullName: full_name,
+                phoneNumber: phone_number,
+                phoneCode: phone_code,
+            });
             log1(["PostLogin createNewOwner ----->", createNewOwner]);
 
             ownerDetails = createNewOwner;

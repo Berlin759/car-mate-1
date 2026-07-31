@@ -558,8 +558,40 @@ export const postHomeDetails = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
         let param = req.body;
+
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails mechanicId----->", mechanicId]);
+
+        let updatePayload = {};
+
+        const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
+        simpleFields.forEach((field) => {
+            if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
+                updatePayload[field] = param[field];
+            };
+        });
+
+        if (
+            param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&
+            param["longitude"] !== undefined && param["longitude"] !== null && param["longitude"] !== ""
+        ) {
+            updatePayload["location"] = {
+                type: "Point",
+                coordinates: [
+                    param["longitude"],
+                    param["latitude"]
+                ]
+            };
+        };
+
+        log1(["postHomeDetails updatePayload------>", updatePayload]);
+
+        if (Object.keys(updatePayload).length > 0) {
+            let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updatePayload, { new: true });
+            if (!updateMechanic) {
+                return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            };
+        };
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -581,13 +613,81 @@ export const postHomeDetails = async (req, res) => {
                 },
             },
             { $limit: 5 },
-            { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
-            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
-            { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
-            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
-            { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
-            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
-            { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [{
+                        $project: {
+                            fullName: 1,
+                            phoneNumber: 1,
+                            profileImage: 1,
+                            latitude: 1,
+                            longitude: 1,
+                            address: 1,
+                        },
+                    }],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    invoiceNo: 1,
+                    date: 1,
+                    slot: 1,
+                    latitude: 1,
+                    longitude: 1,
+                    totalAmount: 1,
+                    status: 1,
+                    createdAt: 1,
+                    serviceDetails: {
+                        _id: 1,
+                        fullName: 1
+                    },
+                    ownerDetails: 1,
+                    carDetails: {
+                        _id: 1,
+                        fullName: 1,
+                        vehicleNumber: 1,
+                        model: 1,
+                    },
+                },
+            },
         ];
 
         const upcomingBookingsPipeline = [
@@ -607,17 +707,85 @@ export const postHomeDetails = async (req, res) => {
             {
                 $sort: {
                     date: 1,
-                    time: 1,
+                    slot: 1,
                 },
             },
             { $limit: 5 },
-            { $lookup: { from: "services", localField: "serviceId", foreignField: "_id", as: "serviceDetails" } },
-            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
-            { $lookup: { from: "owners", localField: "ownerId", foreignField: "_id", as: "ownerDetails", pipeline: [{ $project: { fullName: 1, phoneNumber: 1, profileImage: 1, latitude: 1, longitude: 1, address: 1 } }] } },
-            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
-            { $lookup: { from: "cars", localField: "carId", foreignField: "_id", as: "carDetails" } },
-            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
-            { $project: { invoiceNo: 1, date: 1, time: 1, latitude: 1, longitude: 1, totalAmount: 1, status: 1, createdAt: 1, serviceDetails: { _id: 1, fullName: 1 }, ownerDetails: 1, carDetails: { _id: 1, fullName: 1, vehicleNumber: 1, model: 1 } } },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [{
+                        $project: {
+                            fullName: 1,
+                            phoneNumber: 1,
+                            profileImage: 1,
+                            latitude: 1,
+                            longitude: 1,
+                            address: 1,
+                        },
+                    }],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    invoiceNo: 1,
+                    date: 1,
+                    slot: 1,
+                    latitude: 1,
+                    longitude: 1,
+                    totalAmount: 1,
+                    status: 1,
+                    createdAt: 1,
+                    serviceDetails: {
+                        _id: 1,
+                        fullName: 1,
+                    },
+                    ownerDetails: 1,
+                    carDetails: {
+                        _id: 1,
+                        fullName: 1,
+                        vehicleNumber: 1,
+                        model: 1,
+                    },
+                },
+            },
         ];
 
         const [
@@ -1161,7 +1329,7 @@ export const postBookingList = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 latitude: 1,
                                 longitude: 1,
                                 totalAmount: 1,
@@ -1170,7 +1338,7 @@ export const postBookingList = async (req, res) => {
                                 consultantFee: 1,
                                 checklist: 1,
                                 quotation: 1,
-                                basePrice: 1,
+                                subTotal: 1,
                                 discountAmount: 1,
                                 taxAmount: 1,
                                 serviceDetails: {
@@ -1354,14 +1522,11 @@ export const postBookingDetails = async (req, res) => {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
-                    time: 1,
+                    slot: 1,
                     latitude: 1,
                     longitude: 1,
-                    basePrice: 1,
-                    distanceCharge: 1,
-                    peakHourFee: 1,
-                    materialCost: 1,
                     consultantFee: 1,
+                    subTotal: 1,
                     taxAmount: 1,
                     discountAmount: 1,
                     totalAmount: 1,
@@ -1457,11 +1622,11 @@ export const postBookingUpdateStatus = async (req, res) => {
                 const alreadyBooked = await Booking.exists({
                     mechanicId: new ObjectId(mechanicId),
                     date: new Date(bookingDetails.date),
-                    time: bookingDetails.time,
+                    slot: bookingDetails.slot,
                     status: Constants.BOOKING_STATUS.ACCEPTED,
                 });
                 if (alreadyBooked) {
-                    return res.status(400).json(errorResponse("You have already accepted another booking for this time."));
+                    return res.status(400).json(errorResponse("You have already accepted another booking for this slot."));
                 };
 
                 notificationTitle = "Booking Accepted";
@@ -1640,13 +1805,13 @@ export const postBookingSendQuote = async (req, res) => {
         // Re-calculate pricing breakdown
         const quoteSum = formattedQuotation.reduce((sum, item) => sum + item.price, 0);
         const consultantFee = booking.consultantFee || 0;
-        const basePrice = booking.basePrice || 0;
         const discountAmount = booking.discountAmount || 0;
 
-        const subTotal = (basePrice + consultantFee + quoteSum) - discountAmount;
+        const subTotal = (consultantFee + quoteSum) - discountAmount;
         const taxAmount = Math.round(subTotal * 0.18);
         const totalAmount = subTotal + taxAmount;
 
+        booking.subTotal = subTotal;
         booking.taxAmount = taxAmount;
         booking.totalAmount = totalAmount;
 
@@ -1675,8 +1840,7 @@ export const getBookingInvoice = async (req, res) => {
             return res.status(404).json(errorResponse("Booking not found."));
         };
 
-        const subTotal = (booking.basePrice || 0) + (booking.consultantFee || 0) +
-            ((booking.quotation || []).reduce((sum, item) => sum + item.price, 0)) - (booking.discountAmount || 0);
+        const subTotal = (booking.subTotal || 0);
 
         const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
 
@@ -1969,7 +2133,7 @@ export const postTransactionList = async (req, res) => {
                                     _id: "$bookingDetails._id",
                                     invoiceNo: "$bookingDetails.invoiceNo",
                                     date: "$bookingDetails.date",
-                                    time: "$bookingDetails.time",
+                                    slot: "$bookingDetails.slot",
                                     status: "$bookingDetails.status",
                                 },
                             },
@@ -2970,12 +3134,12 @@ export const postEarningDetails = async (req, res) => {
                         _id: "$bookingDetails._id",
                         invoiceNo: "$bookingDetails.invoiceNo",
                         date: "$bookingDetails.date",
-                        time: "$bookingDetails.time",
+                        slot: "$bookingDetails.slot",
                         address: "$bookingDetails.address",
                         consultantFee: "$bookingDetails.consultantFee",
                         discountAmount: "$bookingDetails.discountAmount",
                         taxAmount: "$bookingDetails.taxAmount",
-                        basePrice: "$bookingDetails.basePrice",
+                        subTotal: "$bookingDetails.subTotal",
                     },
                     customer: {
                         fullName: "$ownerDetails.fullName",

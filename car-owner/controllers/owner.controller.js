@@ -21,6 +21,7 @@ import {
     getTimeFormatFromMilliseconds,
     getIpAddress,
     getLatLngFromIP,
+    generateUniqueUsername,
 } from "../lib/general.js";
 import { sendMail } from "../utils/mailSend.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
@@ -1165,7 +1166,7 @@ export const postNearbyMechanics = async (req, res) => {
         const {
             latitude,
             longitude,
-            radius = 10,
+            radius,
             serviceId,
         } = param;
 
@@ -1173,9 +1174,11 @@ export const postNearbyMechanics = async (req, res) => {
             return res.status(400).json(errorResponse("Please provide latitude and longitude."));
         };
 
+        const defaultRadius = radius || Constants.DEFAULT_RADIUS;
+
         const lat = parseFloat(latitude);
         const lng = parseFloat(longitude);
-        const radiusInMeters = parseFloat(radius) * 1000;
+        const radiusInMeters = parseFloat(defaultRadius) * 1000;
 
         if (isNaN(lat) || isNaN(lng)) {
             return res.status(400).json(errorResponse("Invalid latitude or longitude."));
@@ -1403,7 +1406,7 @@ export const postServiceHistory = async (req, res) => {
                                 _id: 1,
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 address: 1,
                                 totalAmount: 1,
                                 status: 1,
@@ -1814,41 +1817,87 @@ export const postApplyCoupon = async (req, res) => {
 };
 
 export const postAddBooking = async (req, res) => {
-    const param = req.body;
+    const {
+        phoneNumber,
+        serviceId,
+        carId,
+        addressId,
+        mechanicType,
+        mechanicId,
+        date,
+        slot,
+    } = req.body;
 
-    log1(["postAddBooking param----->", param]);
+    log1(["postAddBooking req.body----->", req.body]);
 
     try {
-        const validate = await custom_validation(param, "owner.add_booking");
+        const validate = await custom_validation(req.body, "owner.add_booking");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
-        if (!ObjectId.isValid(param.serviceId)) {
+        if (!ObjectId.isValid(serviceId)) {
             return res.status(400).json(errorResponse("Invalid service id."));
         };
 
-        if (!ObjectId.isValid(param.carId)) {
+        if (!ObjectId.isValid(carId)) {
             return res.status(400).json(errorResponse("Invalid car id."));
         };
 
-        if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(param.mechanicId)) {
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        if (parseInt(mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL && !ObjectId.isValid(mechanicId)) {
             return res.status(400).json(errorResponse("Invalid mechanic id."));
         };
 
-        const [serviceDetails, carDetails, ownerDetails] = await Promise.all([
+        const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
+        let check_phone_number = regex.test(phoneNumber);
+        if (!check_phone_number) {
+            return res.status(400).json(errorResponse("Please enter a valid phone number. Ensure it follows the correct format."));
+        };
+
+        let ownerId;
+        let ownerName;
+        let isNewOwner = false;
+
+        const ownerDetails = await Owner.findOne({ phoneNumber: phoneNumber }).lean();
+
+        if (!ownerDetails) {
+            const full_name = await generateUniqueUsername();
+
+            const newOwner = await Owner.create({
+                fullName: full_name,
+                phoneNumber: phoneNumber,
+                status: Constants.OWNER_STATUS.ACTIVE,
+            });
+
+            ownerId = newOwner._id;
+            ownerName = newOwner.fullName;
+            isNewOwner = true;
+            log1(["postAddBooking newOwner created----->", newOwner]);
+        } else {
+            ownerId = ownerDetails._id;
+            ownerName = ownerDetails.fullName;
+        };
+
+        const [serviceDetails, carDetails, addressDetails] = await Promise.all([
             Service.findOne({
-                _id: new ObjectId(param.serviceId),
+                _id: new ObjectId(serviceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
             }).lean(),
 
             Car.findOne({
-                _id: new ObjectId(param.carId),
+                _id: new ObjectId(carId),
                 ownerId: new ObjectId(ownerId),
                 status: Constants.CAR_STATUS.VALID,
             }).lean(),
 
-            Owner.findOne({ phoneNumber: param.phoneNumber }).lean(),
+            Address.findOne({
+                _id: new ObjectId(addressId),
+                ownerId: new ObjectId(ownerId),
+            }).lean(),
         ]);
 
         log1(["postAddBooking serviceDetails----->", serviceDetails]);
@@ -1862,33 +1911,15 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid selected car. Please choose a different car."));
         };
 
-        let ownerId;
-        let isNewOwner = false;
-
-        if (ownerDetails) {
-            ownerId = ownerDetails._id;
-            await Owner.findByIdAndUpdate(ownerId, {
-                fullName: param.fullName || ownerDetails.fullName,
-                email: param.email || ownerDetails.email,
-            });
-        } else {
-            const newOwner = await Owner.create({
-                fullName: param.fullName,
-                phoneNumber: param.phoneNumber,
-                email: param.email || "",
-                status: Constants.OWNER_STATUS.ACTIVE,
-            });
-            ownerId = newOwner._id;
-            isNewOwner = true;
-            log1(["postAddBooking newOwner created----->", newOwner]);
+        if (!addressDetails) {
+            return res.status(400).json(errorResponse("Invalid selected address. Please choose a different address."));
         };
 
-        let mechanicId;
-        const serviceDoc = await Service.findOne({ _id: new ObjectId(serviceDetails._id) }).lean();
+        let mechanicNewId;
 
-        if (parseInt(param.mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
-            const isServiceAvailable = (serviceDoc?.mechanicIds || []).some(
-                m => m.mechanicId?.toString() === param.mechanicId
+        if (parseInt(mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
+            const isServiceAvailable = (serviceDetails?.mechanicIds || []).some(
+                m => m.mechanicId?.toString() === mechanicId
             );
 
             if (!isServiceAvailable) {
@@ -1896,7 +1927,7 @@ export const postAddBooking = async (req, res) => {
             };
 
             const mechanicDetails = await Mechanic.findOne({
-                _id: new ObjectId(param.mechanicId),
+                _id: new ObjectId(mechanicId),
                 status: Constants.MECHANIC_STATUS.ACTIVE,
             });
 
@@ -1906,8 +1937,8 @@ export const postAddBooking = async (req, res) => {
 
             const existingBooking = await Booking.exists({
                 mechanicId: mechanicDetails._id,
-                date: new Date(param.date),
-                time: param.time,
+                date: new Date(date),
+                slot: slot,
                 status: Constants.BOOKING_STATUS.ACCEPTED,
             });
             log1(["postAddBooking existingBooking----->", existingBooking]);
@@ -1916,9 +1947,9 @@ export const postAddBooking = async (req, res) => {
                 return res.status(400).json(errorResponse("Selected mechanic is already booked for this slot."));
             };
 
-            mechanicId = mechanicDetails._id;
+            mechanicNewId = mechanicDetails._id;
         } else {
-            const mechanicIdsForService = (serviceDoc?.mechanicIds || []).map(m => m.mechanicId);
+            const mechanicIdsForService = (serviceDetails?.mechanicIds || []).map(m => m.mechanicId);
 
             if (!mechanicIdsForService.length) {
                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
@@ -1935,8 +1966,8 @@ export const postAddBooking = async (req, res) => {
 
             const bookedMechanics = await Booking.distinct("mechanicId", {
                 mechanicId: { $in: mechanics.map(m => m._id) },
-                date: new Date(param.date),
-                time: param.time,
+                date: new Date(date),
+                slot: slot,
                 status: Constants.BOOKING_STATUS.ACCEPTED,
             });
 
@@ -1945,19 +1976,19 @@ export const postAddBooking = async (req, res) => {
             );
 
             if (!availableMechanics.length) {
-                return res.status(400).json(errorResponse("No mechanics are available for this time slot."));
+                return res.status(400).json(errorResponse("No mechanics are available for this slot."));
             };
 
             const randomIndex = Math.floor(Math.random() * availableMechanics.length);
 
-            mechanicId = availableMechanics[randomIndex]._id;
+            mechanicNewId = availableMechanics[randomIndex]._id;
         };
 
         const alreadyBooked = await Booking.exists({
             ownerId: new ObjectId(ownerId),
-            carId: new ObjectId(param.carId),
-            date: new Date(param.date),
-            time: param.time,
+            carId: new ObjectId(carId),
+            date: new Date(date),
+            slot: slot,
             status: {
                 $in: [
                     Constants.BOOKING_STATUS.PENDING,
@@ -1967,71 +1998,110 @@ export const postAddBooking = async (req, res) => {
         });
 
         if (alreadyBooked) {
-            return res.status(400).json(errorResponse("You already have a booking for this time."));
+            return res.status(400).json(errorResponse("You already have a booking for this slot."));
         };
 
-        let invoiceNo = generateInvoiceNumber();
-        let basePrice = parseFloat(param.basePrice) || 0;
-        let distanceCharge = parseFloat(param.distanceCharge) || 0;
-        let peakHourFee = parseFloat(param.peakHourFee) || 0;
-        let materialCost = parseFloat(param.materialCost) || 0;
-        let taxAmount = parseFloat(param.taxAmount) || 0;
+        const serviceMechanic = (serviceDetails?.mechanicIds || []).find(
+            (m) => m.mechanicId?.equals(mechanicNewId)
+        );
+        log1(["postAddBooking serviceMechanic----->", serviceMechanic]);
+
+        const invoiceNo = generateInvoiceNumber();
+        const consultantFee = parseFloat(serviceMechanic.price) || 0;
         let discountAmount = 0;
         let couponId = null;
 
-        if (param.couponId && ObjectId.isValid(param.couponId)) {
+        if (couponId && ObjectId.isValid(couponId)) {
             const coupon = await Coupon.findOne({
-                _id: new ObjectId(param.couponId),
+                _id: new ObjectId(couponId),
                 isActive: true,
                 expiryDate: { $gte: new Date() },
             });
+            log1(["postAddBooking coupon----->", coupon]);
 
             if (coupon) {
-                const subTotal = basePrice + distanceCharge + peakHourFee + materialCost;
-
-                if (subTotal >= coupon.minOrderAmount) {
+                if (consultantFee >= coupon.minOrderAmount) {
                     if (coupon.discountType === "percentage") {
-                        discountAmount = (subTotal * coupon.discountValue) / 100;
+                        discountAmount = (consultantFee * coupon.discountValue) / 100;
                         if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
                             discountAmount = coupon.maxDiscountAmount;
                         }
                     } else {
                         discountAmount = coupon.discountValue;
-                    }
+                    };
 
-                    if (discountAmount > subTotal) {
-                        discountAmount = subTotal;
-                    }
+                    if (discountAmount > consultantFee) {
+                        discountAmount = consultantFee;
+                    };
 
                     couponId = coupon._id;
-                }
-            }
-        }
+                };
+            };
+        };
+        log1(["postAddBooking discountAmount----->", discountAmount]);
 
-        let totalPayAmount = parseFloat(param.totalAmount) || (basePrice + distanceCharge + peakHourFee + materialCost + taxAmount - discountAmount);
+        const subTotal = parseFloat(consultantFee - discountAmount);
+
+        const taxAmount = parseFloat((subTotal * 18) / 100);
+
+        let totalPayAmount = parseFloat(subTotal + taxAmount);
 
         let bookingPayload = {
             ownerId: new ObjectId(ownerId),
-            mechanicId: mechanicId,
-            serviceId: new ObjectId(param.serviceId),
-            carId: new ObjectId(param.carId),
-            date: new Date(param.date),
-            time: param.time,
-            latitude: param.latitude,
-            longitude: param.longitude,
-            basePrice: basePrice,
-            distanceCharge: distanceCharge,
-            peakHourFee: peakHourFee,
-            materialCost: materialCost,
-            taxAmount: taxAmount,
+            mechanicId: mechanicNewId,
+            serviceId: new ObjectId(serviceId),
+            carId: new ObjectId(carId),
+            addressId: new ObjectId(addressId),
+            date: new Date(date),
+            slot: slot,
+            address: addressDetails?.address,
+            latitude: addressDetails?.latitude,
+            longitude: addressDetails?.longitude,
+            consultantFee: consultantFee,
             discountAmount: discountAmount,
+            subTotal: subTotal,
+            taxAmount: taxAmount,
             totalAmount: totalPayAmount,
             invoiceNo: invoiceNo,
+            status: Constants.BOOKING_STATUS.PENDING,
         };
 
         if (couponId) {
             bookingPayload.couponId = couponId;
         };
+
+        let razorpayPaymentLink = null;
+        try {
+            const paymentLink = await razorpayInstance.paymentLink.create({
+                amount: Math.round(totalPayAmount * 100),
+                currency: "INR",
+                description: `Booking #${invoiceNo} - ${serviceDetails.fullName || "Service"}`,
+                customer: {
+                    name: ownerName,
+                    email: "",
+                    contact: phoneNumber,
+                },
+                notify: {
+                    sms: true,
+                    email: true,
+                },
+                reference_id: `booking_${invoiceNo}`,
+                callback_url: `${process.env.APP_URL}/owner/verify-payment`,
+                callback_method: "get",
+            });
+
+            log1(["postAddBooking paymentLink----->", paymentLink]);
+
+            razorpayPaymentLink = paymentLink.short_url;
+
+            bookingPayload.razorpayOrderId = paymentLink.id;
+        } catch (razorpayError) {
+            log1(["postAddBooking Razorpay payment link creation failed----->", razorpayError.error.description]);
+
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        log1(["postAddBooking bookingPayload----->", bookingPayload]);
 
         let newBooking = await Booking.create(bookingPayload);
         log1(["postAddBooking newBooking----->", newBooking]);
@@ -2041,13 +2111,13 @@ export const postAddBooking = async (req, res) => {
 
         let transactionPayload = {
             ownerId: new ObjectId(ownerId),
-            mechanicId: mechanicId,
-            serviceId: new ObjectId(param.serviceId),
+            mechanicId: mechanicNewId,
+            serviceId: new ObjectId(serviceId),
             bookingId: new ObjectId(newBooking._id),
-            carId: new ObjectId(param.carId),
+            carId: new ObjectId(carId),
             invoiceId: invoiceNo,
             totalAmount: totalPayAmount,
-            description: `Payment To ${param.fullName || "Guest"}`,
+            description: `Payment To ${ownerName || "Guest"}`,
             status: Constants.TRANSACTION_STATUS.PENDING,
         };
 
@@ -2055,47 +2125,6 @@ export const postAddBooking = async (req, res) => {
         log1(["postAddBooking transactionCreate----->", transactionCreate]);
         if (!transactionCreate) {
             await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        let razorpayPaymentLink = null;
-        try {
-            const paymentLink = await razorpayInstance.paymentLinks.create({
-                amount: Math.round(totalPayAmount * 100),
-                currency: "INR",
-                description: `Booking #${invoiceNo} - ${serviceDetails.fullName || "Service"}`,
-                customer: {
-                    name: param.fullName,
-                    email: param.email || "",
-                    contact: param.phoneNumber,
-                },
-                notify: {
-                    sms: true,
-                    email: !!param.email,
-                },
-                reference_id: `booking_${invoiceNo}`,
-                callback_url: `${process.env.APP_URL}/owner/razorpay-webhook`,
-                callback_method: "get",
-            });
-
-            log1(["postAddBooking paymentLink----->", paymentLink]);
-
-            razorpayPaymentLink = paymentLink.short_url;
-
-            await Booking.findByIdAndUpdate(newBooking._id, {
-                razorpayOrderId: paymentLink.id,
-            });
-        } catch (razorpayError) {
-            log1(["postAddBooking Razorpay payment link creation failed----->", razorpayError.message]);
-
-            await Booking.findByIdAndUpdate(newBooking._id, {
-                status: Constants.BOOKING_STATUS.FAILED,
-            });
-
-            await Transaction.findByIdAndUpdate(transactionCreate._id, {
-                status: Constants.TRANSACTION_STATUS.FAILED,
-            });
-
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
@@ -2226,7 +2255,7 @@ export const postBookingList = async (req, res) => {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
-                                time: 1,
+                                slot: 1,
                                 latitude: 1,
                                 longitude: 1,
                                 totalAmount: 1,
@@ -2399,7 +2428,7 @@ export const postBookingDetails = async (req, res) => {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
-                    time: 1,
+                    slot: 1,
                     latitude: 1,
                     longitude: 1,
                     totalAmount: 1,
@@ -2760,7 +2789,7 @@ export const postTransactionList = async (req, res) => {
                                     _id: "$bookingDetails._id",
                                     invoiceNo: "$bookingDetails.invoiceNo",
                                     date: "$bookingDetails.date",
-                                    time: "$bookingDetails.time",
+                                    slot: "$bookingDetails.slot",
                                     status: "$bookingDetails.status",
                                 },
                             },
@@ -2874,6 +2903,26 @@ export const postVerifyRazorpayPayment = async (req, res) => {
     };
 };
 
+export const getVerifyPayment = async (req, res) => {
+    try {
+        return res.render("owner/verify_payment_page", {
+            header: {
+                page: "Verify Payment",
+                title: "Verify Payment",
+                description: "System verify payment",
+                id: "verify_payment",
+            },
+            body: {},
+            footer: {
+                js: [],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getVerifyPayment ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postRazorpayWebhook = async (req, res) => {
     try {
         log1(["postRazorpayWebhook req.body----->", req.body]);
@@ -2916,9 +2965,7 @@ export const postRazorpayWebhook = async (req, res) => {
                     log1(["postRazorpayWebhook Payment failed for booking----->", booking._id]);
                 };
             };
-        };
-
-        if (event.event === "payment_link.payment.captured" || event.event === "payment_link.payment.authorized") {
+        } else if (event.event === "payment_link.paid") {
             const paymentLink = event.payload?.payment_link?.entity;
             const referenceId = paymentLink?.reference_id;
             const paymentId = event.payload?.payment?.entity?.id;
@@ -2938,7 +2985,6 @@ export const postRazorpayWebhook = async (req, res) => {
                     await Booking.findByIdAndUpdate(booking._id, {
                         razorpayPaymentId: paymentId || "",
                         razorpayOrderId: paymentLink?.id || "",
-                        status: Constants.BOOKING_STATUS.PENDING,
                     });
 
                     await Transaction.findOneAndUpdate(

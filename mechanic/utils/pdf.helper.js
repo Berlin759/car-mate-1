@@ -56,7 +56,7 @@ export const generateInvoicePDF = async (booking, subTotal) => {
 
             doc.fontSize(10).fillColor(COLORS.dark).font("Helvetica");
             doc.text(`Invoice No: ${booking.invoiceNo || "N/A"}`, ML, y);
-            doc.text(`Date: ${formatDate(booking.date)} (${booking.time || ""})`, ML, y + 15);
+            doc.text(`Date: ${formatDate(booking.date)}, Slot: (${booking.slot || ""})`, ML, y + 15);
 
             doc.text(`Mechanic: ${booking.mechanicId?.fullName || "N/A"}`, 350, y);
             doc.text(`Contact: ${booking.mechanicId?.phoneNumber || "N/A"}`, 350, y + 15);
@@ -91,7 +91,7 @@ export const generateInvoicePDF = async (booking, subTotal) => {
                 y += 22;
             };
 
-            drawRow(`Base Service: ${booking.serviceId?.fullName || "N/A"}`, booking.basePrice || 0);
+            drawRow(`Sub Total: ${booking.serviceId?.fullName || "N/A"}`, booking.subTotal || 0);
 
             if (booking.consultantFee) {
                 drawRow("Consultant Fee", booking.consultantFee);

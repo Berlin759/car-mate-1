@@ -42,6 +42,7 @@ import {
     postCancelBooking,
     postTransactionList,
     postVerifyRazorpayPayment,
+    getVerifyPayment,
     postRazorpayWebhook,
     postNotificationList,
     postUpdateNotification,
@@ -117,6 +118,9 @@ router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/update-booking", authMiddleware, postUpdateBooking);
 router.post("/cancel-booking", authMiddleware, postCancelBooking);
+
+// Payment Success Page
+router.get("/verify-payment", getVerifyPayment);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);

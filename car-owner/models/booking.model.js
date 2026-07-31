@@ -47,7 +47,7 @@ const bookingSchema = new Schema(
             type: Date,
             default: null,
         },
-        time: {
+        slot: {
             type: String,
             default: "",
         },
@@ -62,26 +62,6 @@ const bookingSchema = new Schema(
         longitude: {
             type: String,
             default: "",
-        },
-        basePrice: {
-            type: Number,
-            default: 0,
-        },
-        distanceCharge: {
-            type: Number,
-            default: 0,
-        },
-        peakHourFee: {
-            type: Number,
-            default: 0,
-        },
-        materialCost: {
-            type: Number,
-            default: 0,
-        },
-        consultantFee: {
-            type: Number,
-            default: 0,
         },
         checklist: [
             {
@@ -109,7 +89,7 @@ const bookingSchema = new Schema(
                 },
             },
         ],
-        taxAmount: {
+        consultantFee: {
             type: Number,
             default: 0,
         },
@@ -117,7 +97,15 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
+        subTotal: {
+            type: Number,
+            default: 0,
+        },
         cancelFee: {
+            type: Number,
+            default: 0,
+        },
+        taxAmount: {
             type: Number,
             default: 0,
         },

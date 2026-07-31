@@ -213,6 +213,25 @@ export const generateOtp = async () => {
     };
 };
 
+export const generateUniqueUsername = async () => {
+    try {
+        let username;
+        let exists = true;
+
+        while (exists) {
+            const randomNumber = crypto.randomInt(1000, 10000); // 1000 - 9999
+            username = `user${randomNumber}`;
+
+            exists = await Mechanic.exists({ fullName: username });
+        };
+
+        return username;
+    } catch (error) {
+        log1(["Error in generateUniqueUsername ----->", error]);
+        return "";
+    };
+};
+
 export const maskEmail = (email) => {
     const [username, domain] = email.split("@");
 
