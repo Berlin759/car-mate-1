@@ -111,6 +111,7 @@ $(document).on("click", ".remove-subcategory-row-btn", function () {
 $(document).on("click", "#add_service", function () {
     const full_name = $("#addServiceModal #service_name").val().trim();
     const description = $("#addServiceModal #service_description").val().trim();
+    const imageFile = $("#addServiceModal #service_image")[0].files[0];
 
     const nameRegex = /^[a-zA-Z\s]+$/;
     const nameNoSpace = full_name.replace(/\s/g, "");
@@ -129,6 +130,15 @@ $(document).on("click", "#add_service", function () {
         validationMessage = "Category description is required.";
     } else if (descNoSpace.length > 200) {
         validationMessage = "Category description must not exceed 200 characters (excluding spaces).";
+    } else if (!imageFile) {
+        validationMessage = "Service image is required.";
+    } else {
+        const allowedExtensions = /(\.png|\.jpg|\.jpeg)$/i;
+        if (!allowedExtensions.exec(imageFile.name)) {
+            validationMessage = "Only PNG, JPG, and JPEG images are allowed.";
+        } else if (imageFile.size > 5 * 1024 * 1024) {
+            validationMessage = "Image size must not exceed 5 MB.";
+        };
     };
 
     if (validationMessage !== "") {
@@ -142,9 +152,7 @@ $(document).on("click", "#add_service", function () {
 
     $("#subcategory_list_container .subcategory-row").each(function (index) {
         const name = $(this).find(".subcategory-name").val().trim();
-        // const subDesc = $(this).find(".subcategory-description").val().trim();
         const subNameNoSpace = name.replace(/\s/g, "");
-        // const subDescNoSpace = subDesc.replace(/\s/g, "");
 
         if (!name) {
             subValidationMessage = `Sub-category #${index + 1} Name is required.`;
@@ -159,10 +167,6 @@ $(document).on("click", "#add_service", function () {
             subValidationMessage = `Sub-category #${index + 1} Name must not exceed 50 characters (excluding spaces).`;
             return false;
         };
-        // else if (subDesc && subDescNoSpace.length > 200) {
-        //     subValidationMessage = `Sub-category #${index + 1} Description must not exceed 200 characters (excluding spaces).`;
-        //     return false;
-        // };
 
         if (subNames.includes(name.toLowerCase())) {
             subValidationMessage = `Sub-category #${index + 1} Name "${name}" is duplicated. Please use unique sub-category names.`;
@@ -172,7 +176,6 @@ $(document).on("click", "#add_service", function () {
         subNames.push(name.toLowerCase());
         subCategories.push({
             fullName: name,
-            // description: subDesc,
         });
     });
 
@@ -186,13 +189,13 @@ $(document).on("click", "#add_service", function () {
         return;
     };
 
-    const payload = {
-        fullName: full_name,
-        description: description,
-        subCategories: subCategories
-    };
+    const formData = new FormData();
+    formData.append("fullName", full_name);
+    formData.append("description", description);
+    formData.append("subCategories", JSON.stringify(subCategories));
+    formData.append("image", imageFile);
 
-    postAjaxCall("/add-service", payload, function (response) {
+    postFileCall("/add-service", formData, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -222,6 +225,14 @@ $(document).on("click", ".edit-service-button", function () {
             $("#addServiceModal #service_name").val(serviceDetails.fullName);
             $("#addServiceModal #service_description").val(serviceDetails.description);
 
+            if (serviceDetails.image) {
+                $("#addServiceModal #service_image_preview").attr("src", serviceDetails.image);
+                $("#addServiceModal .service-img-preview-container").removeClass("d-none");
+            } else {
+                $("#addServiceModal #service_image_preview").attr("src", "");
+                $("#addServiceModal .service-img-preview-container").addClass("d-none");
+            };
+
             $("#subcategory_list_container").empty();
 
             if (subCategories.length > 0) {
@@ -244,6 +255,7 @@ $(document).on("click", "#update_service", function () {
     const serviceId = $("#addServiceModal #service_id").val();
     const full_name = $("#addServiceModal #service_name").val().trim();
     const description = $("#addServiceModal #service_description").val().trim();
+    const imageFile = $("#addServiceModal #service_image")[0].files[0];
 
     const nameRegex = /^[a-zA-Z\s]+$/;
     const nameNoSpace = full_name.replace(/\s/g, "");
@@ -264,6 +276,13 @@ $(document).on("click", "#update_service", function () {
         validationMessage = "Category description is required.";
     } else if (descNoSpace.length > 200) {
         validationMessage = "Category description must not exceed 200 characters (excluding spaces).";
+    } else if (imageFile) {
+        const allowedExtensions = /(\.png|\.jpg|\.jpeg)$/i;
+        if (!allowedExtensions.exec(imageFile.name)) {
+            validationMessage = "Only PNG, JPG, and JPEG images are allowed.";
+        } else if (imageFile.size > 5 * 1024 * 1024) {
+            validationMessage = "Image size must not exceed 5 MB.";
+        };
     };
 
     if (validationMessage !== "") {
@@ -278,9 +297,7 @@ $(document).on("click", "#update_service", function () {
     $("#subcategory_list_container .subcategory-row").each(function (index) {
         const id = $(this).find(".subcategory-id").val();
         const name = $(this).find(".subcategory-name").val().trim();
-        // const subDesc = $(this).find(".subcategory-description").val().trim();
         const subNameNoSpace = name.replace(/\s/g, "");
-        // const subDescNoSpace = subDesc.replace(/\s/g, "");
 
         if (!name) {
             subValidationMessage = `Sub-category #${index + 1} Name is required.`;
@@ -295,10 +312,6 @@ $(document).on("click", "#update_service", function () {
             subValidationMessage = `Sub-category #${index + 1} Name must not exceed 50 characters (excluding spaces).`;
             return false;
         };
-        // else if (subDesc && subDescNoSpace.length > 200) {
-        //     subValidationMessage = `Sub-category #${index + 1} Description must not exceed 200 characters (excluding spaces).`;
-        //     return false;
-        // };
 
         if (subNames.includes(name.toLowerCase())) {
             subValidationMessage = `Sub-category #${index + 1} Name "${name}" is duplicated. Please use unique sub-category names.`;
@@ -309,7 +322,6 @@ $(document).on("click", "#update_service", function () {
         subCategories.push({
             _id: id || undefined,
             fullName: name,
-            // description: subDesc,
         });
     });
 
@@ -323,14 +335,16 @@ $(document).on("click", "#update_service", function () {
         return;
     };
 
-    const payload = {
-        serviceId: serviceId,
-        fullName: full_name,
-        description: description,
-        subCategories: subCategories
+    const formData = new FormData();
+    formData.append("serviceId", serviceId);
+    formData.append("fullName", full_name);
+    formData.append("description", description);
+    formData.append("subCategories", JSON.stringify(subCategories));
+    if (imageFile) {
+        formData.append("image", imageFile);
     };
 
-    postAjaxCall("/service-update", payload, function (response) {
+    postFileCall("/service-update", formData, function (response) {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
@@ -410,8 +424,26 @@ function resetAddServiceModal() {
     $("#addServiceModal #service_id").val("");
     $("#addServiceModal #service_name").val("");
     $("#addServiceModal #service_description").val("");
+    $("#addServiceModal #service_image").val("");
+    $("#addServiceModal #service_image_preview").attr("src", "");
+    $("#addServiceModal .service-img-preview-container").addClass("d-none");
     $("#subcategory_list_container").empty();
 };
+
+$(document).on("change", "#addServiceModal #service_image", function () {
+    const file = this.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            $("#addServiceModal #service_image_preview").attr("src", e.target.result);
+            $("#addServiceModal .service-img-preview-container").removeClass("d-none");
+        }
+        reader.readAsDataURL(file);
+    } else {
+        $("#addServiceModal #service_image_preview").attr("src", "");
+        $("#addServiceModal .service-img-preview-container").addClass("d-none");
+    };
+});
 
 function fetchAllServicesList(filterObj = {}) {
     setFilters({ ...filterObj });

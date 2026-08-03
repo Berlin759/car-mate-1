@@ -74,7 +74,12 @@
                         <tr>
                             <td><%= start_index %></td>
                             <td>
-                                <strong><%= item?.fullName || "-" %></strong>
+                                <div class="d-flex align-items-center gap-2">
+                                    <% if (item?.image) { %>
+                                        <img src="<%= item.image %>" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" alt="service-img">
+                                    <% } %>
+                                    <strong><%= item?.fullName || "-" %></strong>
+                                </div>
                             </td>
                             <td>
                                 <% if (item?.subCategories && item?.subCategories.length > 0) { %>

@@ -117,6 +117,18 @@
                                 <textarea class="form-control" type="text" name="description" id="service_description" rows="3" placeholder="Enter Category Description" maxlength="250"></textarea>
                                 <div class="text-end fs-11 text-muted" id="service_description_counter">0/200</div>
                             </div>
+                            <div class="col-lg-12">
+                                <label for="image" class="form-label text-dark d-block">Category Image (Required, PNG/JPG/JPEG, Max 5MB)</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="position-relative service-img-preview-container d-none" style="width: 80px; height: 80px; border-radius: 12px; border: 1px solid #dee2e6; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa;">
+                                        <img id="service_image_preview" src="" style="width: 100%; height: 100%; object-fit: cover;" alt="Preview">
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <input class="form-control" type="file" name="image" id="service_image" accept="image/png, image/jpeg, image/jpg">
+                                        <div class="fs-11 text-muted mt-1">PNG, JPG or JPEG. Max size 5MB.</div>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <!-- Sub-categories Section -->
                             <div class="col-lg-12 mt-4">

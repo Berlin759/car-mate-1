@@ -1624,10 +1624,44 @@ export const postAddService = async (req, res) => {
             return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
         };
 
+        // Image Validation
+        if (!req.files || !req.files.image) {
+            return res.status(400).json(errorResponse("Service image is required."));
+        };
+
+        const file = req.files.image;
+        const allowedMimeTypes = ["image/png", "image/jpg", "image/jpeg"];
+        const extension = path.extname(file.name).toLowerCase();
+        const allowedExtensions = [".png", ".jpg", ".jpeg"];
+
+        if (!allowedMimeTypes.includes(file.mimetype) && !allowedExtensions.includes(extension)) {
+            return res.status(400).json(errorResponse("Only PNG, JPG, and JPEG images are allowed."));
+        };
+
+        const maxSize = 5 * 1024 * 1024; // 5 MB
+        if (file.size > maxSize) {
+            return res.status(400).json(errorResponse("Image size must not exceed 5 MB."));
+        };
+
+        const uploadResult = await uploadFile(file);
+        if (uploadResult.flag === 0) {
+            return res.status(400).json(errorResponse("Failed to upload service image."));
+        };
+        const imageUrl = uploadResult.data.url;
+
+        let parsedSubCategories = subCategories;
+        if (typeof subCategories === "string") {
+            try {
+                parsedSubCategories = JSON.parse(subCategories);
+            } catch (err) {
+                log1(["Failed to parse subCategories JSON string ----->", err]);
+            };
+        };
+
         let subCategoryArray = [];
-        if (subCategories && Array.isArray(subCategories) && subCategories.length > 0) {
+        if (parsedSubCategories && Array.isArray(parsedSubCategories) && parsedSubCategories.length > 0) {
             const subNames = [];
-            for (const sub of subCategories) {
+            for (const sub of parsedSubCategories) {
                 if (!sub.fullName || sub.fullName.trim() === "") continue;
 
                 const subTrimmedName = sub.fullName.trim();
@@ -1656,6 +1690,7 @@ export const postAddService = async (req, res) => {
             fullName: trimmedName,
             description: description,
             subCategory: subCategoryArray,
+            image: imageUrl,
         };
 
         const addNewService = await Service.create(payload);
@@ -1902,12 +1937,53 @@ export const postServiceUpdate = async (req, res) => {
             payload["status"] = parseInt(status);
         };
 
-        if (subCategories && Array.isArray(subCategories)) {
+        // Image Validation & Update
+        if (req.files && req.files.image) {
+            const file = req.files.image;
+            const allowedMimeTypes = ["image/png", "image/jpg", "image/jpeg"];
+            const extension = path.extname(file.name).toLowerCase();
+            const allowedExtensions = [".png", ".jpg", ".jpeg"];
+
+            if (!allowedMimeTypes.includes(file.mimetype) && !allowedExtensions.includes(extension)) {
+                return res.status(400).json(errorResponse("Only PNG, JPG, and JPEG images are allowed."));
+            };
+
+            const maxSize = 5 * 1024 * 1024; // 5 MB
+            if (file.size > maxSize) {
+                return res.status(400).json(errorResponse("Image size must not exceed 5 MB."));
+            };
+
+            const uploadResult = await uploadFile(file);
+            if (uploadResult.flag === 0) {
+                return res.status(400).json(errorResponse("Failed to upload service image."));
+            };
+
+            if (serviceDetails.image) {
+                try {
+                    await removeFile(serviceDetails.image);
+                } catch (err) {
+                    log1(["Failed to remove old service image ----->", err]);
+                };
+            };
+
+            payload["image"] = uploadResult.data.url;
+        };
+
+        let parsedSubCategories = subCategories;
+        if (typeof subCategories === "string") {
+            try {
+                parsedSubCategories = JSON.parse(subCategories);
+            } catch (err) {
+                log1(["Failed to parse subCategories JSON string ----->", err]);
+            };
+        };
+
+        if (parsedSubCategories && Array.isArray(parsedSubCategories)) {
             const nameRegex = /^[a-zA-Z\s]+$/;
             const updatedSubCategories = [];
             const subNames = [];
 
-            for (const sub of subCategories) {
+            for (const sub of parsedSubCategories) {
                 if (!sub.fullName || sub.fullName.trim() === "") continue;
 
                 const subTrimmedName = sub.fullName.trim();

@@ -698,41 +698,69 @@ export const postAddCar = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        const vehicle = await getVehicleDetails(vehicleNumber);
+        // const vehicle = await getVehicleDetails(vehicleNumber);
 
-        if (vehicle.flag === 0) {
-            return res.status(vehicle.status).json(vehicle);
-        };
+        // if (vehicle.flag === 0) {
+        //     return res.status(vehicle.status).json(vehicle);
+        // };
 
-        const vehicleDetails = vehicle.data;
+        // const vehicleDetails = vehicle.data;
 
-        const ownerName = vehicleDetails.owner ? `${vehicleDetails.owner} ${vehicleDetails.owner_father_name || ""}` : "";
+        // const ownerName = vehicleDetails.owner ? `${vehicleDetails.owner} ${vehicleDetails.owner_father_name || ""}` : "";
+
+        // let payload = {
+        //     fullName: ownerName,
+        //     vehicleNumber: vehicleDetails.vehicle_number,
+        //     puccNumber: vehicleDetails.pucc_number,
+        //     model: vehicleDetails.model,
+        //     registerNumber: vehicleDetails.reg_no,
+        //     chassis: vehicleDetails.chassis,
+        //     engine: vehicleDetails.engine,
+        //     vehicleManufacturerName: vehicleDetails.vehicle_manufacturer_name,
+        //     vehicleColour: vehicleDetails.vehicle_colour,
+        //     vehicleType: vehicleDetails.type,
+        //     vehicleOwnerCount: vehicleDetails.owner_count,
+        //     ownerPhoneNumber: vehicleDetails.mobile_number,
+        //     rcStatus: vehicleDetails.rc_status,
+        //     registerDate: vehicleDetails.reg_date,
+        //     vehicleManufacturingMonthYear: vehicleDetails.vehicle_manufacturing_month_year,
+        //     rcExpiryDate: vehicleDetails.rc_expiry_date,
+        //     vehicleInsuranceCompanyName: vehicleDetails.vehicle_insurance_company_name,
+        //     vehicleInsuranceEndDate: vehicleDetails.vehicle_insurance_upto,
+        //     vehicleInsurancePolicyNo: vehicleDetails.vehicle_insurance_policy_number,
+        //     rcFinancer: vehicleDetails.rc_financer,
+        //     presentAddress: vehicleDetails.present_address,
+        //     challanDetails: vehicleDetails.challan_details,
+        //     nocDetails: vehicleDetails.noc_details,
+        //     status: vehicleDetails.status === "VALID" ? Constants.CAR_STATUS.VALID : Constants.CAR_STATUS.INVALID,
+        //     ownerId: new ObjectId(ownerId._id),
+        // };
 
         let payload = {
-            fullName: ownerName,
-            vehicleNumber: vehicleDetails.vehicle_number,
-            puccNumber: vehicleDetails.pucc_number,
-            model: vehicleDetails.model,
-            registerNumber: vehicleDetails.reg_no,
-            chassis: vehicleDetails.chassis,
-            engine: vehicleDetails.engine,
-            vehicleManufacturerName: vehicleDetails.vehicle_manufacturer_name,
-            vehicleColour: vehicleDetails.vehicle_colour,
-            vehicleType: vehicleDetails.type,
-            vehicleOwnerCount: vehicleDetails.owner_count,
-            ownerPhoneNumber: vehicleDetails.mobile_number,
-            rcStatus: vehicleDetails.rc_status,
-            registerDate: vehicleDetails.reg_date,
-            vehicleManufacturingMonthYear: vehicleDetails.vehicle_manufacturing_month_year,
-            rcExpiryDate: vehicleDetails.rc_expiry_date,
-            vehicleInsuranceCompanyName: vehicleDetails.vehicle_insurance_company_name,
-            vehicleInsuranceEndDate: vehicleDetails.vehicle_insurance_upto,
-            vehicleInsurancePolicyNo: vehicleDetails.vehicle_insurance_policy_number,
-            rcFinancer: vehicleDetails.rc_financer,
-            presentAddress: vehicleDetails.present_address,
-            challanDetails: vehicleDetails.challan_details,
-            nocDetails: vehicleDetails.noc_details,
-            status: vehicleDetails.status === "VALID" ? Constants.CAR_STATUS.VALID : Constants.CAR_STATUS.INVALID,
+            fullName: "JOHN DOE JOHN DOE",
+            vehicleNumber: vehicleNumber,
+            puccNumber: "Newv3",
+            model: "P20 1.0TURBO GDI DCT",
+            registerNumber: "HJ01ME5678",
+            chassis: "PFGHV511VMM23768",
+            engine: "K8KJHH7766890",
+            vehicleManufacturerName: "HYUNDAI MOTOR INDIA LTD",
+            vehicleColour: "TEAL GREY",
+            vehicleType: "PETROL",
+            vehicleOwnerCount: 1,
+            ownerPhoneNumber: null,
+            rcStatus: "ACTIVE",
+            registerDate: "2021-12-24",
+            vehicleManufacturingMonthYear: "12/2021",
+            rcExpiryDate: "2089-12-23",
+            vehicleInsuranceCompanyName: "BAJAJ INSURANCE CO. LTD.",
+            vehicleInsuranceEndDate: "2029-12-14",
+            vehicleInsurancePolicyNo: "908036874822222",
+            rcFinancer: "BAJAJ FINANCE",
+            presentAddress: "FLAT D876 SUNFLOWER APT BELLANDUR, Bangalore, Karnataka, 560103",
+            challanDetails: null,
+            nocDetails: null,
+            status: Constants.CAR_STATUS.VALID,
             ownerId: new ObjectId(ownerId._id),
         };
 
@@ -1087,10 +1115,11 @@ export const postServiceList = async (req, res) => {
                 categoryGroupMap[serviceIdStr] = {
                     categoryId: service._id,
                     categoryName: service.fullName,
+                    categoryImage: service.image,
                     categoryDescription: service.description || "",
                     subCategory: [],
                 };
-            }
+            };
 
             categoryGroupMap[serviceIdStr].subCategory.push({
                 subCategoryName: sub.fullname,
@@ -2114,7 +2143,10 @@ export const postBookingList = async (req, res) => {
 
         const statusMap = {
             Pending: 0,
-            Confirmed: 0,
+            Accepted: 0,
+            Rejected: 0,
+            ServiceStarted: 0,
+            ServiceCompleted: 0,
             Cancelled: 0,
         };
 
@@ -2127,6 +2159,18 @@ export const postBookingList = async (req, res) => {
 
                 case Constants.BOOKING_STATUS.ACCEPTED:
                     statusMap.Accepted = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.REJECTED:
+                    statusMap.Rejected = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.SERVICE_STARTED:
+                    statusMap.ServiceStarted = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.SERVICE_COMPLETED:
+                    statusMap.ServiceCompleted = item.count;
                     break;
 
                 case Constants.BOOKING_STATUS.CANCELLED:
@@ -2223,6 +2267,34 @@ export const postBookingDetails = async (req, res) => {
             },
             {
                 $lookup: {
+                    from: "transactions",
+                    localField: "_id",
+                    foreignField: "bookingId",
+                    as: "transactionDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceId: 1,
+                                trxId: 1,
+                                adminCharge: 1,
+                                totalAmount: 1,
+                                description: 1,
+                                status: 1,
+                                createdAt: 1,
+                                updatedAt: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$transactionDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
                     from: "cars",
                     localField: "carId",
                     foreignField: "_id",
@@ -2251,6 +2323,7 @@ export const postBookingDetails = async (req, res) => {
                         description: "$serviceDetails.description",
                     },
                     mechanicDetails: 1,
+                    transactionDetails: 1,
                     carDetails: {
                         _id: "$carDetails._id",
                         fullName: "$carDetails.fullName",
@@ -2262,6 +2335,87 @@ export const postBookingDetails = async (req, res) => {
         ];
 
         const [response] = await Booking.aggregate(pipeline);
+
+        if (response) {
+            const transactionStatus = response?.transactionDetails?.status;
+            const bookingStatus = response?.status;
+            const ownerDetails = await Owner.findById(ownerId).select("fullName").lean();
+            const ownerName = ownerDetails?.fullName || "Owner";
+            const categoryName = response.serviceDetails?.fullName || "Service";
+            const bookingDate = response.date ? moment(response.date).format("D MMMM YYYY") : "";
+
+            const trackService = [];
+
+            // 1. Payment Stage
+            const isPaymentDone = transactionStatus === Constants.TRANSACTION_STATUS.SUCCESS || Constants.TRANSACTION_STATUS.REFUND;
+            trackService.push({
+                title: "Payment",
+                subTitle: `${ownerName} (${categoryName})`,
+                isCompleted: isPaymentDone,
+                isActive: bookingStatus === Constants.BOOKING_STATUS.PENDING,
+                iconType: isPaymentDone ? "success" : (bookingStatus === Constants.BOOKING_STATUS.PENDING ? "current" : "pending")
+            });
+
+            // 2. Service Booked Stage
+            trackService.push({
+                title: "Service Booked",
+                subTitle: bookingDate,
+                isCompleted: true,
+                isActive: false,
+                iconType: "success"
+            });
+
+            // 3. Service Approved Stage
+            const isApproved = bookingStatus >= Constants.BOOKING_STATUS.ACCEPTED && bookingStatus !== Constants.BOOKING_STATUS.REJECTED && bookingStatus !== Constants.BOOKING_STATUS.CANCELLED;
+            trackService.push({
+                title: "Service Approved",
+                subTitle: `${ownerName} (${categoryName})`,
+                isCompleted: isApproved,
+                isActive: isPaymentDone && bookingStatus === Constants.BOOKING_STATUS.ACCEPTED,
+                iconType: isApproved ? "success" : (isPaymentDone && bookingStatus === Constants.BOOKING_STATUS.ACCEPTED ? "current" : "pending")
+            });
+
+            if (bookingStatus === Constants.BOOKING_STATUS.CANCELLED) {
+                trackService.push({
+                    title: "Cancelled",
+                    subTitle: "You cancelled this booking",
+                    isCompleted: true,
+                    isActive: true,
+                    iconType: "cancelled"
+                });
+            } else if (bookingStatus === Constants.BOOKING_STATUS.REJECTED) {
+                trackService.push({
+                    title: "Rejected",
+                    subTitle: "Booking was rejected",
+                    isCompleted: true,
+                    isActive: true,
+                    iconType: "cancelled"
+                });
+            } else {
+                // 4. Service In Progress Stage
+                const isInProgress = bookingStatus >= Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE && bookingStatus <= Constants.BOOKING_STATUS.SERVICE_STARTED;
+                const isProgressCompleted = bookingStatus >= Constants.BOOKING_STATUS.SERVICE_COMPLETED;
+                trackService.push({
+                    title: "Service In Progress",
+                    subTitle: isInProgress ? "Service is in progress" : "Service will begin shortly",
+                    isCompleted: isProgressCompleted,
+                    isActive: isInProgress,
+                    iconType: isProgressCompleted ? "success" : (isInProgress ? "current" : "pending")
+                });
+
+                // 5. Service Completed Stage
+                const isCompleted = bookingStatus >= Constants.BOOKING_STATUS.SERVICE_COMPLETED;
+                trackService.push({
+                    title: "Service Completed",
+                    subTitle: "Service completion and clean up",
+                    isCompleted: isCompleted,
+                    isActive: bookingStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                    iconType: isCompleted ? "success" : (bookingStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED ? "current" : "pending")
+                });
+            }
+
+            response.trackService = trackService;
+        }
 
         return res.status(200).json(successResponse("Booking details get successfully.", response));
     } catch (error) {
@@ -3064,7 +3218,6 @@ export const postAddRating = async (req, res) => {
         log1(["postAddRating bookingDetails----->", bookingDetails]);
 
         if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED &&
-            bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED &&
             bookingDetails.status !== Constants.BOOKING_STATUS.CLOSED) {
             return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
         };

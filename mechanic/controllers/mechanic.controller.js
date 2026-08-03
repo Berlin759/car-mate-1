@@ -137,13 +137,13 @@ export const getProfileDetails = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    // email: 1,
                     phoneNumber: 1,
                     phoneCode: 1,
                     profileImage: 1,
                     countryName: 1,
                     countryCode: 1,
                     location: 1,
+                    address: 1,
                     latitude: 1,
                     longitude: 1,
                     earningBalance: 1,
@@ -152,7 +152,9 @@ export const getProfileDetails = async (req, res) => {
                     loginToken: 1,
                     lastLoginAt: 1,
                     pushNotification: 1,
-                    emailVerification: 1,
+                    bookingNotification: 1,
+                    paymentNotification: 1,
+                    smsNotification: 1,
                     bankAccountNumber: 1,
                     bankIfscCode: 1,
                     bankAccountHolderName: 1,
@@ -169,6 +171,49 @@ export const getProfileDetails = async (req, res) => {
         const items = await Mechanic.aggregate(pipeline);
 
         const response = items[0];
+
+        if (response) {
+            const kycRecord = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) }).lean();
+            const serviceCount = await Service.countDocuments({
+                "subCategory.mechanicIds.mechanicId": new ObjectId(mechanicId)
+            });
+
+            const isProfileComplete = !!(
+                response.fullName &&
+                response.fullName !== "" &&
+                !/^user\d+$/.test(response.fullName) &&
+                response.profileImage &&
+                response.profileImage !== ""
+            );
+
+            const isKycVerified = !!(kycRecord && kycRecord.status === Constants.KYC_STATUS.APPROVED);
+
+            const isAddressComplete = !!(
+                response.address &&
+                response.address !== "" &&
+                response.latitude &&
+                response.latitude !== "" &&
+                response.longitude &&
+                response.longitude !== ""
+            );
+
+            const isServiceSelectionComplete = serviceCount > 0;
+
+            const isBankDetailsComplete = !!(
+                response.bankAccountNumber && response.bankAccountNumber !== "" &&
+                response.bankIfscCode && response.bankIfscCode !== "" &&
+                response.bankAccountHolderName && response.bankAccountHolderName !== "" &&
+                response.bankName && response.bankName !== ""
+            );
+
+            response.profileComplete = {
+                profile: isProfileComplete,
+                Kycverification: isKycVerified,
+                address: isAddressComplete,
+                serviceSelection: isServiceSelectionComplete,
+                bankDetails: isBankDetailsComplete
+            };
+        };
 
         return res.status(200).json(successResponse("Get Profile Details successfully!", response));
     } catch (error) {
@@ -636,8 +681,6 @@ export const postHomeDetails = async (req, res) => {
                     pipeline: [{
                         $project: {
                             fullName: 1,
-                            phoneNumber: 1,
-                            profileImage: 1,
                             latitude: 1,
                             longitude: 1,
                             address: 1,
@@ -648,20 +691,6 @@ export const postHomeDetails = async (req, res) => {
             {
                 $unwind: {
                     path: "$ownerDetails",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "cars",
-                    localField: "carId",
-                    foreignField: "_id",
-                    as: "carDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$carDetails",
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -677,15 +706,10 @@ export const postHomeDetails = async (req, res) => {
                     createdAt: 1,
                     serviceDetails: {
                         _id: 1,
-                        fullName: 1
+                        fullName: 1,
+                        image: 1,
                     },
                     ownerDetails: 1,
-                    carDetails: {
-                        _id: 1,
-                        fullName: 1,
-                        vehicleNumber: 1,
-                        model: 1,
-                    },
                 },
             },
         ];
@@ -699,7 +723,6 @@ export const postHomeDetails = async (req, res) => {
                             Constants.BOOKING_STATUS.ACCEPTED,
                             Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
                             Constants.BOOKING_STATUS.ARRIVED,
-                            Constants.BOOKING_STATUS.SERVICE_STARTED,
                         ],
                     },
                 },
@@ -734,11 +757,6 @@ export const postHomeDetails = async (req, res) => {
                     pipeline: [{
                         $project: {
                             fullName: 1,
-                            phoneNumber: 1,
-                            profileImage: 1,
-                            latitude: 1,
-                            longitude: 1,
-                            address: 1,
                         },
                     }],
                 },
@@ -746,20 +764,6 @@ export const postHomeDetails = async (req, res) => {
             {
                 $unwind: {
                     path: "$ownerDetails",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "cars",
-                    localField: "carId",
-                    foreignField: "_id",
-                    as: "carDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$carDetails",
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -776,14 +780,9 @@ export const postHomeDetails = async (req, res) => {
                     serviceDetails: {
                         _id: 1,
                         fullName: 1,
+                        image: 1,
                     },
                     ownerDetails: 1,
-                    carDetails: {
-                        _id: 1,
-                        fullName: 1,
-                        vehicleNumber: 1,
-                        model: 1,
-                    },
                 },
             },
         ];
@@ -791,7 +790,6 @@ export const postHomeDetails = async (req, res) => {
         const [
             todayJobsCount,
             todayCompletedJobsCount,
-            totalPendingRequestsCount,
             todayTransactionsSum,
             mechanicProfile,
             newJobRequests,
@@ -816,16 +814,9 @@ export const postHomeDetails = async (req, res) => {
                 status: {
                     $in: [
                         Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                        Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
                         Constants.BOOKING_STATUS.CLOSED
                     ]
                 },
-            }),
-
-            // Total pending requests count
-            Booking.countDocuments({
-                mechanicId: new ObjectId(mechanicId),
-                status: Constants.BOOKING_STATUS.PENDING,
             }),
 
             // Today's earnings sum
@@ -914,15 +905,13 @@ export const postHomeDetails = async (req, res) => {
         const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
 
         const response = {
-            todayJobs: todayJobsCount,
-            totalCompletedJobs: todayCompletedJobsCount,
-            totalPendingRequests: totalPendingRequestsCount,
-            todayEarnings,
             totalEarnings,
             pendingPayouts,
+            todayJobs: todayJobsCount,
+            totalCompletedJobs: todayCompletedJobsCount,
             rating: avgRating,
+            todayEarnings,
             unreadNotificationsCount,
-            mechanic: mechanicProfile,
             newJobRequests,
             upcomingBookings,
             profileCompletionCount,
@@ -962,6 +951,7 @@ export const postAllServicesList = async (req, res) => {
             return {
                 categoryId: parent._id,
                 categoryName: parent.fullName,
+                categoryImage: parent.image,
                 description: parent.description,
                 isSelected,
                 subServices: children,
@@ -1065,37 +1055,6 @@ export const postAddService = async (req, res) => {
     };
 };
 
-export const postOldAddService = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        log1(["postOldAddService mechanicId----->", mechanicId]);
-
-        log1(["postOldAddService req.body----->", req.body]);
-        const { fullName, description } = req.body;
-
-        const validate = await custom_validation(req.body, "mechanic.add_service");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
-        };
-
-        let payload = {
-            mechanicId: new ObjectId(mechanicId),
-            fullName: fullName,
-            description: description,
-        };
-
-        const addNewService = await Service.create(payload);
-        if (!addNewService) {
-            return res.status(400).json(errorResponse("Failed to add Service."));
-        };
-
-        return res.status(200).json(successResponse("New Service Add Successfully!"));
-    } catch (error) {
-        log1(["Error in postOldAddService----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
 export const postMyServiceList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
@@ -1146,6 +1105,8 @@ export const postMyServiceList = async (req, res) => {
                 categoryGroupMap[service._id.toString()] = {
                     categoryId: service._id,
                     categoryName: service.fullName,
+                    categoryImage: service.image,
+                    categoryDescription: service.description,
                     subCategory: subCategoryList,
                 };
             };
@@ -1222,7 +1183,6 @@ export const postBookingList = async (req, res) => {
                     match.status = {
                         $in: [
                             Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                            Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
                             Constants.BOOKING_STATUS.CLOSED
                         ]
                     };
@@ -1369,7 +1329,10 @@ export const postBookingList = async (req, res) => {
 
         const statusMap = {
             Pending: 0,
-            Confirmed: 0,
+            Accepted: 0,
+            Rejected: 0,
+            ServiceStarted: 0,
+            ServiceCompleted: 0,
             Cancelled: 0,
         };
 
@@ -1382,6 +1345,18 @@ export const postBookingList = async (req, res) => {
 
                 case Constants.BOOKING_STATUS.ACCEPTED:
                     statusMap.Accepted = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.REJECTED:
+                    statusMap.Rejected = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.SERVICE_STARTED:
+                    statusMap.ServiceStarted = item.count;
+                    break;
+
+                case Constants.BOOKING_STATUS.SERVICE_COMPLETED:
+                    statusMap.ServiceCompleted = item.count;
                     break;
 
                 case Constants.BOOKING_STATUS.CANCELLED:
@@ -1707,8 +1682,8 @@ export const postBookingUpdateStatus = async (req, res) => {
             }
 
             case Constants.BOOKING_STATUS.CLOSED: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.PAYMENT_COMPLETED) {
-                    return res.status(400).json(errorResponse("Can only close booking after payment."));
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                    return res.status(400).json(errorResponse("Can only close booking after complete service."));
                 };
 
                 notificationTitle = "Booking Closed";
@@ -2705,92 +2680,10 @@ export const postSubmitKYC = async (req, res) => {
 export const postEarningOverview = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const {
-            filterType = "this_month",
-            startDate,
-            endDate,
-        } = req.body;
-
-        let startPeriod, endPeriod;
-        let startPrevPeriod, endPrevPeriod;
-
-        if (filterType === "this_month") {
-            startPeriod = moment().startOf('month');
-            endPeriod = moment().endOf('month');
-
-            startPrevPeriod = moment().subtract(1, 'months').startOf('month');
-            endPrevPeriod = moment().subtract(1, 'months').endOf('month');
-        } else if (filterType === "last_month") {
-            startPeriod = moment().subtract(1, 'months').startOf('month');
-            endPeriod = moment().subtract(1, 'months').endOf('month');
-
-            startPrevPeriod = moment().subtract(2, 'months').startOf('month');
-            endPrevPeriod = moment().subtract(2, 'months').endOf('month');
-        } else if (filterType === "custom") {
-            if (!startDate || !endDate) {
-                return res.status(400).json(errorResponse("startDate and endDate are required for custom filter type."));
-            };
-
-            startPeriod = moment(startDate).startOf('day');
-            endPeriod = moment(endDate).endOf('day');
-
-            if (!startPeriod.isValid() || !endPeriod.isValid()) {
-                return res.status(400).json(errorResponse("Invalid startDate or endDate format."));
-            };
-
-            const durationDays = endPeriod.diff(startPeriod, 'days') + 1;
-
-            startPrevPeriod = moment(startPeriod).subtract(durationDays, 'days').startOf('day');
-            endPrevPeriod = moment(startPeriod).subtract(1, 'days').endOf('day');
-        } else {
-            return res.status(400).json(errorResponse("Invalid filterType. Must be 'this_month', 'last_month', or 'custom'."));
-        };
 
         // 1. Earnings Overview calculations
-        const [
-            currentPeriodEarningsStats,
-            prevPeriodEarningsStats,
-            allTimeEarningsStats,
-            pendingPayoutsStats
-        ] = await Promise.all([
-            Transaction.aggregate([
-                {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
-                        createdAt: { $gte: startPeriod.toDate(), $lte: endPeriod.toDate() }
-                    },
-                },
-                {
-                    $group: {
-                        _id: null,
-                        total: {
-                            $sum: "$totalAmount",
-                        },
-                    },
-                },
-            ]),
-
-            Transaction.aggregate([
-                {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
-                        createdAt: {
-                            $gte: startPrevPeriod.toDate(),
-                            $lte: endPrevPeriod.toDate(),
-                        },
-                    },
-                },
-                {
-                    $group: {
-                        _id: null,
-                        total: {
-                            $sum: "$totalAmount",
-                        },
-                    },
-                },
-            ]),
-
-            Transaction.aggregate([
+        const [allTimeEarningsStats, pendingPayoutsStats] = await Promise.all([
+            Earning.aggregate([
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
@@ -2825,96 +2718,15 @@ export const postEarningOverview = async (req, res) => {
             ])
         ]);
 
-        const currentEarnings = currentPeriodEarningsStats[0]?.total || 0;
-        const prevEarnings = prevPeriodEarningsStats[0]?.total || 0;
         const allTimeTotalEarnings = allTimeEarningsStats[0]?.total || 0;
         const pendingPayouts = pendingPayoutsStats[0]?.total || 0;
 
-        const diff = currentEarnings - prevEarnings;
-        const pctChange = prevEarnings > 0 ? (diff / prevEarnings) * 100 : (currentEarnings > 0 ? 100 : 0);
-        const percentageChange = parseFloat(Math.abs(pctChange).toFixed(1));
-        const trend = pctChange >= 0 ? "up" : "down";
-
-        // 2. Weekly earnings breakout for graph (WK1 - WK5)
-        const durationDays = endPeriod.diff(startPeriod, 'days') + 1;
-        const weeks = [];
-        if (durationDays >= 28 && durationDays <= 31) {
-            const startOfMonth = moment(startPeriod).startOf('month');
-            weeks.push({ name: "WK1", start: moment(startOfMonth).date(1).startOf('day'), end: moment(startOfMonth).date(7).endOf('day') });
-            weeks.push({ name: "WK2", start: moment(startOfMonth).date(8).startOf('day'), end: moment(startOfMonth).date(14).endOf('day') });
-            weeks.push({ name: "WK3", start: moment(startOfMonth).date(15).startOf('day'), end: moment(startOfMonth).date(21).endOf('day') });
-            weeks.push({ name: "WK4", start: moment(startOfMonth).date(22).startOf('day'), end: moment(startOfMonth).date(28).endOf('day') });
-            weeks.push({ name: "WK5", start: moment(startOfMonth).date(29).startOf('day'), end: moment(startOfMonth).endOf('month') });
-        } else {
-            const interval = Math.max(1, Math.floor(durationDays / 5));
-            for (let i = 0; i < 5; i++) {
-                const wStart = moment(startPeriod).add(i * interval, 'days').startOf('day');
-                let wEnd;
-
-                if (i === 4) {
-                    wEnd = moment(endPeriod).endOf('day');
-                } else {
-                    wEnd = moment(wStart).add(interval - 1, 'days').endOf('day');
-                };
-
-                weeks.push({
-                    name: `WK${i + 1}`,
-                    start: wStart,
-                    end: wEnd,
-                });
-            };
-        };
-
-        const weeklyEarningsBreakdown = await Promise.all(weeks.map(async (w) => {
-            const stats = await Transaction.aggregate([
-                {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
-                        createdAt: { $gte: w.start.toDate(), $lte: w.end.toDate() }
-                    },
-                },
-                {
-                    $group: {
-                        _id: null,
-                        total: {
-                            $sum: "$totalAmount",
-                        },
-                    },
-                },
-            ]);
-
-            return {
-                label: w.name,
-                amount: stats[0]?.total || 0,
-                dateRange: `${w.start.format("MMM D")} - ${w.end.format("MMM D")}`
-            };
-        }));
-
         // 3. Recent Day-wise Earnings (top 5)
-        const [recentEarningsGrouped, recentTransactionList] = await Promise.all([
-            Transaction.aggregate([
+        const [recentTransactionList] = await Promise.all([
+            Earning.aggregate([
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                    },
-                },
-                {
-                    $group: {
-                        _id: {
-                            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-                        },
-                        totalEarning: { $sum: "$totalAmount" },
-                    },
-                },
-                { $sort: { _id: -1 } },
-                { $limit: 5 },
-            ]),
-
-            Transaction.aggregate([
-                {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
-                        createdAt: { $gte: startPeriod.toDate(), $lte: endPeriod.toDate() }
                     },
                 },
                 { $sort: { createdAt: -1 } },
@@ -2922,22 +2734,11 @@ export const postEarningOverview = async (req, res) => {
             ]),
         ]);
 
-        const recentDayWiseEarnings = recentEarningsGrouped.map(item => ({
-            rawDate: item._id,
-            date: moment(item._id, "YYYY-MM-DD").format("MMMM D, YYYY"),
-            totalEarning: item.totalEarning,
-        }));
-
         const response = {
-            earningsOverview: {
+            earningsSummary: {
                 totalEarnings: allTimeTotalEarnings,
-                periodEarnings: currentEarnings,
                 pendingPayouts: pendingPayouts,
-                percentageChange,
-                trend,
-                weeklyEarnings: weeklyEarningsBreakdown,
             },
-            recentDayWiseEarnings,
             recentTransactionList,
         };
 
@@ -3173,11 +2974,11 @@ export const postPerformanceMetrics = async (req, res) => {
         const totalBookings = await Booking.countDocuments({ mechanicId: new ObjectId(mechanicId) });
         const acceptedBookings = await Booking.countDocuments({
             mechanicId: new ObjectId(mechanicId),
-            status: { $in: [Constants.BOOKING_STATUS.ACCEPTED, Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE, Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
+            status: { $in: [Constants.BOOKING_STATUS.ACCEPTED, Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE, Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
         });
         const completedBookings = await Booking.countDocuments({
             mechanicId: new ObjectId(mechanicId),
-            status: { $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.PAYMENT_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
+            status: { $in: [Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED] },
         });
         const cancelledBookings = await Booking.countDocuments({
             mechanicId: new ObjectId(mechanicId),

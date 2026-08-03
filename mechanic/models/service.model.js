@@ -12,6 +12,10 @@ const serviceSchema = new Schema(
             type: String,
             default: "",
         },
+        image: {
+            type: String,
+            default: "",
+        },
         subCategory: [
             {
                 _id: false,
