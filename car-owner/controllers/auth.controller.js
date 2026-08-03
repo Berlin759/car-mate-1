@@ -164,6 +164,7 @@ export const postVerifyOtp = async (req, res) => {
             loginToken: jwtToken,
             status: Constants.OWNER_STATUS.ACTIVE,
             lastLoginAt: new Date(),
+            isDeleted: false,
         };
 
         const ownerData = await Owner.findOneAndUpdate({ phoneNumber: verifyOtpNumber.phoneNumber }, updatePayload, { new: true });

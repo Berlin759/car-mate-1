@@ -118,6 +118,27 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.PREFERENCES_STATUS),
             default: Constants.PREFERENCES_STATUS.FALSE,
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+        },
+        deleteAccount: [
+            {
+                _id: false,
+                reasonCategory: {
+                    type: String,
+                    default: "",
+                },
+                reasonDescription: {
+                    type: String,
+                    default: "",
+                },
+                deletedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            },
+        ],
     },
     {
         versionKey: false,

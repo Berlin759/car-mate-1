@@ -433,6 +433,46 @@ export const postUpdateLocation = async (req, res) => {
     };
 };
 
+export const postDeleteMechanicAccount = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { reasonCategory, reasonDescription } = req.body;
+
+        log1(["postDeleteMechanicAccount mechanicId ----->", mechanicId]);
+        log1(["postDeleteMechanicAccount req.body ----->", req.body]);
+
+        const validate = await custom_validation(req.body, "mechanic.delete_account");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        }
+
+        const mechanic = await Mechanic.findById(mechanicId);
+        if (!mechanic) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        }
+
+        mechanic.isDeleted = true;
+        mechanic.loginToken = "";
+
+        if (!mechanic.deleteAccount) {
+            mechanic.deleteAccount = [];
+        };
+
+        mechanic.deleteAccount.push({
+            reasonCategory: reasonCategory || "",
+            reasonDescription: reasonDescription || "",
+            deletedAt: new Date(),
+        });
+
+        await mechanic.save();
+
+        return res.status(200).json(successResponse("Your account has been deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteMechanicAccount ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
 export const postSendEmailOTP = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
@@ -680,10 +720,7 @@ export const postHomeDetails = async (req, res) => {
                     as: "ownerDetails",
                     pipeline: [{
                         $project: {
-                            fullName: 1,
-                            latitude: 1,
-                            longitude: 1,
-                            address: 1,
+                            fullName: 1
                         },
                     }],
                 },
@@ -699,6 +736,7 @@ export const postHomeDetails = async (req, res) => {
                     invoiceNo: 1,
                     date: 1,
                     slot: 1,
+                    address: 1,
                     latitude: 1,
                     longitude: 1,
                     totalAmount: 1,
@@ -709,7 +747,7 @@ export const postHomeDetails = async (req, res) => {
                         fullName: 1,
                         image: 1,
                     },
-                    ownerDetails: 1,
+                    ownerName: "$ownerDetails.fullName",
                 },
             },
         ];
@@ -3262,41 +3300,6 @@ export const postVerifyCallCaptcha = async (req, res) => {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
-};
-
-export const postDeleteMechanicAccount = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { reasonCategory, reasonDescription } = req.body;
-
-        log1(["postDeleteMechanicAccount mechanicId ----->", mechanicId]);
-        log1(["postDeleteMechanicAccount req.body ----->", req.body]);
-
-        const validate = await custom_validation(req.body, "mechanic.delete_account");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
-        }
-
-        const mechanic = await Mechanic.findById(mechanicId);
-        if (!mechanic) {
-            return res.status(404).json(errorResponse("Mechanic not found."));
-        }
-
-        // Delete associated KYC
-        await KYC.deleteOne({ mechanicId: new ObjectId(mechanicId) });
-
-        if (mechanic.phoneNumber) {
-            await OTP.deleteMany({ phoneNumber: mechanic.phoneNumber });
-        };
-
-        // Delete mechanic record
-        await Mechanic.findByIdAndDelete(mechanicId);
-
-        return res.status(200).json(successResponse("Your account has been deleted successfully."));
-    } catch (error) {
-        log1(["Error in postDeleteMechanicAccount ----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
-    }
 };
 
 export const addBank = async (req, res) => {

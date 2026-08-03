@@ -251,7 +251,9 @@ export const postAllCarOwnerList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        let filter = {};
+        let filter = {
+            isDeleted: { $ne: true }
+        };
 
         if (email) {
             filter["email"] = email;
@@ -586,7 +588,7 @@ export const postCarOwnerDelete = async (req, res) => {
             return res.json(errorResponse("Invalid car owner Id"));
         };
 
-        let carOwnerDelete = await Owner.findOneAndDelete(filter);
+        let carOwnerDelete = await Owner.findOneAndUpdate(filter, { isDeleted: true, loginToken: "" });
         if (!carOwnerDelete) {
             return res.json(errorResponse("Car owner delete failed!"));
         };
@@ -689,7 +691,9 @@ export const postAllMechanicList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        let filter = {};
+        let filter = {
+            isDeleted: { $ne: true }
+        };
 
         if (email) {
             filter["email"] = email;
@@ -1069,7 +1073,7 @@ export const postMechanicDelete = async (req, res) => {
             return res.json(errorResponse("Invalid mechanic Id"));
         };
 
-        let mechanicDelete = await Mechanic.findOneAndDelete(filter);
+        let mechanicDelete = await Mechanic.findOneAndUpdate(filter, { isDeleted: true, loginToken: "" });
         if (!mechanicDelete) {
             return res.json(errorResponse("Mechanic delete failed!"));
         };

@@ -164,6 +164,7 @@ export const postVerifyOtp = async (req, res) => {
             loginToken: jwtToken,
             status: Constants.MECHANIC_STATUS.ACTIVE,
             lastLoginAt: new Date(),
+            isDeleted: false,
         };
 
         const mechanicData = await Mechanic.findOneAndUpdate({ phoneNumber: verifyOtpNumber.phoneNumber }, updatePayload, { new: true });

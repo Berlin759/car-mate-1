@@ -380,6 +380,46 @@ export const postUpdateLocation = async (req, res) => {
     };
 };
 
+export const postDeleteOwnerAccount = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { reasonCategory, reasonDescription } = req.body;
+
+        log1(["postDeleteOwnerAccount ownerId ----->", ownerId]);
+        log1(["postDeleteOwnerAccount req.body ----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.delete_account");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        }
+
+        const owner = await Owner.findById(ownerId);
+        if (!owner) {
+            return res.status(404).json(errorResponse("Owner not found."));
+        }
+
+        owner.isDeleted = true;
+        owner.loginToken = "";
+
+        if (!owner.deleteAccount) {
+            owner.deleteAccount = [];
+        };
+
+        owner.deleteAccount.push({
+            reasonCategory: reasonCategory || "",
+            reasonDescription: reasonDescription || "",
+            deletedAt: new Date(),
+        });
+
+        await owner.save();
+
+        return res.status(200).json(successResponse("Your account has been deleted successfully."));
+    } catch (error) {
+        log1(["Error in postDeleteOwnerAccount ----->", error]);
+        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+    }
+};
+
 export const postSendEmailOTP = async (req, res) => {
     try {
         const ownerId = req.ownerId;
@@ -1048,6 +1088,7 @@ export const postServiceList = async (req, res) => {
 
             const nearbyMechanics = await Mechanic.find({
                 status: Constants.MECHANIC_STATUS.ACTIVE,
+                isDeleted: { $ne: true },
                 "location": {
                     $near: {
                         $geometry: {
@@ -1076,7 +1117,7 @@ export const postServiceList = async (req, res) => {
         };
 
         let services = await Service.find(filter)
-            .populate("subCategory.mechanicIds.mechanicId", "fullName profileImage latitude longitude address status")
+            .populate("subCategory.mechanicIds.mechanicId", "fullName profileImage latitude longitude address status isDeleted")
             .lean();
 
         let flatServices = [];
@@ -1084,7 +1125,7 @@ export const postServiceList = async (req, res) => {
             (service.subCategory || []).forEach(sub => {
 
                 const activeMechanics = (sub.mechanicIds || []).filter(
-                    m => m.mechanicId && m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE
+                    m => m.mechanicId && m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE && m.mechanicId.isDeleted !== true
                 );
 
                 if (activeMechanics.length === 0) return;
@@ -1142,6 +1183,193 @@ export const postServiceList = async (req, res) => {
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postServiceList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postServiceHistory = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postServiceHistory ownerId----->", ownerId]);
+        log1(["postServiceHistory req.body----->", req.body]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            carId,
+            serviceId,
+            startDate,
+            endDate,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const match = {
+            ownerId: new ObjectId(ownerId),
+            status: {
+                $in: [
+                    Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                    Constants.BOOKING_STATUS.CLOSED,
+                ],
+            },
+        };
+
+        if (carId) {
+            if (!ObjectId.isValid(carId)) {
+                return res.status(400).json(errorResponse("Invalid car id."));
+            };
+            match.carId = new ObjectId(carId);
+        };
+
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+            match.serviceId = new ObjectId(serviceId);
+        };
+
+        if (startDate || endDate) {
+            match.createdAt = {};
+            if (startDate) {
+                match.createdAt.$gte = new Date(startDate);
+            };
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                match.createdAt.$lte = end;
+            };
+        };
+
+        const pipeline = [
+            { $match: match },
+            { $sort: { createdAt: -1 } },
+            {
+                $facet: {
+                    items: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $lookup: {
+                                from: "services",
+                                localField: "serviceId",
+                                foreignField: "_id",
+                                as: "serviceDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$serviceDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "mechanics",
+                                localField: "mechanicId",
+                                foreignField: "_id",
+                                as: "mechanicDetails",
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            fullName: 1,
+                                            email: 1,
+                                            phoneNumber: 1,
+                                            profileImage: 1,
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$mechanicDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "cars",
+                                localField: "carId",
+                                foreignField: "_id",
+                                as: "carDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$carDetails",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                invoiceNo: 1,
+                                date: 1,
+                                slot: 1,
+                                address: 1,
+                                totalAmount: 1,
+                                status: 1,
+                                startTime: 1,
+                                endTime: 1,
+                                beforePhotos: 1,
+                                afterPhotos: 1,
+                                createdAt: 1,
+                                serviceDetails: {
+                                    _id: "$serviceDetails._id",
+                                    fullName: "$serviceDetails.fullName",
+                                    description: "$serviceDetails.description",
+                                },
+                                mechanicDetails: 1,
+                                carDetails: {
+                                    _id: "$carDetails._id",
+                                    fullName: "$carDetails.fullName",
+                                    vehicleNumber: "$carDetails.vehicleNumber",
+                                    model: "$carDetails.model",
+                                    brand: "$carDetails.brand",
+                                    year: "$carDetails.year",
+                                    color: "$carDetails.color",
+                                },
+                            },
+                        },
+                    ],
+                    totalRecords: [
+                        { $count: "count" },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
+
+        const items = result.items;
+        const totalRecords = result.totalRecords[0]?.count ?? 0;
+
+        const groupedByCar = {};
+
+        items.forEach((booking) => {
+            const carKey = booking.carDetails?._id?.toString() || "unknown";
+            if (!groupedByCar[carKey]) {
+                groupedByCar[carKey] = {
+                    carDetails: booking.carDetails,
+                    bookings: [],
+                };
+            }
+            groupedByCar[carKey].bookings.push(booking);
+        });
+
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            items: Object.values(groupedByCar),
+        };
+
+        return res.status(200).json(successResponse("Service history fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postServiceHistory ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -2958,7 +3186,6 @@ export const getVerifyPayment = async (req, res) => {
                     if (booking.status === Constants.BOOKING_STATUS.PENDING) {
                         if (isSuccess) {
                             await Booking.findByIdAndUpdate(booking._id, {
-                                status: Constants.BOOKING_STATUS.ACCEPTED,
                                 razorpayPaymentId: razorpay_payment_id,
                             });
                             await Transaction.updateOne(
@@ -4030,39 +4257,4 @@ export const postVerifyCallCaptcha = async (req, res) => {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
-};
-
-export const postDeleteOwnerAccount = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { reasonCategory, reasonDescription } = req.body;
-
-        log1(["postDeleteOwnerAccount ownerId ----->", ownerId]);
-        log1(["postDeleteOwnerAccount req.body ----->", req.body]);
-
-        const validate = await custom_validation(req.body, "owner.delete_account");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
-        }
-
-        const owner = await Owner.findById(ownerId);
-        if (!owner) {
-            return res.status(404).json(errorResponse("Owner not found."));
-        }
-
-        // Delete associated records
-        await Car.deleteMany({ ownerId: new ObjectId(ownerId) });
-        await Address.deleteMany({ ownerId: new ObjectId(ownerId) });
-        if (owner.phoneNumber) {
-            await OTP.deleteMany({ phoneNumber: owner.phoneNumber });
-        }
-
-        // Delete owner record
-        await Owner.findByIdAndDelete(ownerId);
-
-        return res.status(200).json(successResponse("Your account has been deleted successfully."));
-    } catch (error) {
-        log1(["Error in postDeleteOwnerAccount ----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
-    }
 };
