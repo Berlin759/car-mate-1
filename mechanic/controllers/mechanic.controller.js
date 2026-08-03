@@ -1842,6 +1842,12 @@ export const getBookingInvoice = async (req, res) => {
 
         const subTotal = (booking.subTotal || 0);
 
+        const serviceMechanic = (booking?.serviceId?.mechanicIds || []).find(
+            (m) => m.mechanicId?.equals(booking?.mechanicId?._id)
+        );
+
+        booking["servicePrice"] = parseFloat(serviceMechanic.price) || 0;
+
         const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
 
         log1(["getBookingInvoice fileName ----->", fileName]);

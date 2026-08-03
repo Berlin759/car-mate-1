@@ -45,6 +45,7 @@ import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 import KYC from "../models/kyc.model.js";
+import { generateInvoicePDF } from "../utils/pdf.helper.js";
 
 
 const razorpayInstance = new Razorpay({
@@ -2006,8 +2007,17 @@ export const postAddBooking = async (req, res) => {
         );
         log1(["postAddBooking serviceMechanic----->", serviceMechanic]);
 
+        const mechanicDetails = await Mechanic.findOne({
+            _id: new ObjectId(mechanicNewId),
+            status: Constants.MECHANIC_STATUS.ACTIVE,
+        });
+
         const invoiceNo = generateInvoiceNumber();
-        const consultantFee = parseFloat(serviceMechanic.price) || 0;
+        const consultantFee = parseFloat(mechanicDetails.consultantFee) || 0;
+        const serviceFee = parseFloat(serviceMechanic.price) || 0;
+
+        const totalFee = consultantFee + serviceFee;
+
         let discountAmount = 0;
         let couponId = null;
 
@@ -2020,9 +2030,9 @@ export const postAddBooking = async (req, res) => {
             log1(["postAddBooking coupon----->", coupon]);
 
             if (coupon) {
-                if (consultantFee >= coupon.minOrderAmount) {
+                if (totalFee >= coupon.minOrderAmount) {
                     if (coupon.discountType === "percentage") {
-                        discountAmount = (consultantFee * coupon.discountValue) / 100;
+                        discountAmount = (totalFee * coupon.discountValue) / 100;
                         if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
                             discountAmount = coupon.maxDiscountAmount;
                         }
@@ -2030,8 +2040,8 @@ export const postAddBooking = async (req, res) => {
                         discountAmount = coupon.discountValue;
                     };
 
-                    if (discountAmount > consultantFee) {
-                        discountAmount = consultantFee;
+                    if (discountAmount > totalFee) {
+                        discountAmount = totalFee;
                     };
 
                     couponId = coupon._id;
@@ -2040,7 +2050,7 @@ export const postAddBooking = async (req, res) => {
         };
         log1(["postAddBooking discountAmount----->", discountAmount]);
 
-        const subTotal = parseFloat(consultantFee - discountAmount);
+        const subTotal = parseFloat(totalFee - discountAmount);
 
         const taxAmount = parseFloat((subTotal * 18) / 100);
 
@@ -2610,6 +2620,55 @@ export const postCancelBooking = async (req, res) => {
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     } finally {
         ownerLocks.delete(ownerId);
+    };
+};
+
+export const getBookingInvoice = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        const booking = await Booking.findById(bookingId)
+            .populate("serviceId")
+            .populate("ownerId")
+            .populate("mechanicId");
+
+        if (!booking) {
+            return res.status(404).json(errorResponse("Booking not found."));
+        };
+
+        const subTotal = (booking.subTotal || 0);
+
+        const serviceMechanic = (booking?.serviceId?.mechanicIds || []).find(
+            (m) => m.mechanicId?.equals(booking?.mechanicId?._id)
+        );
+
+        booking["servicePrice"] = parseFloat(serviceMechanic.price) || 0;
+
+        const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
+
+        log1(["getBookingInvoice fileName ----->", fileName]);
+        log1(["getBookingInvoice filePath ----->", filePath]);
+        log1(["getBookingInvoice folder ----->", folder]);
+
+        if (!fileName || !folder) {
+            return res.status(500).json(errorResponse("Error generating invoice."));
+        };
+
+        const invoicePath = `/${folder}/${fileName}`;
+        log1(["getBookingInvoice invoicePath ----->", invoicePath]);
+
+        return res.status(200).json(successResponse("Invoice PDF generated successfully.", {
+            invoicePath,
+            fileName,
+            bookingId: booking._id,
+            invoiceNo: booking.invoiceNo || null,
+        }));
+    } catch (error) {
+        log1(["Error in getBookingInvoice ----->", error]);
+        return res.status(500).json(errorResponse("Error generating invoice."));
     };
 };
 

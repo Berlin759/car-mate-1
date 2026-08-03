@@ -40,6 +40,7 @@ import {
     postBookingDetails,
     postUpdateBooking,
     postCancelBooking,
+    getBookingInvoice,
     postTransactionList,
     postVerifyRazorpayPayment,
     getVerifyPayment,
@@ -118,13 +119,14 @@ router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/update-booking", authMiddleware, postUpdateBooking);
 router.post("/cancel-booking", authMiddleware, postCancelBooking);
-
-// Payment Success Page
-router.get("/verify-payment", getVerifyPayment);
+router.get("/booking-invoice/:bookingId", authMiddleware, getBookingInvoice);
 
 // Transaction Routes
 router.post("/transaction-list", authMiddleware, postTransactionList);
 router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
+
+// Payment Success Page
+router.get("/verify-payment", getVerifyPayment);
 
 // Razorpay Webhook (Public - called by Razorpay)
 router.post("/razorpay-webhook", postRazorpayWebhook);
