@@ -66,6 +66,25 @@ export const log1 = (msg) => {
     console.log("[" + d.toLocaleString() + " " + d.getMilliseconds() + "] :", msg);
 };
 
+export const validatePhoneNumber = (phoneCode, phoneNumber) => {
+    if (!phoneCode || !phoneNumber) return false;
+    const cleanCode = phoneCode.trim();
+    const cleanNumber = phoneNumber.trim().replace(/[\s\-()]/g, "");
+
+    const phoneCodeRegexes = {
+        "+91": /^[6-9]\d{9}$/, // India: 10 digits starting with 6, 7, 8, 9
+        "+1": /^\d{10}$/,    // US/Canada: 10 digits
+        "+44": /^\d{9,10}$/,  // UK: 9 to 10 digits
+        "+971": /^\d{9}$/,   // UAE: 9 digits
+        "+61": /^\d{9}$/,    // Australia: 9 digits
+        "+64": /^\d{8,10}$/,  // New Zealand: 8 to 10 digits
+        "+65": /^[89]\d{7}$/, // Singapore: 8 digits starting with 8 or 9
+    };
+
+    const regex = phoneCodeRegexes[cleanCode] || /^\d{7,15}$/;
+    return regex.test(cleanNumber);
+};
+
 export const DateInHumanReadableFormat = (date) => {
     let currentDate = moment.utc();
     const formattedCurrentDatetime = currentDate.toISOString();

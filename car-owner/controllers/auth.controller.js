@@ -13,6 +13,7 @@ import {
     generateUniqueUsername,
     log1,
     successResponse,
+    validatePhoneNumber,
 } from "../lib/general.js";
 import { sendOtp } from "../lib/twilioHelper.js";
 import Owner from "../models/owner.model.js";
@@ -34,10 +35,8 @@ export const postLogin = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
-        let check_phone_number = regex.test(phone_number);
-        if (!check_phone_number) {
-            return res.status(400).json(errorResponse("Please enter a valid phone number. Ensure it follows the correct format."));
+        if (!validatePhoneNumber(phone_code, phone_number)) {
+            return res.status(400).json(errorResponse("Please enter a valid phone number according to your phone code."));
         };
 
         const owner = await Owner.findOne({ phoneNumber: phone_number });
@@ -135,10 +134,15 @@ export const postVerifyOtp = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
-        let check_phone_number = regex.test(phone_number);
-        if (!check_phone_number) {
-            return res.status(400).json(errorResponse("In valid phone number."));
+        const owner = await Owner.findOne({ phoneNumber: phone_number });
+        if (!owner) {
+            return res.status(400).json(errorResponse("Please enter valid phone number."));
+        };
+
+        const phoneCode = owner?.phoneCode || "+91";
+
+        if (!validatePhoneNumber(phoneCode, phone_number)) {
+            return res.status(400).json(errorResponse("Invalid phone number."));
         };
 
         const verifyOtpNumber = await OTP.findOne({ phoneNumber: phone_number });
@@ -195,16 +199,14 @@ export const postResendOtp = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
-        let check_phone_number = regex.test(phone_number);
-        if (!check_phone_number) {
-            return res.status(400).json(errorResponse("Please enter valid phone number."));
-        };
-
         const owner = await Owner.findOne({ phoneNumber: phone_number });
         log1(["postResendOtp owner ----->", owner]);
 
         if (!owner) {
+            return res.status(400).json(errorResponse("Please enter valid phone number."));
+        };
+
+        if (!validatePhoneNumber(owner.phoneCode || "+91", phone_number)) {
             return res.status(400).json(errorResponse("Please enter valid phone number."));
         };
 
