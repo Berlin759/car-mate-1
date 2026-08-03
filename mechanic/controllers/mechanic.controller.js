@@ -944,29 +944,20 @@ export const postAllServicesList = async (req, res) => {
             return res.status(404).json(errorResponse("Mechanic not found."));
         };
 
-        const parentServices = await Service.find({ parentId: null, status: Constants.SERVICE_STATUS.ACTIVE }).lean();
-        const subServices = await Service.find({ parentId: { $ne: null }, status: Constants.SERVICE_STATUS.ACTIVE }).lean();
-
-        const serviceMap = subServices.map(sub => {
-            const mechanicEntry = (sub.mechanicIds || []).find(
-                m => m.mechanicId?.toString() === mechanicId.toString()
-            );
-            const isSelected = (mechanic.serviceIds || []).some(
-                id => id.toString() === sub._id.toString()
-            );
-            return {
-                subServiceId: sub._id,
-                parentId: sub.parentId,
-                fullName: sub.fullName,
-                description: sub.description,
-                price: mechanicEntry?.price || 0,
-                customDescription: mechanicEntry?.description || "",
-                isSelected,
-            };
-        });
+        const parentServices = await Service.find({ status: Constants.SERVICE_STATUS.ACTIVE }).lean();
 
         const items = parentServices.map(parent => {
-            const children = serviceMap.filter(sub => sub.parentId?.toString() === parent._id.toString());
+            const children = (parent.subCategory || []).map(sub => {
+                const mechanicEntry = (sub.mechanicIds || []).find(
+                    m => m.mechanicId?.toString() === mechanicId.toString()
+                );
+                const isSelected = !!mechanicEntry;
+                return {
+                    fullName: sub.fullname,
+                    isSelected,
+                };
+            });
+
             const isSelected = children.some(c => c.isSelected);
             return {
                 categoryId: parent._id,
@@ -994,41 +985,70 @@ export const postAddService = async (req, res) => {
         log1(["postAddService mechanicId----->", mechanicId]);
         log1(["postAddService req.body----->", req.body]);
 
-        const { services, consultantFee } = req.body;
+        const { categoryId, subServices, consultantFee } = req.body;
 
         const validate = await custom_validation(req.body, "mechanic.add_service");
         if (validate.flag !== 1) {
             return res.status(400).json(validate);
         };
 
-        if (!Array.isArray(services) || services.length === 0) {
-            return res.status(400).json(errorResponse("Please provide a valid services array."));
+        if (!ObjectId.isValid(categoryId)) {
+            return res.status(400).json(errorResponse("Invalid categoryId."));
         };
 
-        for (const service of services) {
-            if (!service.serviceId) {
-                return res.status(400).json(errorResponse("serviceId is required for each service."));
+        if (!Array.isArray(subServices)) {
+            return res.status(400).json(errorResponse("Please provide a valid subServices array."));
+        };
+
+        for (const sub of subServices) {
+            if (!sub.subCategoryName) {
+                return res.status(400).json(errorResponse("subCategoryName is required for each sub service."));
             };
-            if (service.price === undefined || service.price === null || service.price < 0) {
-                return res.status(400).json(errorResponse("Valid price is required for each service."));
+
+            if (sub.price === undefined || sub.price === null || sub.price < 0) {
+                return res.status(400).json(errorResponse("Valid price is required for each sub service."));
             };
-            if (service.description) {
-                const descNoSpace = service.description.replace(/\s/g, "");
+
+            if (sub.description) {
+                const descNoSpace = sub.description.replace(/\s/g, "");
                 if (descNoSpace.length > 200) {
                     return res.status(400).json(errorResponse("Service description must not exceed 200 characters (excluding spaces)."));
                 };
             };
         };
 
-        const serviceIds = services.map(s => new mongoose.Types.ObjectId(s.serviceId));
+        // Pull the mechanic from all sub-categories of this category only
+        await Service.updateOne(
+            { _id: new ObjectId(categoryId) },
+            { $pull: { "subCategory.$[].mechanicIds": { mechanicId: new ObjectId(mechanicId) } } }
+        );
 
-        const existingMechanic = await Mechanic.findById(mechanicId).select("serviceIds").lean();
-        const oldServiceIds = (existingMechanic?.serviceIds || []).map(id => id.toString());
-        const newServiceIds = serviceIds.map(id => id.toString());
+        // Add the mechanic to the selected sub-categories of this category
+        for (const sub of subServices) {
+            await Service.findOneAndUpdate(
+                {
+                    _id: new ObjectId(categoryId),
+                    "subCategory.fullname": sub.subCategoryName,
+                },
+                {
+                    $addToSet: {
+                        "subCategory.$.mechanicIds": {
+                            mechanicId: new ObjectId(mechanicId),
+                            price: Number(sub.price),
+                            description: sub.description ? sub.description.trim() : "",
+                        },
+                    },
+                }
+            );
+        };
 
-        const servicesToRemove = oldServiceIds.filter(id => !newServiceIds.includes(id));
+        // Get all categories where the mechanic is registered in at least one subcategory
+        const activeCategories = await Service.find({
+            "subCategory.mechanicIds.mechanicId": new ObjectId(mechanicId)
+        }).select("_id").lean();
+        const activeCategoryIds = activeCategories.map(c => c._id);
 
-        const mechanicUpdateObj = { serviceIds: serviceIds };
+        const mechanicUpdateObj = { serviceIds: activeCategoryIds };
         if (consultantFee !== undefined && consultantFee !== null) {
             mechanicUpdateObj.consultantFee = Number(consultantFee);
         };
@@ -1037,39 +1057,6 @@ export const postAddService = async (req, res) => {
             mechanicId,
             mechanicUpdateObj,
         );
-
-        for (const service of services) {
-            const serviceObjId = new mongoose.Types.ObjectId(service.serviceId);
-
-            await Service.findByIdAndUpdate(
-                serviceObjId,
-                {
-                    $pull: { mechanicIds: { mechanicId: new mongoose.Types.ObjectId(mechanicId) } },
-                },
-            );
-
-            await Service.findByIdAndUpdate(
-                serviceObjId,
-                {
-                    $addToSet: {
-                        mechanicIds: {
-                            mechanicId: new mongoose.Types.ObjectId(mechanicId),
-                            price: Number(service.price),
-                            description: service.description ? service.description.trim() : "",
-                        },
-                    },
-                },
-            );
-        };
-
-        for (const serviceId of servicesToRemove) {
-            await Service.findByIdAndUpdate(
-                serviceId,
-                {
-                    $pull: { mechanicIds: { mechanicId: new mongoose.Types.ObjectId(mechanicId) } },
-                },
-            );
-        };
 
         return res.status(200).json(successResponse("Services added successfully!"));
     } catch (error) {
@@ -1133,47 +1120,46 @@ export const postMyServiceList = async (req, res) => {
             return res.status(404).json(errorResponse("Mechanic not found."));
         };
 
-        if (!mechanic.serviceIds || mechanic.serviceIds.length === 0) {
-            return res.status(200).json(
-                successResponse("Service List Get Successfully.", {
-                    items: [],
-                    page,
-                    limit,
-                    totalRecords: 0,
-                })
-            );
-        };
-
         const services = await Service.find({
-            _id: { $in: mechanic.serviceIds },
-            parentId: { $ne: null },
-        })
-            .select("_id fullName description parentId mechanicIds")
-            .populate("parentId", "fullName description")
-            .lean();
+            "subCategory.mechanicIds.mechanicId": new ObjectId(mechanicId),
+        }).lean();
 
-        const items = services.map(service => {
-            const mechanicEntry = (service.mechanicIds || []).find(
-                m => m.mechanicId?.toString() === mechanicId.toString()
-            );
+        const categoryGroupMap = {};
 
-            return {
-                serviceId: service._id,
-                categoryName: service.parentId?.fullName || "",
-                subCategoryName: service.fullName,
-                price: mechanicEntry?.price || 0,
-                description: mechanicEntry?.description || "",
+        services.forEach(service => {
+            const subCategoryList = [];
+            (service.subCategory || []).forEach(sub => {
+                const mechanicEntry = (sub.mechanicIds || []).find(
+                    m => m.mechanicId?.toString() === mechanicId.toString()
+                );
+
+                if (mechanicEntry) {
+                    subCategoryList.push({
+                        subCategoryName: sub.fullname,
+                        price: mechanicEntry.price || 0,
+                        description: mechanicEntry.description || "",
+                    });
+                };
+            });
+
+            if (subCategoryList.length > 0) {
+                categoryGroupMap[service._id.toString()] = {
+                    categoryId: service._id,
+                    categoryName: service.fullName,
+                    subCategory: subCategoryList,
+                };
             };
         });
 
+        const items = Object.values(categoryGroupMap);
         const totalRecords = items.length;
         const paginatedItems = items.slice(skip, skip + limit);
 
         let response = {
-            items: paginatedItems,
             page,
             limit,
             totalRecords,
+            items: paginatedItems,
         };
 
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
@@ -1842,13 +1828,23 @@ export const getBookingInvoice = async (req, res) => {
 
         const subTotal = (booking.subTotal || 0);
 
-        const serviceMechanic = (booking?.serviceId?.mechanicIds || []).find(
-            (m) => m.mechanicId?.equals(booking?.mechanicId?._id)
-        );
+        let serviceFee = 0;
+        (booking?.serviceId.subCategory || []).forEach(sub => {
+            const serviceMechanic = (sub.mechanicIds || []).find(
+                (m) => m.mechanicId?.toString() === booking?.mechanicId?._id.toString()
+            );
 
-        booking["servicePrice"] = parseFloat(serviceMechanic.price) || 0;
+            if (serviceMechanic) {
+                serviceFee += parseFloat(serviceMechanic.price) || 0;
+            };
+        });
 
-        const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
+        log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
+
+        const bookingObj = booking.toObject();
+        bookingObj["servicePrice"] = parseFloat(serviceMechanic?.price || 0) || 0;
+
+        const { fileName, filePath, folder } = await generateInvoicePDF(bookingObj, subTotal);
 
         log1(["getBookingInvoice fileName ----->", fileName]);
         log1(["getBookingInvoice filePath ----->", filePath]);

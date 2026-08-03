@@ -21,8 +21,8 @@ export const errorResponse = (msg = "", data = {}) => {
     return {
         flag: 0,
         msg: msg.length == 0 ? "Error" : msg,
-        data: data,
         status: 400,
+        data: data,
     };
 };
 
@@ -30,8 +30,8 @@ export const successResponse = (msg = "", data = {}) => {
     return {
         flag: 1,
         msg: msg.length == 0 ? "Success" : msg,
-        data: data,
         status: 200,
+        data: data,
     };
 };
 
@@ -47,8 +47,8 @@ export const authErrorResponse = (msg = "", data = {}) => {
     return {
         flag: 8,
         msg: msg.length == 0 ? "Session Expired!" : msg,
-        data: data,
         status: 401,
+        data: data,
     };
 };
 
@@ -56,8 +56,8 @@ export const maintenanceErrorResponse = (msg = "", data = {}) => {
     return {
         flag: 9,
         msg: msg.length == 0 ? "Service unavailable due to maintenance" : msg,
-        data: data,
         status: 503,
+        data: data,
     };
 };
 

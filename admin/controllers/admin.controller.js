@@ -1619,22 +1619,12 @@ export const postAddService = async (req, res) => {
             return res.status(400).json(errorResponse("Category description must not exceed 200 characters (excluding spaces)."));
         };
 
-        const existingCategory = await Service.findOne({ fullName: trimmedName, parentId: null });
+        const existingCategory = await Service.findOne({ fullName: trimmedName });
         if (existingCategory) {
             return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
         };
 
-        let payload = {
-            fullName: trimmedName,
-            description: description,
-            parentId: null,
-        };
-
-        const addNewService = await Service.create(payload);
-        if (!addNewService) {
-            return res.status(400).json(errorResponse("Failed to add Service."));
-        };
-
+        let subCategoryArray = [];
         if (subCategories && Array.isArray(subCategories) && subCategories.length > 0) {
             const subNames = [];
             for (const sub of subCategories) {
@@ -1650,29 +1640,28 @@ export const postAddService = async (req, res) => {
                     return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must not exceed 50 characters (excluding spaces).`));
                 };
 
-                const subDescNoSpace = (sub.description || "").replace(/\s/g, "");
-                if (subDescNoSpace.length > 200) {
-                    return res.status(400).json(errorResponse(`Sub-category description for "${subTrimmedName}" must not exceed 200 characters (excluding spaces).`));
-                };
-
                 if (subNames.includes(subTrimmedName.toLowerCase())) {
                     return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" is duplicated. Please use unique sub-category names.`));
                 };
                 subNames.push(subTrimmedName.toLowerCase());
-            };
 
-            const subCategoryPayloads = subCategories
-                .filter(sub => sub.fullName && sub.fullName.trim() !== "")
-                .map(sub => ({
-                    fullName: sub.fullName.trim(),
-                    description: sub.description ? sub.description.trim() : "",
-                    parentId: addNewService._id,
-                }));
-
-            if (subCategoryPayloads.length > 0) {
-                await Service.insertMany(subCategoryPayloads);
+                subCategoryArray.push({
+                    fullname: subTrimmedName,
+                    mechanicIds: [],
+                });
             }
         }
+
+        let payload = {
+            fullName: trimmedName,
+            description: description,
+            subCategory: subCategoryArray,
+        };
+
+        const addNewService = await Service.create(payload);
+        if (!addNewService) {
+            return res.status(400).json(errorResponse("Failed to add Service."));
+        };
 
         return res.status(200).json(successResponse("New Service Add Successfully!"));
     } catch (error) {
@@ -1709,23 +1698,24 @@ export const postAllServiceList = async (req, res) => {
             };
 
             const services = await Service.find({
-                _id: { $in: mechanic.serviceIds || [] },
-                parentId: { $ne: null },
-            })
-                .select("_id fullName description parentId")
-                .populate("parentId", "fullName description")
-                .lean();
+                "subCategory.mechanicIds.mechanicId": new ObjectId(mechanicId),
+            }).lean();
 
-            const mechanicServiceList = services.map(service => {
-                const mechanicEntry = (service.mechanicIds || []).find(
-                    m => m.mechanicId?.toString() === mechanicId.toString()
-                );
-                return {
-                    categoryName: service.parentId?.fullName || "",
-                    subCategoryName: service.fullName,
-                    price: mechanicEntry?.price || 0,
-                    description: mechanicEntry?.description || "",
-                };
+            const mechanicServiceList = [];
+            services.forEach(service => {
+                (service.subCategory || []).forEach(sub => {
+                    const mechanicEntry = (sub.mechanicIds || []).find(
+                        m => m.mechanicId?.toString() === mechanicId.toString()
+                    );
+                    if (mechanicEntry) {
+                        mechanicServiceList.push({
+                            categoryName: service.fullName,
+                            subCategoryName: sub.fullname,
+                            price: mechanicEntry.price || 0,
+                            description: mechanicEntry.description || "",
+                        });
+                    }
+                });
             });
 
             const totalRecords = mechanicServiceList.length;
@@ -1748,9 +1738,7 @@ export const postAllServiceList = async (req, res) => {
             return res.status(200).json(response);
         }
 
-        let filter = {
-            parentId: null
-        };
+        let filter = {};
 
         if (status) {
             filter["status"] = parseInt(status);
@@ -1761,14 +1749,6 @@ export const postAllServiceList = async (req, res) => {
                 $match: filter,
             },
             {
-                $lookup: {
-                    from: "services",
-                    localField: "_id",
-                    foreignField: "parentId",
-                    as: "subCategories",
-                }
-            },
-            {
                 $project: {
                     _id: 1,
                     fullName: 1,
@@ -1776,7 +1756,16 @@ export const postAllServiceList = async (req, res) => {
                     status: 1,
                     createdAt: 1,
                     updatedAt: 1,
-                    subCategories: 1,
+                    subCategories: {
+                        $map: {
+                            input: "$subCategory",
+                            as: "sub",
+                            in: {
+                                fullName: "$$sub.fullname",
+                                description: "",
+                            }
+                        }
+                    },
                 },
             },
             {
@@ -1826,10 +1815,11 @@ export const postServiceDetails = async (req, res) => {
             return res.json(errorResponse("Service not found"));
         }
 
-        let subCategories = [];
-        if (!serviceDetails.parentId) {
-            subCategories = await Service.find({ parentId: serviceDetails._id }).sort({ createdAt: 1 }).lean();
-        }
+        const subCategories = (serviceDetails.subCategory || []).map(sub => ({
+            _id: sub.fullname,
+            fullName: sub.fullname,
+            description: "",
+        }));
 
         return res.status(200).json(successResponse("Service details get successfully!", {
             serviceDetails,
@@ -1886,7 +1876,7 @@ export const postServiceUpdate = async (req, res) => {
                 return res.status(400).json(errorResponse("Category name must not exceed 50 characters (excluding spaces)."));
             };
 
-            const existingCategory = await Service.findOne({ fullName: trimmedName, parentId: null, _id: { $ne: new ObjectId(serviceId) } });
+            const existingCategory = await Service.findOne({ fullName: trimmedName, _id: { $ne: new ObjectId(serviceId) } });
             if (existingCategory) {
                 return res.status(400).json(errorResponse("This category name already exists. Please use a different name."));
             };
@@ -1912,16 +1902,9 @@ export const postServiceUpdate = async (req, res) => {
             payload["status"] = parseInt(status);
         };
 
-        if (Object.keys(payload).length > 0) {
-            await Service.findOneAndUpdate(filter, payload);
-        };
-
         if (subCategories && Array.isArray(subCategories)) {
             const nameRegex = /^[a-zA-Z\s]+$/;
-            const existingSubcategories = await Service.find({ parentId: serviceDetails._id });
-            const existingSubIds = existingSubcategories.map(sub => sub._id.toString());
-
-            const incomingSubIds = [];
+            const updatedSubCategories = [];
             const subNames = [];
 
             for (const sub of subCategories) {
@@ -1937,38 +1920,26 @@ export const postServiceUpdate = async (req, res) => {
                     return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" must not exceed 50 characters (excluding spaces).`));
                 };
 
-                const subDesc = sub.description ? sub.description.trim() : "";
-                const subDescNoSpace = subDesc.replace(/\s/g, "");
-                if (subDescNoSpace.length > 200) {
-                    return res.status(400).json(errorResponse(`Sub-category description for "${subTrimmedName}" must not exceed 200 characters (excluding spaces).`));
-                };
-
                 if (subNames.includes(subTrimmedName.toLowerCase())) {
                     return res.status(400).json(errorResponse(`Sub-category name "${subTrimmedName}" is duplicated. Please use unique sub-category names.`));
                 };
                 subNames.push(subTrimmedName.toLowerCase());
 
-                if (sub._id && ObjectId.isValid(sub._id)) {
-                    incomingSubIds.push(sub._id.toString());
-                    await Service.findByIdAndUpdate(sub._id, {
-                        fullName: subTrimmedName,
-                        description: subDesc,
-                    });
-                } else {
-                    const newSub = await Service.create({
-                        fullName: subTrimmedName,
-                        description: subDesc,
-                        parentId: serviceDetails._id,
-                        status: serviceDetails.status,
-                    });
-                    incomingSubIds.push(newSub._id.toString());
-                };
-            };
+                const existingSub = (serviceDetails.subCategory || []).find(
+                    exSub => exSub.fullname.toLowerCase() === subTrimmedName.toLowerCase()
+                );
 
-            const subsToDelete = existingSubIds.filter(id => !incomingSubIds.includes(id));
-            if (subsToDelete.length > 0) {
-                await Service.deleteMany({ _id: { $in: subsToDelete.map(id => new ObjectId(id)) } });
-            };
+                updatedSubCategories.push({
+                    fullname: subTrimmedName,
+                    mechanicIds: existingSub ? existingSub.mechanicIds : [],
+                });
+            }
+
+            payload["subCategory"] = updatedSubCategories;
+        }
+
+        if (Object.keys(payload).length > 0) {
+            await Service.findOneAndUpdate(filter, payload);
         };
 
         return res.status(200).json(successResponse("Service Update Successfully!"));
@@ -1999,8 +1970,6 @@ export const postServiceDelete = async (req, res) => {
         if (!serviceDelete) {
             return res.json(errorResponse("Service delete failed!"));
         };
-
-        await Service.deleteMany({ parentId: serviceDetails._id });
 
         return res.status(200).json(successResponse("Service delete successfully!"));
     } catch (error) {

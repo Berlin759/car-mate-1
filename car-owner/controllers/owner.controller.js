@@ -634,35 +634,36 @@ export const postHomeDetails = async (req, res) => {
                 const mechanicIds = nearbyMechanics.map(m => m._id);
 
                 const nearbyServices = await Service.find({
-                    parentId: { $ne: null },
                     status: Constants.SERVICE_STATUS.ACTIVE,
-                    "mechanicIds.mechanicId": { $in: mechanicIds },
+                    "subCategory.mechanicIds.mechanicId": { $in: mechanicIds },
                 })
-                    .select("_id fullName description parentId mechanicIds")
-                    .populate("parentId", "fullName description")
-                    .populate("mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
+                    .populate("subCategory.mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
                     .lean();
 
-                popularNearbyServices = nearbyServices.map(service => {
-                    const parent = service.parentId;
-                    const nearbyMechs = (service.mechanicIds || []).filter(
-                        m => m.mechanicId && mechanicIds.some(id => id.equals(m.mechanicId._id || m.mechanicId))
-                    );
+                popularNearbyServices = [];
+                nearbyServices.forEach(service => {
+                    (service.subCategory || []).forEach(sub => {
+                        const nearbyMechs = (sub.mechanicIds || []).filter(
+                            m => m.mechanicId && mechanicIds.some(id => id.equals(m.mechanicId._id || m.mechanicId))
+                        );
 
-                    return {
-                        serviceId: service._id,
-                        categoryDetails: {
-                            _id: parent?._id || null,
-                            fullName: parent?.fullName || "",
-                            description: parent?.description || "",
-                            subCategoryDetails: {
-                                fullName: service.fullName,
-                                description: service.description || "",
-                                price: nearbyMechs[0]?.price || 0,
-                            },
-                        },
-                        mechanicCount: nearbyMechs.length,
-                    };
+                        if (nearbyMechs.length > 0) {
+                            popularNearbyServices.push({
+                                serviceId: `${service._id}:${sub.fullname}`,
+                                categoryDetails: {
+                                    _id: service._id,
+                                    fullName: service.fullName,
+                                    description: service.description || "",
+                                    subCategoryDetails: {
+                                        fullName: sub.fullname,
+                                        description: "",
+                                        price: nearbyMechs[0]?.price || 0,
+                                    },
+                                },
+                                mechanicCount: nearbyMechs.length,
+                            });
+                        }
+                    });
                 });
 
                 popularNearbyServices.sort((a, b) => b.mechanicCount - a.mechanicCount);
@@ -979,13 +980,10 @@ export const postServiceList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            keyword,
-            minPrice,
-            maxPrice,
             categoryId,
+            mechanicId,
             latitude,
             longitude,
-            radius,
         } = req.body;
 
         const page = Math.max(1, Number(currentPage));
@@ -996,11 +994,11 @@ export const postServiceList = async (req, res) => {
         let nearbyLongitude = longitude || null;
 
         const filter = {
-            parentId: { $ne: null },
-            "mechanicIds.0": { $exists: true },
+            status: Constants.SERVICE_STATUS.ACTIVE,
+            "subCategory.mechanicIds.0": { $exists: true },
         };
 
-        if (!nearbyLatitude || !nearbyLongitude) {
+        if (!mechanicId && (!nearbyLatitude || !nearbyLongitude)) {
             const ipAddress = getIpAddress(req);
             log1(["postServiceList ipAddress----->", ipAddress]);
 
@@ -1018,7 +1016,7 @@ export const postServiceList = async (req, res) => {
         if (nearbyLatitude && nearbyLongitude) {
             const lat = parseFloat(nearbyLatitude);
             const lng = parseFloat(nearbyLongitude);
-            const radiusInMeters = (parseFloat(radius) || 10) * 1000;
+            const radiusInMeters = 10000;
 
             const nearbyMechanics = await Mechanic.find({
                 status: Constants.MECHANIC_STATUS.ACTIVE,
@@ -1038,105 +1036,70 @@ export const postServiceList = async (req, res) => {
         };
 
         if (categoryId) {
-            filter.parentId = new ObjectId(categoryId);
+            filter._id = new ObjectId(categoryId);
+        };
+
+        if (mechanicId) {
+            filter["subCategory.mechanicIds.mechanicId"] = { $in: mechanicId };
         };
 
         if (nearbyMechanicIds.length > 0) {
-            filter["mechanicIds.mechanicId"] = { $in: nearbyMechanicIds };
-        };
-
-        if (keyword && keyword.trim() !== "") {
-            filter.$or = [
-                { fullName: { $regex: keyword, $options: "i" } },
-                { description: { $regex: keyword, $options: "i" } },
-            ];
+            filter["subCategory.mechanicIds.mechanicId"] = { $in: nearbyMechanicIds };
         };
 
         let services = await Service.find(filter)
-            .select("_id fullName description parentId mechanicIds")
-            .populate("parentId", "fullName description")
-            .populate("mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
+            .populate("subCategory.mechanicIds.mechanicId", "fullName profileImage latitude longitude address status")
             .lean();
 
-        if (minPrice || maxPrice) {
-            services = services.filter(service => {
-                const price = service.mechanicIds?.[0]?.price || 0;
+        let flatServices = [];
+        services.forEach(service => {
+            (service.subCategory || []).forEach(sub => {
 
-                if (minPrice && price < parseFloat(minPrice)) return false;
-                if (maxPrice && price > parseFloat(maxPrice)) return false;
+                const activeMechanics = (sub.mechanicIds || []).filter(
+                    m => m.mechanicId && m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE
+                );
 
-                return true;
-            });
-        };
+                if (activeMechanics.length === 0) return;
 
-        const items = services.map(service => {
-            const parent = service.parentId;
-            const activeMechanics = (service.mechanicIds || []).filter(
-                m => m.mechanicId && m.mechanicId.status !== undefined
-                    ? m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE
-                    : true
-            );
+                if (nearbyMechanicIds.length > 0) {
+                    const hasNearby = activeMechanics.some(m => nearbyMechanicIds.some(id => id.equals(m.mechanicId._id || m.mechanicId)));
+                    if (!hasNearby) return;
+                };
 
-            let distance = null;
-            if (nearbyLatitude && nearbyLongitude && activeMechanics.length > 0) {
-                const lat = parseFloat(nearbyLatitude);
-                const lng = parseFloat(nearbyLongitude);
-                let minDistance = Infinity;
-
-                activeMechanics.forEach(m => {
-                    if (m.mechanicId && m.mechanicId.latitude && m.mechanicId.longitude) {
-                        const mLat = parseFloat(m.mechanicId.latitude);
-                        const mLng = parseFloat(m.mechanicId.longitude);
-                        const R = 6371;
-                        const dLat = ((mLat - lat) * Math.PI) / 180;
-                        const dLng = ((mLng - lng) * Math.PI) / 180;
-                        const a =
-                            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                            Math.cos((lat * Math.PI) / 180) *
-                            Math.cos((mLat * Math.PI) / 180) *
-                            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                        const dist = R * c;
-                        if (dist < minDistance) minDistance = dist;
-                    }
+                flatServices.push({
+                    service,
+                    sub,
+                    activeMechanics
                 });
+            });
+        });
 
-                if (minDistance < Infinity) {
-                    distance = Math.round(minDistance * 100) / 100;
-                }
+        const categoryGroupMap = {};
+
+        flatServices.forEach(item => {
+            const service = item.service;
+            const sub = item.sub;
+            const activeMechanics = item.activeMechanics;
+
+            const serviceIdStr = service._id.toString();
+
+            if (!categoryGroupMap[serviceIdStr]) {
+                categoryGroupMap[serviceIdStr] = {
+                    categoryId: service._id,
+                    categoryName: service.fullName,
+                    categoryDescription: service.description || "",
+                    subCategory: [],
+                };
             }
 
-            return {
-                serviceId: service._id,
-                distance: distance,
-                mechanicDetails: activeMechanics.map(m => ({
-                    _id: m.mechanicId._id || m.mechanicId,
-                    fullName: m.mechanicId.fullName || "",
-                    email: m.mechanicId.email || "",
-                    profileImage: m.mechanicId.profileImage || "",
-                    latitude: m.mechanicId.latitude || "",
-                    longitude: m.mechanicId.longitude || "",
-                    address: m.mechanicId.address || "",
-                })),
-                categoryDetails: {
-                    _id: parent?._id || null,
-                    fullName: parent?.fullName || "",
-                    description: parent?.description || "",
-                    subCategoryDetails: {
-                        fullName: service.fullName,
-                        description: activeMechanics[0]?.description || service.description || "",
-                        price: activeMechanics[0]?.price || 0,
-                    },
-                },
-            };
+            categoryGroupMap[serviceIdStr].subCategory.push({
+                subCategoryName: sub.fullname,
+                price: activeMechanics[0]?.price || 0,
+                description: activeMechanics[0]?.description || "",
+            });
         });
 
-        items.sort((a, b) => {
-            if (a.distance === null) return 1;
-            if (b.distance === null) return -1;
-            return a.distance - b.distance;
-        });
-
+        const items = Object.values(categoryGroupMap);
         const totalCount = items.length;
         const paginatedItems = items.slice(skip, skip + limit);
 
@@ -1144,10 +1107,6 @@ export const postServiceList = async (req, res) => {
             page: page,
             limit: limit,
             totalRecords: totalCount,
-            location: nearbyLatitude && nearbyLongitude ? {
-                latitude: nearbyLatitude,
-                longitude: nearbyLongitude,
-            } : null,
             items: paginatedItems,
         };
 
@@ -1281,194 +1240,6 @@ export const postNearbyMechanics = async (req, res) => {
         }));
     } catch (error) {
         log1(["Error in postNearbyMechanics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postServiceHistory = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-
-        log1(["postServiceHistory ownerId----->", ownerId]);
-        log1(["postServiceHistory req.body----->", req.body]);
-
-        const {
-            currentPage = Constants.DEFAULT_PAGE,
-            itemPerPage = Constants.DEFAULT_LIMIT,
-            carId,
-            serviceId,
-            startDate,
-            endDate,
-        } = req.body;
-
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
-
-        const match = {
-            ownerId: new ObjectId(ownerId),
-            status: {
-                $in: [
-                    Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                    Constants.BOOKING_STATUS.PAYMENT_COMPLETED,
-                    Constants.BOOKING_STATUS.CLOSED,
-                ],
-            },
-        };
-
-        if (carId) {
-            if (!ObjectId.isValid(carId)) {
-                return res.status(400).json(errorResponse("Invalid car id."));
-            };
-            match.carId = new ObjectId(carId);
-        };
-
-        if (serviceId) {
-            if (!ObjectId.isValid(serviceId)) {
-                return res.status(400).json(errorResponse("Invalid service id."));
-            };
-            match.serviceId = new ObjectId(serviceId);
-        };
-
-        if (startDate || endDate) {
-            match.createdAt = {};
-            if (startDate) {
-                match.createdAt.$gte = new Date(startDate);
-            };
-            if (endDate) {
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                match.createdAt.$lte = end;
-            };
-        };
-
-        const pipeline = [
-            { $match: match },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    items: [
-                        { $skip: skip },
-                        { $limit: limit },
-                        {
-                            $lookup: {
-                                from: "services",
-                                localField: "serviceId",
-                                foreignField: "_id",
-                                as: "serviceDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "mechanics",
-                                localField: "mechanicId",
-                                foreignField: "_id",
-                                as: "mechanicDetails",
-                                pipeline: [
-                                    {
-                                        $project: {
-                                            fullName: 1,
-                                            email: 1,
-                                            phoneNumber: 1,
-                                            profileImage: 1,
-                                        },
-                                    },
-                                ],
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$mechanicDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "cars",
-                                localField: "carId",
-                                foreignField: "_id",
-                                as: "carDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$carDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                                invoiceNo: 1,
-                                date: 1,
-                                slot: 1,
-                                address: 1,
-                                totalAmount: 1,
-                                status: 1,
-                                startTime: 1,
-                                endTime: 1,
-                                beforePhotos: 1,
-                                afterPhotos: 1,
-                                createdAt: 1,
-                                serviceDetails: {
-                                    _id: "$serviceDetails._id",
-                                    fullName: "$serviceDetails.fullName",
-                                    description: "$serviceDetails.description",
-                                },
-                                mechanicDetails: 1,
-                                carDetails: {
-                                    _id: "$carDetails._id",
-                                    fullName: "$carDetails.fullName",
-                                    vehicleNumber: "$carDetails.vehicleNumber",
-                                    model: "$carDetails.model",
-                                    brand: "$carDetails.brand",
-                                    year: "$carDetails.year",
-                                    color: "$carDetails.color",
-                                },
-                            },
-                        },
-                    ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
-                },
-            },
-        ];
-
-        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
-
-        const items = result.items;
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
-
-        const groupedByCar = {};
-
-        items.forEach((booking) => {
-            const carKey = booking.carDetails?._id?.toString() || "unknown";
-            if (!groupedByCar[carKey]) {
-                groupedByCar[carKey] = {
-                    carDetails: booking.carDetails,
-                    bookings: [],
-                };
-            }
-            groupedByCar[carKey].bookings.push(booking);
-        });
-
-        const response = {
-            page,
-            limit,
-            totalRecords,
-            items: Object.values(groupedByCar),
-        };
-
-        return res.status(200).json(successResponse("Service history fetched successfully.", response));
-    } catch (error) {
-        log1(["Error in postServiceHistory ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -1837,7 +1608,13 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        if (!ObjectId.isValid(serviceId)) {
+        let parsedServiceId = serviceId;
+        if (typeof serviceId === "string" && serviceId.includes(":")) {
+            const parts = serviceId.split(":");
+            parsedServiceId = parts[0];
+        }
+
+        if (!ObjectId.isValid(parsedServiceId)) {
             return res.status(400).json(errorResponse("Invalid service id."));
         };
 
@@ -1885,7 +1662,7 @@ export const postAddBooking = async (req, res) => {
 
         const [serviceDetails, carDetails, addressDetails] = await Promise.all([
             Service.findOne({
-                _id: new ObjectId(serviceId),
+                _id: new ObjectId(parsedServiceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
             }).lean(),
 
@@ -1919,9 +1696,13 @@ export const postAddBooking = async (req, res) => {
         let mechanicNewId;
 
         if (parseInt(mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
-            const isServiceAvailable = (serviceDetails?.mechanicIds || []).some(
-                m => m.mechanicId?.toString() === mechanicId
-            );
+            let isServiceAvailable = false;
+            (serviceDetails.subCategory || []).forEach(sub => {
+                const hasMech = (sub.mechanicIds || []).some(
+                    m => m.mechanicId?.toString() === mechanicId
+                );
+                if (hasMech) isServiceAvailable = true;
+            });
 
             if (!isServiceAvailable) {
                 return res.status(400).json(errorResponse("Selected mechanic is unavailable for this service."));
@@ -1950,7 +1731,17 @@ export const postAddBooking = async (req, res) => {
 
             mechanicNewId = mechanicDetails._id;
         } else {
-            const mechanicIdsForService = (serviceDetails?.mechanicIds || []).map(m => m.mechanicId);
+            const mechanicIdsForService = [];
+            const seenMechanics = new Set();
+            (serviceDetails.subCategory || []).forEach(sub => {
+                (sub.mechanicIds || []).forEach(m => {
+                    const idStr = m.mechanicId?.toString();
+                    if (idStr && !seenMechanics.has(idStr)) {
+                        seenMechanics.add(idStr);
+                        mechanicIdsForService.push(m.mechanicId);
+                    }
+                });
+            });
 
             if (!mechanicIdsForService.length) {
                 return res.status(400).json(errorResponse("No mechanics are available for this service."));
@@ -2002,10 +1793,21 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(errorResponse("You already have a booking for this slot."));
         };
 
-        const serviceMechanic = (serviceDetails?.mechanicIds || []).find(
-            (m) => m.mechanicId?.equals(mechanicNewId)
-        );
-        log1(["postAddBooking serviceMechanic----->", serviceMechanic]);
+        let serviceFee = 0;
+        const bookedSubCategories = [];
+        (serviceDetails.subCategory || []).forEach(sub => {
+            const serviceMechanic = (sub.mechanicIds || []).find(
+                (m) => m.mechanicId?.toString() === mechanicNewId.toString()
+            );
+
+            if (serviceMechanic) {
+                serviceFee += parseFloat(serviceMechanic.price) || 0;
+                bookedSubCategories.push(sub.fullname);
+            };
+        });
+
+        const subCategoryName = bookedSubCategories.join(", ");
+        log1(["postAddBooking serviceFee sum----->", serviceFee, "for sub-categories:", subCategoryName]);
 
         const mechanicDetails = await Mechanic.findOne({
             _id: new ObjectId(mechanicNewId),
@@ -2014,7 +1816,6 @@ export const postAddBooking = async (req, res) => {
 
         const invoiceNo = generateInvoiceNumber();
         const consultantFee = parseFloat(mechanicDetails.consultantFee) || 0;
-        const serviceFee = parseFloat(serviceMechanic.price) || 0;
 
         const totalFee = consultantFee + serviceFee;
 
@@ -2122,7 +1923,7 @@ export const postAddBooking = async (req, res) => {
         let transactionPayload = {
             ownerId: new ObjectId(ownerId),
             mechanicId: mechanicNewId,
-            serviceId: new ObjectId(serviceId),
+            serviceId: new ObjectId(parsedServiceId),
             bookingId: new ObjectId(newBooking._id),
             carId: new ObjectId(carId),
             invoiceId: invoiceNo,
@@ -2641,13 +2442,23 @@ export const getBookingInvoice = async (req, res) => {
 
         const subTotal = (booking.subTotal || 0);
 
-        const serviceMechanic = (booking?.serviceId?.mechanicIds || []).find(
-            (m) => m.mechanicId?.equals(booking?.mechanicId?._id)
-        );
+        let serviceFee = 0;
+        (booking?.serviceId.subCategory || []).forEach(sub => {
+            const serviceMechanic = (sub.mechanicIds || []).find(
+                (m) => m.mechanicId?.toString() === booking?.mechanicId?._id.toString()
+            );
 
-        booking["servicePrice"] = parseFloat(serviceMechanic.price) || 0;
+            if (serviceMechanic) {
+                serviceFee += parseFloat(serviceMechanic.price) || 0;
+            };
+        });
 
-        const { fileName, filePath, folder } = await generateInvoicePDF(booking, subTotal);
+        log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
+
+        const bookingObj = booking.toObject();
+        bookingObj["servicePrice"] = parseFloat(serviceFee || 0) || 0;
+
+        const { fileName, filePath, folder } = await generateInvoicePDF(bookingObj, subTotal);
 
         log1(["getBookingInvoice fileName ----->", fileName]);
         log1(["getBookingInvoice filePath ----->", filePath]);

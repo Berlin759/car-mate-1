@@ -27,7 +27,6 @@ import {
     postLanguageList,
     postAppVersion,
     postNearbyMechanics,
-    postServiceHistory,
     postAddAddress,
     postAddressList,
     postUpdateAddress,
@@ -99,8 +98,9 @@ router.post("/delete-car", authMiddleware, postDeleteCar);
 
 // Service API (Public - no auth required)
 router.post("/service-list", postServiceList);
+
+// Mechanic API (Public - no auth required)
 router.post("/nearby-mechanics", postNearbyMechanics);
-router.post("/service-history", authMiddleware, postServiceHistory);
 
 // Address API
 router.post("/add-address", authMiddleware, postAddAddress);

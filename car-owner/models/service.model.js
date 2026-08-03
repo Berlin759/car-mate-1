@@ -12,28 +12,32 @@ const serviceSchema = new Schema(
             type: String,
             default: "",
         },
-        parentId: {
-            type: Schema.Types.ObjectId,
-            ref: "Service",
-            default: null,
-        },
-        mechanicIds: [
+        subCategory: [
             {
                 _id: false,
-                mechanicId: {
-                    type: Schema.Types.ObjectId,
-                    ref: "Mechanic",
-                    required: true,
-                },
-                price: {
-                    type: Number,
-                    required: true,
-                    min: 0,
-                },
-                description: {
+                fullname: {
                     type: String,
                     default: "",
                 },
+                mechanicIds: [
+                    {
+                        _id: false,
+                        mechanicId: {
+                            type: Schema.Types.ObjectId,
+                            ref: "Mechanic",
+                            required: true,
+                        },
+                        price: {
+                            type: Number,
+                            required: true,
+                            min: 0,
+                        },
+                        description: {
+                            type: String,
+                            default: "",
+                        },
+                    },
+                ],
             },
         ],
         status: {
