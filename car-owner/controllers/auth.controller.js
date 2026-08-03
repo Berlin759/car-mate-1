@@ -51,6 +51,8 @@ export const postLogin = async (req, res) => {
             };
         };
 
+        await OTP.deleteMany({ phoneNumber: phone_number });
+
         // const otp = await generateOtp();
         const otp = "123456";
         const token = await generateRandomToken();
@@ -205,6 +207,8 @@ export const postResendOtp = async (req, res) => {
         if (!owner) {
             return res.status(400).json(errorResponse("Please enter valid phone number."));
         };
+
+        await OTP.deleteMany({ phoneNumber: phone_number });
 
         // const otp = await generateOtp();
         const otp = "123456";

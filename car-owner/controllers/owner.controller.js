@@ -2775,6 +2775,52 @@ export const postVerifyRazorpayPayment = async (req, res) => {
 
 export const getVerifyPayment = async (req, res) => {
     try {
+        const {
+            razorpay_payment_id,
+            razorpay_payment_link_id,
+            razorpay_payment_link_reference_id,
+            razorpay_payment_link_status,
+        } = req.query;
+
+        log1(["getVerifyPayment query params----->", req.query]);
+
+        let isSuccess = false;
+        let invoiceNo = "";
+        let amount = 0;
+        let bookingId = "";
+
+        if (razorpay_payment_link_status === "paid") {
+            isSuccess = true;
+        }
+
+        if (razorpay_payment_link_reference_id) {
+            const parts = razorpay_payment_link_reference_id.split("_");
+            if (parts.length > 1) {
+                invoiceNo = parts[1];
+                const booking = await Booking.findOne({ invoiceNo }).lean();
+                if (booking) {
+                    bookingId = booking._id;
+                    amount = booking.totalAmount;
+                    if (booking.status === Constants.BOOKING_STATUS.PENDING) {
+                        if (isSuccess) {
+                            await Booking.findByIdAndUpdate(booking._id, {
+                                status: Constants.BOOKING_STATUS.ACCEPTED,
+                                razorpayPaymentId: razorpay_payment_id,
+                            });
+                            await Transaction.updateOne(
+                                { bookingId: booking._id },
+                                {
+                                    trxId: razorpay_payment_id,
+                                    status: Constants.TRANSACTION_STATUS.SUCCESS,
+                                    description: `Razorpay Payment - ${razorpay_payment_id}`,
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         return res.render("owner/verify_payment_page", {
             header: {
                 page: "Verify Payment",
@@ -2782,15 +2828,38 @@ export const getVerifyPayment = async (req, res) => {
                 description: "System verify payment",
                 id: "verify_payment",
             },
-            body: {},
+            body: {
+                isSuccess,
+                invoiceNo,
+                amount,
+                paymentId: razorpay_payment_id || "",
+                bookingId,
+            },
             footer: {
                 js: [],
             },
         });
     } catch (error) {
         log1(["Error in getVerifyPayment ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
+        return res.render("owner/verify_payment_page", {
+            header: {
+                page: "Verify Payment",
+                title: "Verify Payment",
+                description: "System verify payment",
+                id: "verify_payment",
+            },
+            body: {
+                isSuccess: false,
+                invoiceNo: "",
+                amount: 0,
+                paymentId: "",
+                bookingId: "",
+            },
+            footer: {
+                js: [],
+            },
+        });
+    }
 };
 
 export const postRazorpayWebhook = async (req, res) => {
@@ -2816,9 +2885,12 @@ export const postRazorpayWebhook = async (req, res) => {
         const event = req.body;
         log1(["postRazorpayWebhook event----->", event.event]);
 
-        if (event.event === "payment_link.payment.failed") {
-            const paymentLink = event.payload?.payment_link?.entity;
+        if (event.event === "payment.failed") {
+            log1(["postRazorpayWebhook event.payload----->", event.payload]);
+            const paymentLink = event.payload?.payment?.entity;
+            log1(["postRazorpayWebhook paymentLink----->", paymentLink]);
             const referenceId = paymentLink?.reference_id;
+            log1(["postRazorpayWebhook referenceId----->", referenceId]);
 
             if (referenceId && referenceId.startsWith("booking_")) {
                 const invoiceNo = referenceId.replace("booking_", "");
