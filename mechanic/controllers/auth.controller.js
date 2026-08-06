@@ -52,8 +52,7 @@ export const postLogin = async (req, res) => {
 
         await OTP.deleteMany({ phoneNumber: phone_number });
 
-        // const otp = await generateOtp();
-        const otp = "123456";
+        const otp = await generateOtp();
         const token = await generateRandomToken();
         const currentTime = moment().utc().valueOf();
         const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
@@ -213,8 +212,7 @@ export const postResendOtp = async (req, res) => {
 
         await OTP.deleteMany({ phoneNumber: phone_number });
 
-        // const otp = await generateOtp();
-        const otp = "123456";
+        const otp = await generateOtp();
         const token = await generateRandomToken();
         const currentTime = moment().utc().valueOf();
         const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();

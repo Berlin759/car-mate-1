@@ -223,6 +223,9 @@ export const generateLoginToken = async (payload) => {
 
 export const generateOtp = async () => {
     try {
+
+        if (process.env.APP_ENV === "local") return "123456";
+
         const otp = crypto.randomInt(100000, 999999);
 
         return otp;
