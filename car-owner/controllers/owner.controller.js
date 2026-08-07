@@ -714,27 +714,29 @@ export const postHomeDetails = async (req, res) => {
                                 distanceInMinutes = Math.round((distance / avgSpeedKmph) * 60);
                             };
 
-                            popularNearbyServices.push({
-                                serviceId: service._id,
-                                mechanicId: mechanicDetails?._id || "",
-                                mechanicProfileImage: mechanicDetails?.profileImage || "",
-                                categoryName: service.fullName,
-                                price: nearbyMechs[0]?.price || 0,
-                                distanceInMinutes: distanceInMinutes || 0,
-                                // categoryDescription: service.description || "",
-                                // categoryImage: service.image || "",
-                                // subCategoryDetails: {
-                                //     fullName: sub.fullname,
-                                //     description: nearbyMechs[0]?.description || 0,
-                                //     price: nearbyMechs[0]?.price || 0,
-                                // },
-                                // mechanicCount: nearbyMechs.length,
-                            });
+                            if (popularNearbyServices.length < 5) {
+                                popularNearbyServices.push({
+                                    serviceId: service._id,
+                                    mechanicId: mechanicDetails?._id || "",
+                                    mechanicProfileImage: mechanicDetails?.profileImage || "",
+                                    categoryName: sub.fullname,
+                                    price: nearbyMechs[0]?.price || 0,
+                                    distanceInMinutes: distanceInMinutes || 0,
+                                    // categoryDescription: service.description || "",
+                                    // categoryImage: service.image || "",
+                                    // subCategoryDetails: {
+                                    //     fullName: sub.fullname,
+                                    //     description: nearbyMechs[0]?.description || 0,
+                                    //     price: nearbyMechs[0]?.price || 0,
+                                    // },
+                                    // mechanicCount: nearbyMechs.length,
+                                });
+                            };
                         }
                     });
                 });
 
-                popularNearbyServices.sort((a, b) => b.mechanicCount - a.mechanicCount);
+                popularNearbyServices.sort((a, b) => b.distanceInMinutes - a.distanceInMinutes);
                 popularNearbyServices = popularNearbyServices.slice(0, 10);
             }
         }
