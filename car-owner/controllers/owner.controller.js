@@ -1619,21 +1619,24 @@ export const postMechanicDetails = async (req, res) => {
             return res.status(404).json(errorResponse("Service not found or inactive."));
         };
 
-        const sub = (service.subCategory || []).find(
+        const chosenSubcategories = (service.subCategory || []).filter(
             (s) => (s.mechanicIds || []).some((m) => m.mechanicId.toString() === mechanic._id.toString())
         );
 
-        if (!sub) {
-            return res.status(404).json(errorResponse("Subcategory not found for this mechanic under this service."));
-        };
-
-        const mechPriceInfo = (sub.mechanicIds || []).find(
-            (m) => m.mechanicId.toString() === mechanic._id.toString()
-        );
-
-        if (!mechPriceInfo) {
+        if (chosenSubcategories.length === 0) {
             return res.status(400).json(errorResponse("This mechanic does not offer this service."));
         };
+
+        let totalPrice = 0;
+        const whatsIncluded = [];
+
+        chosenSubcategories.forEach((s) => {
+            whatsIncluded.push(s.fullname);
+            const mInfo = s.mechanicIds.find((m) => m.mechanicId.toString() === mechanic._id.toString());
+            if (mInfo && mInfo.price) {
+                totalPrice += mInfo.price;
+            };
+        });
 
         const coupon = await Coupon.findOne({
             isActive: true,
@@ -1657,12 +1660,10 @@ export const postMechanicDetails = async (req, res) => {
             serviceDetails: {
                 serviceId: service._id,
                 serviceName: service.fullName,
-                serviceDescription: service.description,
-                subCategoryDetails: {
-                    fullname: sub.fullname,
-                    description: mechPriceInfo.description || "",
-                    price: mechPriceInfo.price || 0,
-                },
+                serviceDescription: service.description || "",
+                totalPrice: totalPrice,
+                whatsIncluded: whatsIncluded,
+                subCategoryDescription: chosenSubcategories[0]?.mechanicIds[0]?.description,
             },
             couponDetails: couponDetails,
         };
