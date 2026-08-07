@@ -58,6 +58,12 @@ const validate_rules = {
             bookingId: "required",
             reason: "required",
         },
+        mechanic_details: {
+            serviceId: "required",
+            mechanicId: "required",
+            latitude: "required",
+            longitude: "required",
+        },
         create_rating: {
             bookingId: "required",
             rating: "required",
