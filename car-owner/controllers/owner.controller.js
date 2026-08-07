@@ -593,6 +593,8 @@ export const postHomeDetails = async (req, res) => {
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails ownerId----->", ownerId]);
 
+        let carList = [];
+
         if (ownerId) {
             let ownerData = await Owner.findById(ownerId);
             log1(["postHomeDetails ownerData----->", ownerData]);
@@ -626,10 +628,12 @@ export const postHomeDetails = async (req, res) => {
                     return res.status(400).json(errorResponse(messages.unexpectedDataError));
                 };
             };
+
+            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber images");
         }
 
         const serviceCategories = await Service.find({ parentId: null, status: Constants.SERVICE_STATUS.ACTIVE })
-            .select("_id fullName description")
+            .select("_id fullName description image")
             .lean();
 
         let nearbyLatitude = param.latitude || null;
@@ -688,19 +692,43 @@ export const postHomeDetails = async (req, res) => {
                         );
 
                         if (nearbyMechs.length > 0) {
+                            const mechanicDetails = nearbyMechs[0]?.mechanicId;
+
+                            let distanceInMinutes = 0;
+
+                            if (mechanicDetails.latitude && mechanicDetails.longitude) {
+                                const mLat = parseFloat(mechanicDetails.latitude) || 0;
+                                const mLng = parseFloat(mechanicDetails.longitude) || 0;
+                                const R = 6371;
+                                const dLat = ((mLat - lat) * Math.PI) / 180;
+                                const dLng = ((mLng - lng) * Math.PI) / 180;
+                                const a =
+                                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                    Math.cos((lat * Math.PI) / 180) *
+                                    Math.cos((mLat * Math.PI) / 180) *
+                                    Math.sin(dLng / 2) *
+                                    Math.sin(dLng / 2);
+                                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                                const distance = R * c;
+                                const avgSpeedKmph = 30;
+                                distanceInMinutes = Math.round((distance / avgSpeedKmph) * 60);
+                            };
+
                             popularNearbyServices.push({
-                                serviceId: `${service._id}:${sub.fullname}`,
-                                categoryDetails: {
-                                    _id: service._id,
-                                    fullName: service.fullName,
-                                    description: service.description || "",
-                                    subCategoryDetails: {
-                                        fullName: sub.fullname,
-                                        description: "",
-                                        price: nearbyMechs[0]?.price || 0,
-                                    },
-                                },
-                                mechanicCount: nearbyMechs.length,
+                                serviceId: service._id,
+                                mechanicId: mechanicDetails?._id || "",
+                                mechanicProfileImage: mechanicDetails?.profileImage || "",
+                                categoryName: service.fullName,
+                                price: nearbyMechs[0]?.price || 0,
+                                distanceInMinutes: distanceInMinutes || 0,
+                                // categoryDescription: service.description || "",
+                                // categoryImage: service.image || "",
+                                // subCategoryDetails: {
+                                //     fullName: sub.fullname,
+                                //     description: nearbyMechs[0]?.description || 0,
+                                //     price: nearbyMechs[0]?.price || 0,
+                                // },
+                                // mechanicCount: nearbyMechs.length,
                             });
                         }
                     });
@@ -712,6 +740,7 @@ export const postHomeDetails = async (req, res) => {
         }
 
         return res.status(200).json(successResponse("Home details success", {
+            carList: carList,
             serviceCategories: serviceCategories,
             popularNearbyServices: popularNearbyServices,
             location: nearbyLatitude && nearbyLongitude ? {
@@ -1483,7 +1512,7 @@ export const postNearbyMechanics = async (req, res) => {
                 address: mechanic.address,
                 consultantFee: mechanic.consultantFee,
                 distance: Math.round(distance * 100) / 100,
-                minutes,
+                minutes: minutes,
                 profileCompletionCount,
                 profileCompletionPercentage,
             };

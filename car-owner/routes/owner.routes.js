@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import unAuthMiddleware from "../middleware/unAuth.middleware.js";
 import {
     postLogin,
     postVerifyOtp,
@@ -89,7 +90,7 @@ router.post("/language-list", postLanguageList);
 router.post("/app-version", postAppVersion);
 
 // Home API (Public - no auth required)
-router.post("/home-details", postHomeDetails);
+router.post("/home-details", unAuthMiddleware, postHomeDetails);
 
 // Vehicle Management
 router.post("/add-car", authMiddleware, postAddCar);
@@ -98,11 +99,11 @@ router.post("/update-car", authMiddleware, postUpdateCar);
 router.post("/delete-car", authMiddleware, postDeleteCar);
 
 // Service API (Public - no auth required)
-router.post("/service-list", postServiceList);
+router.post("/service-list", unAuthMiddleware, postServiceList);
 router.post("/service-history", authMiddleware, postServiceHistory);
 
 // Mechanic API (Public - no auth required)
-router.post("/nearby-mechanics", postNearbyMechanics);
+router.post("/nearby-mechanics", unAuthMiddleware, postNearbyMechanics);
 
 // Address API
 router.post("/add-address", authMiddleware, postAddAddress);
@@ -116,7 +117,7 @@ router.post("/coupon-list", authMiddleware, postCouponList);
 router.post("/apply-coupon", authMiddleware, postApplyCoupon);
 
 // Booking API
-router.post("/add-booking", postAddBooking);
+router.post("/add-booking", unAuthMiddleware, postAddBooking);
 router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
 router.post("/update-booking", authMiddleware, postUpdateBooking);
