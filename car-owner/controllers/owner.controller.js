@@ -1094,21 +1094,21 @@ export const postServiceList = async (req, res) => {
 
         const filter = {
             status: Constants.SERVICE_STATUS.ACTIVE,
-            "subCategory.mechanicIds.0": { $exists: true },
+            // "subCategory.mechanicIds.0": { $exists: true },
         };
 
-        if (!mechanicId && (!nearbyLatitude || !nearbyLongitude)) {
-            const ipAddress = getIpAddress(req);
-            log1(["postServiceList ipAddress----->", ipAddress]);
+        // if (!mechanicId && (!nearbyLatitude || !nearbyLongitude)) {
+        //     const ipAddress = getIpAddress(req);
+        //     log1(["postServiceList ipAddress----->", ipAddress]);
 
-            const ipLocation = await getLatLngFromIP(ipAddress);
-            log1(["postServiceList ipLocation----->", ipLocation]);
+        //     const ipLocation = await getLatLngFromIP(ipAddress);
+        //     log1(["postServiceList ipLocation----->", ipLocation]);
 
-            if (ipLocation.flag === 1 && ipLocation.data) {
-                nearbyLatitude = ipLocation.data.latitude;
-                nearbyLongitude = ipLocation.data.longitude;
-            };
-        };
+        //     if (ipLocation.flag === 1 && ipLocation.data) {
+        //         nearbyLatitude = ipLocation.data.latitude;
+        //         nearbyLongitude = ipLocation.data.longitude;
+        //     };
+        // };
 
         let nearbyMechanicIds = [];
 
@@ -1155,15 +1155,18 @@ export const postServiceList = async (req, res) => {
         services.forEach(service => {
             (service.subCategory || []).forEach(sub => {
 
-                const activeMechanics = (sub.mechanicIds || []).filter(
-                    m => m.mechanicId && m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE && m.mechanicId.isDeleted !== true
-                );
-
-                if (activeMechanics.length === 0) return;
-
+                let activeMechanics = [];
                 if (nearbyMechanicIds.length > 0) {
+                    activeMechanics = (sub.mechanicIds || []).filter(
+                        m => m.mechanicId && m.mechanicId.status === Constants.MECHANIC_STATUS.ACTIVE && m.mechanicId.isDeleted !== true
+                    );
+
+                    if (activeMechanics.length === 0) return;
+
                     const hasNearby = activeMechanics.some(m => nearbyMechanicIds.some(id => id.equals(m.mechanicId._id || m.mechanicId)));
                     if (!hasNearby) return;
+                } else {
+                    activeMechanics = (sub.mechanicIds || []);
                 };
 
                 flatServices.push({
