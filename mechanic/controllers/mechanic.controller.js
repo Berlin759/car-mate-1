@@ -3329,8 +3329,8 @@ export const addBank = async (req, res) => {
         };
 
         // Bank IfSC Code
-        const trimmedIfsc = bankIfscCode.trim().toUpperCase();
-        const ifscRegex = /^[A-Z]{4}[0-9]{6}$/;
+        const trimmedIfsc = String(bankIfscCode || "").trim().toUpperCase();
+        const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
         if (!ifscRegex.test(trimmedIfsc)) {
             return res.status(400).json(errorResponse("Please enter a valid IFSC code (e.g., SBIN0001234)."));
