@@ -132,6 +132,20 @@ export const getProfileDetails = async (req, res) => {
 
         let pipeline = [
             { $match: filter },
+            {
+                $lookup: {
+                    from: "kycs",
+                    localField: "_id",
+                    foreignField: "mechanicId",
+                    as: "kycDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$kycDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             { $sort: { createdAt: -1 } },
             {
                 $project: {
@@ -162,6 +176,12 @@ export const getProfileDetails = async (req, res) => {
                     status: 1,
                     languageCode: 1,
                     isAutoDetectLanguage: 1,
+                    aadhaarFront: "$kycDetails.aadhaarFront",
+                    aadhaarBack: "$kycDetails.aadhaarBack",
+                    panCard: "$kycDetails.panCard",
+                    selfie: "$kycDetails.selfie",
+                    rejectReason: "$kycDetails.rejectReason",
+                    kycStatus: "$kycDetails.status",
                     createdAt: 1,
                     updatedAt: 1,
                 },
@@ -326,11 +346,9 @@ export const postUpdateMechanicProfile = async (req, res) => {
             if (!updateMechanic) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
             };
-
-            mechanicData = updateMechanic;
         };
 
-        return res.status(200).json(successResponse("Profile Updated successfully.", mechanicData));
+        return res.status(200).json(successResponse("Profile Updated successfully."));
     } catch (error) {
         log1(["Error in postUpdateMechanicProfile ----->", error]);
         return res.status(400).json(errorResponse(error.message));

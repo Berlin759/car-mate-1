@@ -684,7 +684,7 @@ export const postHomeDetails = async (req, res) => {
                     .populate("subCategory.mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
                     .lean();
 
-                popularNearbyServices = [];
+                const allNearbyServices = [];
                 nearbyServices.forEach(service => {
                     (service.subCategory || []).forEach(sub => {
                         const nearbyMechs = (sub.mechanicIds || []).filter(
@@ -714,30 +714,34 @@ export const postHomeDetails = async (req, res) => {
                                 distanceInMinutes = Math.round((distance / avgSpeedKmph) * 60);
                             };
 
-                            if (popularNearbyServices.length < 5) {
-                                popularNearbyServices.push({
-                                    serviceId: service._id,
-                                    mechanicId: mechanicDetails?._id || "",
-                                    mechanicProfileImage: mechanicDetails?.profileImage || "",
-                                    categoryName: sub.fullname,
-                                    price: nearbyMechs[0]?.price || 0,
-                                    distanceInMinutes: distanceInMinutes || 0,
-                                    // categoryDescription: service.description || "",
-                                    // categoryImage: service.image || "",
-                                    // subCategoryDetails: {
-                                    //     fullName: sub.fullname,
-                                    //     description: nearbyMechs[0]?.description || 0,
-                                    //     price: nearbyMechs[0]?.price || 0,
-                                    // },
-                                    // mechanicCount: nearbyMechs.length,
-                                });
-                            };
+                            allNearbyServices.push({
+                                serviceId: service._id,
+                                mechanicId: mechanicDetails?._id || "",
+                                mechanicProfileImage: mechanicDetails?.profileImage || "",
+                                categoryName: sub.fullname,
+                                price: nearbyMechs[0]?.price || 0,
+                                distanceInMinutes: distanceInMinutes || 0,
+                            });
                         }
                     });
                 });
 
-                popularNearbyServices.sort((a, b) => b.distanceInMinutes - a.distanceInMinutes);
-                popularNearbyServices = popularNearbyServices.slice(0, 10);
+                // Sort by distance ascending (closest first)
+                allNearbyServices.sort((a, b) => a.distanceInMinutes - b.distanceInMinutes);
+
+                // Filter for unique mechanics and limit to 5
+                popularNearbyServices = [];
+                const seenMechanics = new Set();
+                for (const item of allNearbyServices) {
+                    const mechanicIdStr = item.mechanicId?.toString();
+                    if (mechanicIdStr && !seenMechanics.has(mechanicIdStr)) {
+                        seenMechanics.add(mechanicIdStr);
+                        popularNearbyServices.push(item);
+                        if (popularNearbyServices.length >= 5) {
+                            break;
+                        }
+                    }
+                }
             }
         }
 
