@@ -5,6 +5,7 @@ import {
     errorResponse,
     log1,
     successResponse,
+    convertToPaise,
 } from "../lib/general.js";
 import messages from "../utils/messages.js";
 import Owner from "../models/owner.model.js";
@@ -13,36 +14,53 @@ import Transaction from "../models/transaction.model.js";
 import { sendPushNotification } from "./pushNotification.js";
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY,
+    key_secret: process.env.RAZORPAY_SECRET,
 });
 
-export const createRazorpayOrder = async (payload) => {
+export const createOrder = async (payload) => {
     try {
-        const { amount, currency, receipt } = payload;
+        const { order_id, order_amount } = payload;
 
-        const order = await razorpay.orders.create({
-            amount: Math.round(amount * 100),
-            currency: currency || "INR",
-            receipt: receipt,
+        const createOrderResponse = await razorpay.orders.create({
+            amount: convertToPaise(order_amount),
+            currency: Constants.BASE_CURRENCY,
+            receipt: `order_${order_id.toString()}`,
+            notes: {
+                secret: process.env.RAZORPAY_WEBHOOK_SECRET,
+                orderId: order_id,
+            },
         });
 
-        if (!order) {
-            log1(["createRazorpayOrder Error----->", order]);
-            return errorResponse("Failed to create Razorpay order.");
+        log1(["createOrder order----->", createOrderResponse]);
+        if (!createOrderResponse) {
+            return errorResponse("Failed to create order.");
         };
 
-        log1(["createRazorpayOrder order----->", order]);
-
-        return successResponse("Razorpay order created successfully.", {
-            orderId: order.id,
-            amount: order.amount,
-            currency: order.currency,
-            keyId: process.env.RAZORPAY_KEY_ID,
-        });
+        return successResponse("Order created successfully.", { order: createOrderResponse });
     } catch (error) {
-        log1(["createRazorpayOrder Error----->", error.message]);
+        log1(["createOrder Error----->", error.message]);
         return errorResponse(messages.unexpectedDataError);
+    };
+};
+
+export const verifySignature = async (payload) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = payload;
+
+        const generated_signature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
+            .update(razorpay_order_id + "|" + razorpay_payment_id)
+            .digest("hex");
+
+        if (generated_signature === razorpay_signature) {
+            return true;
+        };
+
+        return false;
+    } catch (error) {
+        log1(["verifySignature Error----->", error.message]);
+        return false;
     };
 };
 
@@ -57,7 +75,7 @@ export const verifyRazorpayPayment = async (payload) => {
         const body = razorpayOrderId + "|" + razorpayPaymentId;
 
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
             .update(body)
             .digest("hex");
 

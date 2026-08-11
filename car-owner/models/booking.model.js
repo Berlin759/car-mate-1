@@ -151,6 +151,11 @@ const bookingSchema = new Schema(
             type: String,
             default: "",
         },
+        payment_status: {
+            type: Number,
+            enum: Object.values(Constants.BOOKING_PAYMENT_STATUS),
+            default: Constants.BOOKING_PAYMENT_STATUS.PENDING,
+        },
         status: {
             type: Number,
             enum: Object.values(Constants.BOOKING_STATUS),

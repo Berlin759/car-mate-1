@@ -39,12 +39,6 @@ import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 
-
-const razorpayInstance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
-
 const __dirname = path.resolve();
 
 const { ObjectId } = mongoose.Types;
@@ -126,9 +120,6 @@ export const getProfileDetails = async (req, res) => {
         let filter = {
             _id: new ObjectId(mechanicId),
         };
-
-        const mechanic = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
-        log1(["getProfileDetails mechanic------>", mechanic]);
 
         let pipeline = [
             { $match: filter },

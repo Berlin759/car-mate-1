@@ -4,7 +4,7 @@ dotenv.config();
 const Constants = {
     PLATFORM_NAME: "car_mate_owner_app",
     DEFAULT_COUNTRY_CODE: "IN",
-    CURRENCY_CODE: "USD",
+    BASE_CURRENCY: 'INR',
     OTP_LENGTH: 6,
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 10,

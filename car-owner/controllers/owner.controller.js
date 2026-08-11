@@ -25,7 +25,7 @@ import {
 } from "../lib/general.js";
 import { sendMail } from "../utils/mailSend.helper.js";
 import { sendPushNotification } from "./pushNotification.js";
-import { razorpayRefund } from "./razorpay.controller.js";
+import { createOrder, razorpayRefund, verifySignature } from "./razorpay.controller.js";
 import { io } from "../index.js";
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
@@ -46,12 +46,6 @@ import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 import KYC from "../models/kyc.model.js";
 import { generateInvoicePDF } from "../utils/pdf.helper.js";
-
-
-const razorpayInstance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 
 const __dirname = path.resolve();
 
@@ -135,11 +129,47 @@ export const getProfileDetails = async (req, res) => {
             _id: new ObjectId(ownerId),
         };
 
-        const owner = await Owner.findOne({ _id: new ObjectId(ownerId) });
-        log1(["getProfileDetails owner------>", owner]);
-
         let pipeline = [
             { $match: filter },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: {
+                        ownerId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ["$ownerId", "$$ownerId"],
+                                        },
+                                        {
+                                            $eq: ["$isDefault", true],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
+                        {
+                            $limit: 1,
+                        },
+                    ],
+                    as: "addressDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$addressDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             { $sort: { createdAt: -1 } },
             {
                 $project: {
@@ -158,6 +188,14 @@ export const getProfileDetails = async (req, res) => {
                     status: 1,
                     languageCode: 1,
                     isAutoDetectLanguage: 1,
+                    addressDetails: {
+                        _id: "$addressDetails._id",
+                        label: "$addressDetails.label",
+                        address: "$addressDetails.address",
+                        latitude: "$addressDetails.latitude",
+                        longitude: "$addressDetails.longitude",
+                        isDefault: "$addressDetails.isDefault",
+                    },
                     createdAt: 1,
                     updatedAt: 1,
                 },
@@ -166,7 +204,7 @@ export const getProfileDetails = async (req, res) => {
 
         const items = await Owner.aggregate(pipeline);
 
-        const response = items[0];
+        const response = items[0] || null;
 
         return res.status(200).json(successResponse("Get Profile Details successfully!", response));
     } catch (error) {
@@ -2292,7 +2330,7 @@ export const postAddBooking = async (req, res) => {
 
         let totalPayAmount = parseFloat(subTotal + taxAmount);
 
-        let bookingPayload = {
+        let bookingData = {
             ownerId: new ObjectId(ownerId),
             mechanicId: mechanicNewId,
             serviceId: new ObjectId(serviceId),
@@ -2310,56 +2348,39 @@ export const postAddBooking = async (req, res) => {
             totalAmount: totalPayAmount,
             invoiceNo: invoiceNo,
             status: Constants.BOOKING_STATUS.PENDING,
+            payment_status: Constants.BOOKING_PAYMENT_STATUS.PENDING,
         };
 
         if (couponId) {
-            bookingPayload.couponId = couponId;
+            bookingData.couponId = couponId;
         };
 
-        let razorpayPaymentLink = null;
-        try {
-            const paymentLink = await razorpayInstance.paymentLink.create({
-                amount: Math.round(totalPayAmount * 100),
-                currency: "INR",
-                description: `Booking #${invoiceNo} - ${serviceDetails.fullName || "Service"}`,
-                customer: {
-                    name: ownerName,
-                    email: "",
-                    contact: phoneNumber,
-                },
-                notify: {
-                    sms: true,
-                    email: true,
-                },
-                reference_id: `booking_${invoiceNo}`,
-                callback_url: `${process.env.APP_URL}/owner/verify-payment`,
-                callback_method: "get",
-            });
+        log1(["postAddBooking bookingData----->", bookingData]);
 
-            log1(["postAddBooking paymentLink----->", paymentLink]);
-
-            razorpayPaymentLink = paymentLink.short_url;
-
-            bookingPayload.razorpayOrderId = paymentLink.id;
-        } catch (razorpayError) {
-            log1(["postAddBooking Razorpay payment link creation failed----->", razorpayError.error.description]);
-
+        const createBooking = await Booking.create(bookingData);
+        log1(["postAddBooking createBooking----->", createBooking]);
+        if (!createBooking) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
-        log1(["postAddBooking bookingPayload----->", bookingPayload]);
+        const razorBooking = await createOrder({
+            order_id: createBooking._id,
+            order_amount: bookingData.totalAmount,
+        });
 
-        let newBooking = await Booking.create(bookingPayload);
-        log1(["postAddBooking newBooking----->", newBooking]);
-        if (!newBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        log1(["postAddBooking placeorder - razorOrder : ", razorBooking]);
+        if (razorBooking.flag !== 1) {
+            await Booking.deleteOne({ _id: createBooking._id })
+            return res.status(400).json(errorResponse("Something went wrong!"));
         };
+
+        await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id })
 
         let transactionPayload = {
             ownerId: new ObjectId(ownerId),
             mechanicId: mechanicNewId,
             serviceId: new ObjectId(parsedServiceId),
-            bookingId: new ObjectId(newBooking._id),
+            bookingId: new ObjectId(createBooking._id),
             carId: new ObjectId(carId),
             invoiceId: invoiceNo,
             totalAmount: totalPayAmount,
@@ -2370,17 +2391,17 @@ export const postAddBooking = async (req, res) => {
         let transactionCreate = await Transaction.create(transactionPayload);
         log1(["postAddBooking transactionCreate----->", transactionCreate]);
         if (!transactionCreate) {
-            await Booking.deleteOne({ _id: new ObjectId(newBooking._id) });
+            await Booking.deleteOne({ _id: new ObjectId(createBooking._id) });
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
         let responseData = {
-            bookingId: newBooking._id,
+            bookingId: createBooking._id,
             ownerId: ownerId,
             isNewOwner: isNewOwner,
             invoiceNo: invoiceNo,
             totalAmount: totalPayAmount,
-            paymentLink: razorpayPaymentLink,
+            razorpayOrderId: razorBooking.data.order.id,
         };
 
         return res.status(200).json(successResponse("Booking created successfully. Please complete the payment.", responseData));
@@ -2408,8 +2429,12 @@ export const postBookingList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const match = {
+        const ownerMatch = {
             ownerId: new ObjectId(ownerId),
+        };
+
+        const match = {
+            ...ownerMatch,
         };
 
         if (serviceId) {
@@ -2427,18 +2452,16 @@ export const postBookingList = async (req, res) => {
         // ---------- AGGREGATE ----------
         const pipeline = [
             {
-                $match: match,
-            },
-
-            {
-                $sort: {
-                    createdAt: -1,
-                },
-            },
-
-            {
                 $facet: {
                     items: [
+                        {
+                            $match: match,
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
                         { $skip: skip },
                         { $limit: limit },
                         {
@@ -2524,10 +2547,16 @@ export const postBookingList = async (req, res) => {
                     ],
                     totalRecords: [
                         {
+                            $match: match,
+                        },
+                        {
                             $count: "count",
                         },
                     ],
                     statusSummary: [
+                        {
+                            $match: ownerMatch,
+                        },
                         {
                             $group: {
                                 _id: "$status",
@@ -2543,11 +2572,12 @@ export const postBookingList = async (req, res) => {
 
         const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
 
-        const items = result.items;
+        const items = result.items || [];
 
         const totalRecords = result.totalRecords[0]?.count ?? 0;
 
         const statusMap = {
+            All: 0,
             Pending: 0,
             Accepted: 0,
             Rejected: 0,
@@ -2584,6 +2614,8 @@ export const postBookingList = async (req, res) => {
                     break;
             };
         });
+
+        statusMap.All = Object.values(statusMap).slice(1).reduce((total, count) => total + count, 0);
 
         const response = {
             page,
@@ -3043,6 +3075,75 @@ export const getBookingInvoice = async (req, res) => {
     };
 };
 
+export const postVerifyRazorPaySignature = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.verify_razorpay_signature");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        const isVerified = verifySignature({
+            razorpay_order_id: razorpayOrderId,
+            razorpay_payment_id: razorpayPaymentId,
+            razorpay_signature: razorpaySignature,
+        });
+
+        const booking = await Booking.findOne({ razorpayOrderId });
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
+        };
+
+        if (!isVerified) {
+            return res.status(400).json(errorResponse("Payment Failed!", { is_verifed: isVerified }));
+        };
+
+        if (booking.payment_status === Constants.BOOKING_PAYMENT_STATUS.PENDING) {
+            await Booking.updateOne(
+                { _id: booking._id },
+                {
+                    razorpayPaymentId,
+                    payment_status: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
+                }
+            );
+
+            const transaction = await Transaction.findOne({ bookingId: booking._id });
+            if (transaction) {
+                await Transaction.findByIdAndUpdate(transaction._id, {
+                    trxId: razorpayPaymentId,
+                    status: Constants.TRANSACTION_STATUS.SUCCESS,
+                    description: `Razorpay Payment - ${razorpayPaymentId}`,
+                });
+            };
+
+            const ownerData = await Owner.findById(ownerId);
+            if (
+                ownerData &&
+                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.deviceToken &&
+                ownerData.deviceToken !== ""
+            ) {
+                let notificationObject = {
+                    title: "Payment",
+                    description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
+                    ownerId: ownerId,
+                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                };
+
+                await sendPushNotification(ownerData.deviceToken, notificationObject);
+            };
+        };
+
+        return res.status(200).json(successResponse("Success", { is_verifed: isVerified }));
+    } catch (error) {
+        log1(["Error in postVerifyRazorPaySignature ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const postTransactionList = async (req, res) => {
     try {
         const ownerId = req.ownerId;
@@ -3277,7 +3378,7 @@ export const postVerifyRazorpayPayment = async (req, res) => {
         const body = razorpayOrderId + "|" + razorpayPaymentId;
 
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
             .update(body)
             .digest("hex");
 

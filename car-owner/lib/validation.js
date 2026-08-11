@@ -89,8 +89,7 @@ const validate_rules = {
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
         },
-        verify_razorpay_payment: {
-            bookingId: "required",
+        verify_razorpay_signature: {
             razorpayOrderId: "required",
             razorpayPaymentId: "required",
             razorpaySignature: "required",

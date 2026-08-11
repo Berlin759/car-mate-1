@@ -13,38 +13,9 @@ import Transaction from "../models/transaction.model.js";
 import { sendPushNotification } from "./pushNotification.js";
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY,
+    key_secret: process.env.RAZORPAY_SECRET,
 });
-
-export const createRazorpayOrder = async (payload) => {
-    try {
-        const { amount, currency, receipt } = payload;
-
-        const order = await razorpay.orders.create({
-            amount: Math.round(amount * 100),
-            currency: currency || "INR",
-            receipt: receipt,
-        });
-
-        if (!order) {
-            log1(["createRazorpayOrder Error----->", order]);
-            return errorResponse("Failed to create Razorpay order.");
-        };
-
-        log1(["createRazorpayOrder order----->", order]);
-
-        return successResponse("Razorpay order created successfully.", {
-            orderId: order.id,
-            amount: order.amount,
-            currency: order.currency,
-            keyId: process.env.RAZORPAY_KEY_ID,
-        });
-    } catch (error) {
-        log1(["createRazorpayOrder Error----->", error.message]);
-        return errorResponse(messages.unexpectedDataError);
-    };
-};
 
 export const verifyRazorpayPayment = async (payload) => {
     try {
@@ -57,7 +28,7 @@ export const verifyRazorpayPayment = async (payload) => {
         const body = razorpayOrderId + "|" + razorpayPaymentId;
 
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
             .update(body)
             .digest("hex");
 

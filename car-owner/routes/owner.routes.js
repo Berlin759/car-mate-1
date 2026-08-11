@@ -44,7 +44,7 @@ import {
     postCancelBooking,
     getBookingInvoice,
     postTransactionList,
-    postVerifyRazorpayPayment,
+    postVerifyRazorPaySignature,
     getVerifyPayment,
     postRazorpayWebhook,
     postNotificationList,
@@ -127,8 +127,8 @@ router.post("/cancel-booking", authMiddleware, postCancelBooking);
 router.get("/booking-invoice/:bookingId", authMiddleware, getBookingInvoice);
 
 // Transaction Routes
+router.post('/razorpay/signature/verify', authMiddleware, postVerifyRazorPaySignature);
 router.post("/transaction-list", authMiddleware, postTransactionList);
-router.post("/verify-razorpay-payment", authMiddleware, postVerifyRazorpayPayment);
 
 // Payment Success Page
 router.get("/verify-payment", getVerifyPayment);
