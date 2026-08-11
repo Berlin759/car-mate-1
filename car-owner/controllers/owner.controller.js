@@ -1695,6 +1695,7 @@ export const postMechanicDetails = async (req, res) => {
                 _id: mechanic._id,
                 fullName: mechanic.fullName,
                 profileImage: mechanic.profileImage,
+                consultantFee: mechanic.consultantFee,
                 rating: avgRating,
                 distance: distance,
                 minutes: minutes,
