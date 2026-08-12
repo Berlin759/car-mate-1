@@ -1195,8 +1195,12 @@ export const postBookingList = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const match = {
+        const mechanicMatch = {
             mechanicId: new ObjectId(mechanicId),
+        };
+
+        const match = {
+            ...mechanicMatch,
         };
 
         if (serviceId) {
@@ -1208,37 +1212,20 @@ export const postBookingList = async (req, res) => {
         };
 
         if (status !== undefined && status !== null && status !== "") {
-            if (Array.isArray(status)) {
-                match.status = { $in: status.map(Number) };
-            } else if (typeof status === 'string' && status.includes(',')) {
-                match.status = { $in: status.split(',').map(Number) };
-            } else if (typeof status === 'string') {
-                const lowerStatus = status.toLowerCase();
-                if (lowerStatus === 'pending') {
-                    match.status = Constants.BOOKING_STATUS.PENDING;
-                } else if (lowerStatus === 'in_progress' || lowerStatus === 'inprogress') {
-                    match.status = Constants.BOOKING_STATUS.SERVICE_STARTED;
-                } else if (lowerStatus === 'upcoming') {
-                    match.status = {
-                        $in: [
-                            Constants.BOOKING_STATUS.ACCEPTED,
-                            Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
-                            Constants.BOOKING_STATUS.ARRIVED
-                        ]
-                    };
-                } else if (lowerStatus === 'completed') {
-                    match.status = {
-                        $in: [
-                            Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                            Constants.BOOKING_STATUS.CLOSED
-                        ]
-                    };
-                } else if (lowerStatus === 'cancelled') {
-                    match.status = Constants.BOOKING_STATUS.CANCELLED;
-                } else if (lowerStatus === 'rejected') {
-                    match.status = Constants.BOOKING_STATUS.REJECTED;
-                } else {
-                    match.status = Number(status);
+            if (Number(status) === Constants.BOOKING_STATUS.ACCEPTED) {
+                match.status = {
+                    $in: [
+                        Constants.BOOKING_STATUS.ACCEPTED,
+                        Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                        Constants.BOOKING_STATUS.ARRIVED
+                    ]
+                };
+            } else if (Number(status) === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                match.status = {
+                    $in: [
+                        Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                        Constants.BOOKING_STATUS.CLOSED
+                    ]
                 };
             } else {
                 match.status = Number(status);
@@ -1248,18 +1235,16 @@ export const postBookingList = async (req, res) => {
         // ---------- AGGREGATE ----------
         const pipeline = [
             {
-                $match: match,
-            },
-
-            {
-                $sort: {
-                    createdAt: -1,
-                },
-            },
-
-            {
                 $facet: {
                     items: [
+                        {
+                            $match: match,
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
                         { $skip: skip },
                         { $limit: limit },
                         {
@@ -1286,7 +1271,6 @@ export const postBookingList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            // email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -1325,20 +1309,18 @@ export const postBookingList = async (req, res) => {
                                 slot: 1,
                                 latitude: 1,
                                 longitude: 1,
+                                totalServiceFee: 1,
+                                consultantFee: 1,
+                                discountAmount: 1,
+                                subTotal: 1,
+                                taxAmount: 1,
                                 totalAmount: 1,
+                                quotation: 1,
+                                quotationPaymentStatus: 1,
+                                bookingPaymentStatus: 1,
                                 status: 1,
                                 createdAt: 1,
-                                consultantFee: 1,
-                                checklist: 1,
-                                quotation: 1,
-                                subTotal: 1,
-                                discountAmount: 1,
-                                taxAmount: 1,
-                                serviceDetails: {
-                                    _id: "$serviceDetails._id",
-                                    fullName: "$serviceDetails.fullName",
-                                    description: "$serviceDetails.description",
-                                },
+                                serviceDetails: 1,
                                 ownerDetails: 1,
                                 carDetails: {
                                     _id: "$carDetails._id",
@@ -1351,10 +1333,16 @@ export const postBookingList = async (req, res) => {
                     ],
                     totalRecords: [
                         {
+                            $match: match,
+                        },
+                        {
                             $count: "count",
                         },
                     ],
                     statusSummary: [
+                        {
+                            $match: mechanicMatch,
+                        },
                         {
                             $group: {
                                 _id: "$status",
@@ -1370,11 +1358,12 @@ export const postBookingList = async (req, res) => {
 
         const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
 
-        const items = result.items;
+        const items = result.items || [];
 
         const totalRecords = result.totalRecords[0]?.count ?? 0;
 
         const statusMap = {
+            All: 0,
             Pending: 0,
             Accepted: 0,
             Rejected: 0,
@@ -1411,6 +1400,8 @@ export const postBookingList = async (req, res) => {
                     break;
             };
         });
+
+        statusMap.All = Object.values(statusMap).slice(1).reduce((total, count) => total + count, 0);
 
         const response = {
             page,
@@ -1480,7 +1471,6 @@ export const postBookingDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                // email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -1495,6 +1485,35 @@ export const postBookingDetails = async (req, res) => {
             {
                 $unwind: {
                     path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "transactions",
+                    localField: "_id",
+                    foreignField: "bookingId",
+                    as: "transactionDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceId: 1,
+                                trxId: 1,
+                                adminCharge: 1,
+                                totalAmount: 1,
+                                totalQuotationAmount: 1,
+                                description: 1,
+                                status: 1,
+                                createdAt: 1,
+                                updatedAt: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$transactionDetails",
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -1533,25 +1552,24 @@ export const postBookingDetails = async (req, res) => {
                     slot: 1,
                     latitude: 1,
                     longitude: 1,
+                    totalServiceFee: 1,
                     consultantFee: 1,
+                    discountAmount: 1,
                     subTotal: 1,
                     taxAmount: 1,
-                    discountAmount: 1,
                     totalAmount: 1,
-                    checklist: 1,
                     quotation: 1,
+                    quotationPaymentStatus: 1,
+                    bookingPaymentStatus: 1,
                     status: 1,
                     createdAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    transactionDetails: 1,
                     feedback: {
                         rating: "$ratingDetails.rating",
                         description: "$ratingDetails.description",
                     },
-                    serviceDetails: {
-                        _id: "$serviceDetails._id",
-                        fullName: "$serviceDetails.fullName",
-                        description: "$serviceDetails.description",
-                    },
-                    ownerDetails: 1,
                     carDetails: {
                         _id: "$carDetails._id",
                         fullName: "$carDetails.fullName",

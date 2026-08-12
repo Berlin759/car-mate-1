@@ -2457,7 +2457,24 @@ export const postBookingList = async (req, res) => {
         };
 
         if (status !== undefined && status !== null && status !== "") {
-            match.status = Number(status);
+            if (Number(status) === Constants.BOOKING_STATUS.ACCEPTED) {
+                match.status = {
+                    $in: [
+                        Constants.BOOKING_STATUS.ACCEPTED,
+                        Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                        Constants.BOOKING_STATUS.ARRIVED
+                    ]
+                };
+            } else if (Number(status) === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                match.status = {
+                    $in: [
+                        Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                        Constants.BOOKING_STATUS.CLOSED
+                    ]
+                };
+            } else {
+                match.status = Number(status);
+            };
         };
 
         // ---------- AGGREGATE ----------
@@ -2538,14 +2555,18 @@ export const postBookingList = async (req, res) => {
                                 slot: 1,
                                 latitude: 1,
                                 longitude: 1,
+                                totalServiceFee: 1,
+                                consultantFee: 1,
+                                discountAmount: 1,
+                                subTotal: 1,
+                                taxAmount: 1,
                                 totalAmount: 1,
+                                quotation: 1,
+                                quotationPaymentStatus: 1,
+                                bookingPaymentStatus: 1,
                                 status: 1,
                                 createdAt: 1,
-                                serviceDetails: {
-                                    _id: "$serviceDetails._id",
-                                    fullName: "$serviceDetails.fullName",
-                                    description: "$serviceDetails.description",
-                                },
+                                serviceDetails: 1,
                                 mechanicDetails: 1,
                                 carDetails: {
                                     _id: "$carDetails._id",
@@ -2696,7 +2717,6 @@ export const postBookingDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -2758,6 +2778,20 @@ export const postBookingDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "ratings",
+                    localField: "_id",
+                    foreignField: "bookingId",
+                    as: "ratingDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ratingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
@@ -2775,13 +2809,13 @@ export const postBookingDetails = async (req, res) => {
                     bookingPaymentStatus: 1,
                     status: 1,
                     createdAt: 1,
-                    serviceDetails: {
-                        _id: "$serviceDetails._id",
-                        fullName: "$serviceDetails.fullName",
-                        description: "$serviceDetails.description",
-                    },
+                    serviceDetails: 1,
                     mechanicDetails: 1,
                     transactionDetails: 1,
+                    feedback: {
+                        rating: "$ratingDetails.rating",
+                        description: "$ratingDetails.description",
+                    },
                     carDetails: {
                         _id: "$carDetails._id",
                         fullName: "$carDetails.fullName",
