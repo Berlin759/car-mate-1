@@ -1561,6 +1561,7 @@ export const postBookingDetails = async (req, res) => {
                     quotation: 1,
                     quotationPaymentStatus: 1,
                     bookingPaymentStatus: 1,
+                    cancelReason: 1,
                     status: 1,
                     createdAt: 1,
                     serviceDetails: 1,
@@ -1678,6 +1679,10 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("Cannot cancel booking after service has started."));
                 };
 
+                if (!param.reason) {
+                    return res.status(400).json(errorResponse("Please enter reason for cancel service."));
+                };
+
                 updatePayload.cancelById = new ObjectId(mechanicId);
                 updatePayload.cancelReason = param.reason || "";
                 updatePayload.cancelTime = new Date();
@@ -1688,31 +1693,31 @@ export const postBookingUpdateStatus = async (req, res) => {
                 break;
             }
 
-            case Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.ACCEPTED) {
-                    return res.status(400).json(errorResponse("Can only mark as en route after accepting booking."));
-                };
+            // case Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE: {
+            //     if (bookingDetails.status !== Constants.BOOKING_STATUS.ACCEPTED) {
+            //         return res.status(400).json(errorResponse("Can only mark as en route after accepting booking."));
+            //     };
 
-                notificationTitle = "Provider En Route";
-                notificationDescription = `${mechanicDetails?.fullName || "Provider"} is on the way to your location.`;
+            //     notificationTitle = "Provider En Route";
+            //     notificationDescription = `${mechanicDetails?.fullName || "Provider"} is on the way to your location.`;
 
-                break;
-            }
+            //     break;
+            // }
 
-            case Constants.BOOKING_STATUS.ARRIVED: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE) {
-                    return res.status(400).json(errorResponse("Can only mark as arrived after being en route."));
-                };
+            // case Constants.BOOKING_STATUS.ARRIVED: {
+            //     if (bookingDetails.status !== Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE) {
+            //         return res.status(400).json(errorResponse("Can only mark as arrived after being en route."));
+            //     };
 
-                notificationTitle = "Provider Arrived";
-                notificationDescription = `${mechanicDetails?.fullName || "Provider"} has arrived at your location.`;
+            //     notificationTitle = "Provider Arrived";
+            //     notificationDescription = `${mechanicDetails?.fullName || "Provider"} has arrived at your location.`;
 
-                break;
-            }
+            //     break;
+            // }
 
             case Constants.BOOKING_STATUS.SERVICE_STARTED: {
-                if (bookingDetails.status !== Constants.BOOKING_STATUS.ARRIVED) {
-                    return res.status(400).json(errorResponse("Can only start service after arriving."));
+                if (bookingDetails.status !== Constants.BOOKING_STATUS.ACCEPTED) {
+                    return res.status(400).json(errorResponse("Can only start service after accepting booking."));
                 };
 
                 updatePayload.startTime = new Date();
@@ -1826,12 +1831,20 @@ export const postBookingSendQuote = async (req, res) => {
             price: Number(item.price) || 0,
         }));
 
-        booking.quotation = formattedQuotation;
+        const existingQuotation = Array.isArray(booking.quotation) ? booking.quotation : [];
 
-        // Re-calculate pricing breakdown
-        const quoteSum = formattedQuotation.reduce((sum, item) => sum + item.price, 0);
-        const consultantFee = booking.consultantFee || 0;
-        const discountAmount = booking.discountAmount || 0;
+        booking.quotation = [
+            ...existingQuotation,
+            ...formattedQuotation
+        ];
+
+        const quoteSum = booking.quotation.reduce(
+            (sum, item) => sum + (Number(item.price) || 0),
+            0
+        );
+
+        const consultantFee = Number(booking.consultantFee) || 0;
+        const discountAmount = Number(booking.discountAmount) || 0;
 
         const subTotal = (consultantFee + quoteSum) - discountAmount;
         const taxAmount = Math.round(subTotal * 0.18);
@@ -1843,7 +1856,7 @@ export const postBookingSendQuote = async (req, res) => {
 
         await booking.save();
 
-        return res.status(200).json(successResponse("Quotation sent successfully.", booking));
+        return res.status(200).json(successResponse("Quotation add successfully.", booking));
     } catch (error) {
         log1(["Error in postBookingSendQuote ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
