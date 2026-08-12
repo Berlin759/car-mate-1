@@ -94,6 +94,12 @@ const validate_rules = {
             razorpayPaymentId: "required",
             razorpaySignature: "required",
         },
+        verify_quotation_razorpay_signature: {
+            bookingId: "required",
+            razorpayOrderId: "required",
+            razorpayPaymentId: "required",
+            razorpaySignature: "required",
+        },
         apply_coupon: {
             couponCode: "required",
             orderAmount: "required",

@@ -152,7 +152,13 @@ const Constants = {
         PENDING: 1,
         INPROGRESS: 2,
         COMPLETED: 3,
-        REJECTED: 4
+        FAILED: 4
+    },
+    QUOTATION_PAYMENT_STATUS: {
+        PENDING: 1,
+        INPROGRESS: 2,
+        COMPLETED: 3,
+        FAILED: 4
     },
     PREFERENCES_STATUS: {
         FALSE: 1,

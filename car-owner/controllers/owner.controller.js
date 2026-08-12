@@ -1457,27 +1457,46 @@ export const postNearbyMechanics = async (req, res) => {
         log1(["postNearbyMechanics param----->", param]);
 
         const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
             latitude,
             longitude,
             radius,
             serviceId,
         } = param;
 
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
         if (!latitude || !longitude) {
             return res.status(400).json(errorResponse("Please provide latitude and longitude."));
         };
 
-        const defaultRadius = radius || Constants.DEFAULT_RADIUS;
-
         const lat = parseFloat(latitude);
         const lng = parseFloat(longitude);
-        const radiusInMeters = parseFloat(defaultRadius) * 1000;
 
-        if (isNaN(lat) || isNaN(lng)) {
-            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
+        if (
+            Number.isNaN(lat) ||
+            Number.isNaN(lng) ||
+            lat < -90 ||
+            lat > 90 ||
+            lng < -180 ||
+            lng > 180
+        ) {
+            return res.status(400).json(
+                errorResponse("Invalid latitude or longitude.")
+            );
         };
 
-        let matchFilter = {
+        const defaultRadius = radius !== undefined && radius !== null && radius !== "" ? parseFloat(radius) : Constants.DEFAULT_RADIUS;
+        if (Number.isNaN(defaultRadius) || defaultRadius <= 0) {
+            return res.status(400).json(errorResponse("Invalid radius."));
+        };
+
+        const radiusInMeters = defaultRadius * 1000;
+
+        const matchFilter = {
             status: Constants.MECHANIC_STATUS.ACTIVE,
             "location": {
                 $near: {
@@ -1490,11 +1509,15 @@ export const postNearbyMechanics = async (req, res) => {
             },
         };
 
-        if (serviceId && ObjectId.isValid(serviceId)) {
+        if (serviceId) {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid service id."));
+            };
+
             matchFilter.serviceIds = new ObjectId(serviceId);
         };
 
-        const mechanics = await Mechanic.find(matchFilter).limit(50).lean();
+        const mechanics = await Mechanic.find(matchFilter).skip(skip).limit(limit).lean();
 
         const mechanicIds = mechanics.map((mechanic) => mechanic._id);
 
@@ -1510,15 +1533,19 @@ export const postNearbyMechanics = async (req, res) => {
         const response = mechanics.map((mechanic) => {
             const mLat = parseFloat(mechanic.latitude) || 0;
             const mLng = parseFloat(mechanic.longitude) || 0;
+
             const R = 6371;
+
             const dLat = ((mLat - lat) * Math.PI) / 180;
             const dLng = ((mLng - lng) * Math.PI) / 180;
+
             const a =
                 Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos((lat * Math.PI) / 180) *
                 Math.cos((mLat * Math.PI) / 180) *
                 Math.sin(dLng / 2) *
                 Math.sin(dLng / 2);
+
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distance = R * c;
             const avgSpeedKmph = 30;
@@ -1567,10 +1594,20 @@ export const postNearbyMechanics = async (req, res) => {
 
         response.sort((a, b) => b.profileCompletionPercentage - a.profileCompletionPercentage || a.distance - b.distance);
 
-        return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", {
+        const totalRecords = response.length;
+        const totalPages = Math.ceil(totalRecords / limit);
+
+        let mechanicResponse = {
+            page,
+            limit,
+            totalRecords,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
             items: response,
-            totalRecords: response.length,
-        }));
+        };
+
+        return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", mechanicResponse));
     } catch (error) {
         log1(["Error in postNearbyMechanics ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -2082,13 +2119,7 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        let parsedServiceId = serviceId;
-        if (typeof serviceId === "string" && serviceId.includes(":")) {
-            const parts = serviceId.split(":");
-            parsedServiceId = parts[0];
-        }
-
-        if (!ObjectId.isValid(parsedServiceId)) {
+        if (!ObjectId.isValid(serviceId)) {
             return res.status(400).json(errorResponse("Invalid service id."));
         };
 
@@ -2111,7 +2142,6 @@ export const postAddBooking = async (req, res) => {
         };
 
         let ownerId;
-        let ownerName;
         let isNewOwner = false;
 
         const ownerDetails = await Owner.findOne({ phoneNumber: phoneNumber }).lean();
@@ -2126,17 +2156,15 @@ export const postAddBooking = async (req, res) => {
             });
 
             ownerId = newOwner._id;
-            ownerName = newOwner.fullName;
             isNewOwner = true;
             log1(["postAddBooking newOwner created----->", newOwner]);
         } else {
             ownerId = ownerDetails._id;
-            ownerName = ownerDetails.fullName;
         };
 
         const [serviceDetails, carDetails, addressDetails] = await Promise.all([
             Service.findOne({
-                _id: new ObjectId(parsedServiceId),
+                _id: new ObjectId(serviceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
             }).lean(),
 
@@ -2343,13 +2371,14 @@ export const postAddBooking = async (req, res) => {
             latitude: addressDetails?.latitude,
             longitude: addressDetails?.longitude,
             consultantFee: consultantFee,
+            totalServiceFee: serviceFee,
             discountAmount: discountAmount,
             subTotal: subTotal,
             taxAmount: taxAmount,
             totalAmount: totalPayAmount,
             invoiceNo: invoiceNo,
             status: Constants.BOOKING_STATUS.PENDING,
-            payment_status: Constants.BOOKING_PAYMENT_STATUS.PENDING,
+            bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.PENDING,
         };
 
         if (couponId) {
@@ -2376,25 +2405,6 @@ export const postAddBooking = async (req, res) => {
         };
 
         await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id })
-
-        let transactionPayload = {
-            ownerId: new ObjectId(ownerId),
-            mechanicId: mechanicNewId,
-            serviceId: new ObjectId(parsedServiceId),
-            bookingId: new ObjectId(createBooking._id),
-            carId: new ObjectId(carId),
-            invoiceId: invoiceNo,
-            totalAmount: totalPayAmount,
-            description: `Payment To ${ownerName || "Guest"}`,
-            status: Constants.TRANSACTION_STATUS.PENDING,
-        };
-
-        let transactionCreate = await Transaction.create(transactionPayload);
-        log1(["postAddBooking transactionCreate----->", transactionCreate]);
-        if (!transactionCreate) {
-            await Booking.deleteOne({ _id: new ObjectId(createBooking._id) });
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
 
         let responseData = {
             bookingId: createBooking._id,
@@ -2717,6 +2727,7 @@ export const postBookingDetails = async (req, res) => {
                                 trxId: 1,
                                 adminCharge: 1,
                                 totalAmount: 1,
+                                totalQuotationAmount: 1,
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
@@ -2753,7 +2764,15 @@ export const postBookingDetails = async (req, res) => {
                     slot: 1,
                     latitude: 1,
                     longitude: 1,
+                    totalServiceFee: 1,
+                    consultantFee: 1,
+                    discountAmount: 1,
+                    subTotal: 1,
+                    taxAmount: 1,
                     totalAmount: 1,
+                    quotation: 1,
+                    quotationPaymentStatus: 1,
+                    bookingPaymentStatus: 1,
                     status: 1,
                     createdAt: 1,
                     serviceDetails: {
@@ -2786,7 +2805,7 @@ export const postBookingDetails = async (req, res) => {
             const trackService = [];
 
             // 1. Payment Stage
-            const isPaymentDone = transactionStatus === Constants.TRANSACTION_STATUS.SUCCESS || Constants.TRANSACTION_STATUS.REFUND;
+            const isPaymentDone = transactionStatus === (Constants.TRANSACTION_STATUS.SUCCESS || Constants.TRANSACTION_STATUS.REFUND);
             trackService.push({
                 title: "Payment",
                 subTitle: `${ownerName} (${categoryName})`,
@@ -3102,25 +3121,32 @@ export const postVerifyRazorPaySignature = async (req, res) => {
             return res.status(400).json(errorResponse("Payment Failed!", { is_verifed: isVerified }));
         };
 
-        if (booking.payment_status === Constants.BOOKING_PAYMENT_STATUS.PENDING) {
+        if (booking.bookingPaymentStatus === Constants.BOOKING_PAYMENT_STATUS.PENDING) {
             await Booking.updateOne(
                 { _id: booking._id },
                 {
                     razorpayPaymentId,
-                    payment_status: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
+                    bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
                 }
             );
 
-            const transaction = await Transaction.findOne({ bookingId: booking._id });
-            if (transaction) {
-                await Transaction.findByIdAndUpdate(transaction._id, {
-                    trxId: razorpayPaymentId,
-                    status: Constants.TRANSACTION_STATUS.SUCCESS,
-                    description: `Razorpay Payment - ${razorpayPaymentId}`,
-                });
+            const ownerData = await Owner.findById(ownerId);
+
+            let transactionPayload = {
+                ownerId: booking.ownerId,
+                mechanicId: booking.mechanicId,
+                serviceId: booking.serviceId,
+                bookingId: booking._id,
+                carId: booking.carId,
+                trxId: razorpayPaymentId,
+                invoiceId: booking.invoiceNo,
+                totalAmount: booking.totalAmount,
+                description: `Payment for booking #${booking._id} was successful.`,
+                status: Constants.TRANSACTION_STATUS.SUCCESS,
             };
 
-            const ownerData = await Owner.findById(ownerId);
+            await Transaction.create(transactionPayload);
+
             if (
                 ownerData &&
                 ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
@@ -3128,8 +3154,155 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                 ownerData.deviceToken !== ""
             ) {
                 let notificationObject = {
-                    title: "Payment",
-                    description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
+                    title: "Payment Successful!",
+                    description: `Payment for booking #${booking._id} was successful. The mechanic will accept your booking request soon.`,
+                    ownerId: ownerId,
+                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                };
+
+                await sendPushNotification(ownerData.deviceToken, notificationObject);
+            };
+        };
+
+        const pipeline = [
+            {
+                $match: { _id: booking._id },
+            },
+
+            {
+                $sort: {
+                    createdAt: -1,
+                },
+            },
+
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    date: 1,
+                    slot: 1,
+                    totalAmount: 1,
+                    status: 1,
+                    createdAt: 1,
+                    serviceDetails: {
+                        _id: "$serviceDetails._id",
+                        fullName: "$serviceDetails.fullName",
+                    },
+                    mechanicDetails: 1,
+                },
+            },
+        ];
+
+        const [bookingDetails] = await Booking.aggregate(pipeline);
+
+        return res.status(200).json(successResponse("Success", { is_verifed: isVerified, bookingDetails }));
+    } catch (error) {
+        log1(["Error in postVerifyRazorPaySignature ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postQuotationVerifyRazorPaySignature = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.verify_quotation_razorpay_signature");
+        if (validate.flag != 1) {
+            return res.status(400).json(validate);
+        };
+
+        const isVerified = verifySignature({
+            razorpay_order_id: razorpayOrderId,
+            razorpay_payment_id: razorpayPaymentId,
+            razorpay_signature: razorpaySignature,
+        });
+
+        const booking = await Booking.findOne({ bookingId });
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
+        };
+
+        if (!isVerified) {
+            return res.status(400).json(errorResponse("Payment Failed!", { is_verifed: isVerified }));
+        };
+
+        if (booking.bookingPaymentStatus === Constants.BOOKING_PAYMENT_STATUS.COMPLETED && booking.quotationPaymentStatus === Constants.QUOTATION_PAYMENT_STATUS.PENDING) {
+            await Booking.updateOne(
+                { _id: booking._id },
+                {
+                    razorpayQuotationPaymentId: razorpayPaymentId,
+                    quotationPaymentStatus: Constants.QUOTATION_PAYMENT_STATUS.COMPLETED,
+                }
+            );
+
+            let totalQuotationFee = 0;
+            (booking.quotation || []).forEach(item => {
+                totalQuotationFee += parseFloat(item.price) || 0;
+            });
+
+            await Transaction.updateOne(
+                { bookingId: booking._id },
+                {
+                    $set: {
+                        totalQuotationAmount: totalQuotationFee,
+                    },
+                    $inc: {
+                        totalAmount: totalQuotationFee,
+                    },
+                }
+            );
+
+            const ownerData = await Owner.findById(ownerId);
+
+            if (
+                ownerData &&
+                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.deviceToken &&
+                ownerData.deviceToken !== ""
+            ) {
+                let notificationObject = {
+                    title: "Payment Successful!",
+                    description: `Payment for booking quotation amount ₹${totalQuotationFee} was successful.`,
                     ownerId: ownerId,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
@@ -3140,7 +3313,67 @@ export const postVerifyRazorPaySignature = async (req, res) => {
 
         return res.status(200).json(successResponse("Success", { is_verifed: isVerified }));
     } catch (error) {
-        log1(["Error in postVerifyRazorPaySignature ----->", error]);
+        log1(["Error in postQuotationVerifyRazorPaySignature ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postBookingPaymentFail = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { bookingId } = req.params;
+
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        let query = {
+            _id: new ObjectId(bookingId),
+            ownerId: new ObjectId(ownerId),
+        };
+
+        const booking = await Booking.findOne(query);
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
+        };
+
+        await Booking.updateOne(
+            { _id: booking._id },
+            {
+                status: Constants.BOOKING_STATUS.CANCELLED,
+                bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.FAILED,
+            }
+        );
+
+        const transaction = await Transaction.findOne({ bookingId: booking._id });
+        if (transaction) {
+            await Transaction.findByIdAndUpdate(transaction._id, {
+                status: Constants.TRANSACTION_STATUS.FAILED,
+                description: `Razorpay Payment failed for bookingId - ${booking._id}`,
+            });
+        };
+
+        const ownerData = await Owner.findById(ownerId);
+        if (
+            ownerData &&
+            ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerData.deviceToken &&
+            ownerData.deviceToken !== ""
+        ) {
+            let notificationObject = {
+                title: "Payment Failed",
+                description: `Payment of ₹${booking.totalAmount} failed.`,
+                ownerId: ownerId,
+                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+            };
+
+            await sendPushNotification(ownerData.deviceToken, notificationObject);
+        };
+
+        return res.status(200).json(successResponse("Booking payment failed successfully!"));
+    } catch (error) {
+        log1(["Error in postBookingPaymentFail ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

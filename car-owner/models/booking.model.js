@@ -93,6 +93,10 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
+        totalServiceFee: {
+            type: Number,
+            default: 0,
+        },
         discountAmount: {
             type: Number,
             default: 0,
@@ -147,14 +151,23 @@ const bookingSchema = new Schema(
             type: String,
             default: "",
         },
+        razorpayQuotationPaymentId: {
+            type: String,
+            default: "",
+        },
         razorpaySignature: {
             type: String,
             default: "",
         },
-        payment_status: {
+        bookingPaymentStatus: {
             type: Number,
             enum: Object.values(Constants.BOOKING_PAYMENT_STATUS),
             default: Constants.BOOKING_PAYMENT_STATUS.PENDING,
+        },
+        quotationPaymentStatus: {
+            type: Number,
+            enum: Object.values(Constants.QUOTATION_PAYMENT_STATUS),
+            default: Constants.QUOTATION_PAYMENT_STATUS.PENDING,
         },
         status: {
             type: Number,
