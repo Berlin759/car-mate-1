@@ -151,6 +151,10 @@ const bookingSchema = new Schema(
             type: String,
             default: "",
         },
+        razorpayQuotationPaymentId: {
+            type: String,
+            default: "",
+        },
         razorpaySignature: {
             type: String,
             default: "",
