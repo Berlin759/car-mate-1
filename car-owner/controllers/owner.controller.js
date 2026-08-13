@@ -1397,6 +1397,7 @@ export const postServiceHistory = async (req, res) => {
                                     _id: "$serviceDetails._id",
                                     fullName: "$serviceDetails.fullName",
                                     description: "$serviceDetails.description",
+                                    image: "$serviceDetails.image",
                                 },
                                 mechanicDetails: 1,
                                 carDetails: {
@@ -1744,6 +1745,7 @@ export const postMechanicDetails = async (req, res) => {
             serviceDetails: {
                 serviceId: service._id,
                 serviceName: service.fullName,
+                serviceImage: service.image,
                 serviceDescription: service.description || "",
                 totalPrice: totalPrice,
                 whatsIncluded: whatsIncluded,
@@ -3264,6 +3266,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                     serviceDetails: {
                         _id: "$serviceDetails._id",
                         fullName: "$serviceDetails.fullName",
+                        serviceImage: "$serviceDetails.image",
                     },
                     mechanicDetails: 1,
                 },
@@ -3501,6 +3504,7 @@ export const postTransactionList = async (req, res) => {
                                         $project: {
                                             fullName: 1,
                                             description: 1,
+                                            image: 1,
                                             status: 1,
                                         },
                                     },

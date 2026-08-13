@@ -3025,6 +3025,7 @@ export const postEarningDetails = async (req, res) => {
                     createdAt: 1,
                     status: 1,
                     serviceName: "$serviceDetails.fullName",
+                    serviceImage: "$serviceDetails.image",
                     bookingDetails: {
                         _id: "$bookingDetails._id",
                         invoiceNo: "$bookingDetails.invoiceNo",
