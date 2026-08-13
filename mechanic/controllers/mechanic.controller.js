@@ -1644,8 +1644,13 @@ export const postBookingUpdateStatus = async (req, res) => {
         switch (newStatus) {
             case Constants.BOOKING_STATUS.ACCEPTED: {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PENDING) {
-                    return res.status(400).json(errorResponse("Booking can only be accepted from PENDING status."));
+                    return res.status(400).json(errorResponse("Booking can only be accepted from pending status."));
                 };
+
+                if (bookingDetails.bookingPaymentStatus !== Constants.BOOKING_PAYMENT_STATUS.COMPLETED) {
+                    return res.status(400).json(errorResponse("Can only accepted service after owner complete booking payment."));
+                };
+
                 const alreadyBooked = await Booking.exists({
                     mechanicId: new ObjectId(mechanicId),
                     date: new Date(bookingDetails.date),
@@ -1664,7 +1669,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
             case Constants.BOOKING_STATUS.REJECTED: {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.PENDING) {
-                    return res.status(400).json(errorResponse("Booking can only be rejected from PENDING status."));
+                    return res.status(400).json(errorResponse("Booking can only be rejected from pending status."));
                 };
 
                 notificationTitle = "Booking Rejected";
@@ -1734,6 +1739,12 @@ export const postBookingUpdateStatus = async (req, res) => {
             case Constants.BOOKING_STATUS.SERVICE_COMPLETED: {
                 if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_STARTED) {
                     return res.status(400).json(errorResponse("Can only complete service after starting."));
+                };
+
+                if (bookingDetails.quotation && bookingDetails.quotation.length > 0) {
+                    if (bookingDetails.quotationPaymentStatus !== Constants.QUOTATION_PAYMENT_STATUS.COMPLETED) {
+                        return res.status(400).json(errorResponse("Can only complete service after owner complete quotation payment."));
+                    };
                 };
 
                 updatePayload.endTime = new Date();
@@ -1853,6 +1864,7 @@ export const postBookingSendQuote = async (req, res) => {
         booking.subTotal = subTotal;
         booking.taxAmount = taxAmount;
         booking.totalAmount = totalAmount;
+        booking.quotationPaymentStatus = Constants.QUOTATION_PAYMENT_STATUS.PENDING;
 
         await booking.save();
 
@@ -1866,6 +1878,7 @@ export const postBookingSendQuote = async (req, res) => {
 export const getBookingInvoice = async (req, res) => {
     try {
         const { bookingId } = req.params;
+
         if (!bookingId || !ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid Booking ID."));
         };
@@ -1879,7 +1892,7 @@ export const getBookingInvoice = async (req, res) => {
             return res.status(404).json(errorResponse("Booking not found."));
         };
 
-        const subTotal = (booking.subTotal || 0);
+        const subTotal = parseFloat(booking.subTotal) || 0;
 
         let serviceFee = 0;
         (booking?.serviceId.subCategory || []).forEach(sub => {
@@ -1895,7 +1908,8 @@ export const getBookingInvoice = async (req, res) => {
         log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
 
         const bookingObj = booking.toObject();
-        bookingObj["servicePrice"] = parseFloat(serviceMechanic?.price || 0) || 0;
+
+        bookingObj.servicePrice = parseFloat(serviceFee) || 0;
 
         const { fileName, filePath, folder } = await generateInvoicePDF(bookingObj, subTotal);
 
