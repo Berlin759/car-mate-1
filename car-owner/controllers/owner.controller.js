@@ -1279,25 +1279,28 @@ export const postServiceHistory = async (req, res) => {
             endDate,
         } = req.body;
 
+        if (!carId || !ObjectId.isValid(carId)) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+
+        const carDetails = await Car.findOne({ _id: new ObjectId(carId), status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model brand year color");
+        if (!carDetails) {
+            return res.status(400).json(errorResponse("Invalid car id."));
+        };
+
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         const match = {
             ownerId: new ObjectId(ownerId),
+            carId: new ObjectId(carId),
             status: {
                 $in: [
                     Constants.BOOKING_STATUS.SERVICE_COMPLETED,
                     Constants.BOOKING_STATUS.CLOSED,
                 ],
             },
-        };
-
-        if (carId) {
-            if (!ObjectId.isValid(carId)) {
-                return res.status(400).json(errorResponse("Invalid car id."));
-            };
-            match.carId = new ObjectId(carId);
         };
 
         if (serviceId) {
@@ -1321,131 +1324,91 @@ export const postServiceHistory = async (req, res) => {
 
         const pipeline = [
             { $match: match },
-            { $sort: { createdAt: -1 } },
             {
-                $facet: {
-                    items: [
-                        { $skip: skip },
-                        { $limit: limit },
-                        {
-                            $lookup: {
-                                from: "services",
-                                localField: "serviceId",
-                                foreignField: "_id",
-                                as: "serviceDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "mechanics",
-                                localField: "mechanicId",
-                                foreignField: "_id",
-                                as: "mechanicDetails",
-                                pipeline: [
-                                    {
-                                        $project: {
-                                            fullName: 1,
-                                            email: 1,
-                                            phoneNumber: 1,
-                                            profileImage: 1,
-                                        },
-                                    },
-                                ],
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$mechanicDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
-                        {
-                            $lookup: {
-                                from: "cars",
-                                localField: "carId",
-                                foreignField: "_id",
-                                as: "carDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$carDetails",
-                                preserveNullAndEmptyArrays: true,
-                            },
-                        },
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
                         {
                             $project: {
-                                _id: 1,
-                                invoiceNo: 1,
-                                date: 1,
-                                slot: 1,
-                                address: 1,
-                                totalAmount: 1,
-                                status: 1,
-                                startTime: 1,
-                                endTime: 1,
-                                beforePhotos: 1,
-                                afterPhotos: 1,
-                                createdAt: 1,
-                                serviceDetails: {
-                                    _id: "$serviceDetails._id",
-                                    fullName: "$serviceDetails.fullName",
-                                    description: "$serviceDetails.description",
-                                    image: "$serviceDetails.image",
-                                },
-                                mechanicDetails: 1,
-                                carDetails: {
-                                    _id: "$carDetails._id",
-                                    fullName: "$carDetails.fullName",
-                                    vehicleNumber: "$carDetails.vehicleNumber",
-                                    registerNumber: "$carDetails.registerNumber",
-                                    images: "$carDetails.images",
-                                    model: "$carDetails.model",
-                                    brand: "$carDetails.brand",
-                                    year: "$carDetails.year",
-                                    color: "$carDetails.color",
-                                },
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
                             },
                         },
                     ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $project: {
+                    _id: 1,
+                    invoiceNo: 1,
+                    date: 1,
+                    slot: 1,
+                    address: 1,
+                    totalAmount: 1,
+                    status: 1,
+                    startTime: 1,
+                    endTime: 1,
+                    beforePhotos: 1,
+                    afterPhotos: 1,
+                    createdAt: 1,
+                    serviceDetails: {
+                        _id: "$serviceDetails._id",
+                        fullName: "$serviceDetails.fullName",
+                        description: "$serviceDetails.description",
+                        image: "$serviceDetails.image",
+                    },
+                    mechanicDetails: 1,
                 },
             },
         ];
 
-        const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
+        const [serviceHistory, totalCount, serviceList] = await Promise.all([
+            Booking.aggregate(pipeline).allowDiskUse(true),
 
-        const items = result.items;
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
+            Booking.countDocuments(match),
 
-        const groupedByCar = {};
+            Service.find({ status: Constants.SERVICE_STATUS.ACTIVE }).select("_id fullName image"),
+        ]);
 
-        items.forEach((booking) => {
-            const carKey = booking.carDetails?._id?.toString() || "unknown";
-            if (!groupedByCar[carKey]) {
-                groupedByCar[carKey] = {
-                    carDetails: booking.carDetails,
-                    bookings: [],
-                };
-            }
-            groupedByCar[carKey].bookings.push(booking);
-        });
-
-        const carHistoryData = Object.values(groupedByCar)
+        const carHistoryData = {
+            carDetails: carDetails,
+            service: serviceList,
+            bookings: serviceHistory,
+        };
 
         const response = {
             page,
             limit,
-            totalRecords,
-            items: carHistoryData[0],
+            totalRecords: totalCount,
+            items: carHistoryData,
         };
 
         return res.status(200).json(successResponse("Service history fetched successfully.", response));
