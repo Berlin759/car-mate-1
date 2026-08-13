@@ -667,7 +667,7 @@ export const postHomeDetails = async (req, res) => {
                 };
             };
 
-            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images");
+            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model");
         }
 
         const serviceCategories = await Service.find({ parentId: null, status: Constants.SERVICE_STATUS.ACTIVE })
@@ -1403,6 +1403,8 @@ export const postServiceHistory = async (req, res) => {
                                     _id: "$carDetails._id",
                                     fullName: "$carDetails.fullName",
                                     vehicleNumber: "$carDetails.vehicleNumber",
+                                    registerNumber: "$carDetails.registerNumber",
+                                    images: "$carDetails.images",
                                     model: "$carDetails.model",
                                     brand: "$carDetails.brand",
                                     year: "$carDetails.year",
@@ -1436,11 +1438,13 @@ export const postServiceHistory = async (req, res) => {
             groupedByCar[carKey].bookings.push(booking);
         });
 
+        const carHistoryData = Object.values(groupedByCar)
+
         const response = {
             page,
             limit,
             totalRecords,
-            items: Object.values(groupedByCar),
+            items: carHistoryData[0],
         };
 
         return res.status(200).json(successResponse("Service history fetched successfully.", response));
@@ -3086,7 +3090,7 @@ export const getBookingInvoice = async (req, res) => {
             return res.status(404).json(errorResponse("Booking not found."));
         };
 
-        const subTotal = (booking.subTotal || 0);
+        const subTotal = parseFloat(booking.subTotal) || 0;
 
         let serviceFee = 0;
         (booking?.serviceId.subCategory || []).forEach(sub => {
@@ -3102,7 +3106,8 @@ export const getBookingInvoice = async (req, res) => {
         log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
 
         const bookingObj = booking.toObject();
-        bookingObj["servicePrice"] = parseFloat(serviceFee || 0) || 0;
+
+        bookingObj.servicePrice = parseFloat(serviceFee) || 0;
 
         const { fileName, filePath, folder } = await generateInvoicePDF(bookingObj, subTotal);
 
