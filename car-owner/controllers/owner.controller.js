@@ -1437,7 +1437,14 @@ export const postNearbyMechanics = async (req, res) => {
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        if (!latitude || !longitude) {
+        if (
+            latitude === undefined ||
+            latitude === null ||
+            longitude === undefined ||
+            longitude === null ||
+            latitude === "" ||
+            longitude === ""
+        ) {
             return res.status(400).json(errorResponse("Please provide latitude and longitude."));
         };
 
@@ -1452,9 +1459,7 @@ export const postNearbyMechanics = async (req, res) => {
             lng < -180 ||
             lng > 180
         ) {
-            return res.status(400).json(
-                errorResponse("Invalid latitude or longitude.")
-            );
+            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
         };
 
         const defaultRadius = radius !== undefined && radius !== null && radius !== "" ? parseFloat(radius) : Constants.DEFAULT_RADIUS;
@@ -1464,115 +1469,267 @@ export const postNearbyMechanics = async (req, res) => {
 
         const radiusInMeters = defaultRadius * 1000;
 
-        const matchFilter = {
-            status: Constants.MECHANIC_STATUS.ACTIVE,
-            "location": {
-                $near: {
-                    $geometry: {
-                        type: "Point",
-                        coordinates: [lng, lat],
-                    },
-                    $maxDistance: radiusInMeters,
+        const geoNearStage = {
+            $geoNear: {
+                near: {
+                    type: "Point",
+                    coordinates: [lng, lat],
+                },
+                key: "location",
+                distanceField: "distanceInMeters",
+                maxDistance: radiusInMeters,
+                spherical: true,
+                query: {
+                    status: Constants.MECHANIC_STATUS.ACTIVE,
                 },
             },
         };
+
+        const matchStage = {};
 
         if (serviceId) {
             if (!ObjectId.isValid(serviceId)) {
                 return res.status(400).json(errorResponse("Invalid service id."));
             };
 
-            matchFilter.serviceIds = new ObjectId(serviceId);
+            matchStage.serviceIds = new ObjectId(serviceId);
         };
 
-        const mechanics = await Mechanic.find(matchFilter).skip(skip).limit(limit).lean();
+        const pipeline = [
+            geoNearStage,
+            {
+                $match: matchStage,
+            },
+            {
+                $lookup: {
+                    from: "kycs",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ["$mechanicId", "$$mechanicId",],
+                                        },
+                                        {
+                                            $eq: ["$status", Constants.KYC_STATUS.APPROVED,],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $limit: 1,
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                            },
+                        },
+                    ],
+                    as: "approvedKyc",
+                },
+            },
+            {
+                $lookup: {
+                    from: "ratings",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$mechanicId", "$$mechanicId",],
+                                },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: null,
 
-        const mechanicIds = mechanics.map((mechanic) => mechanic._id);
+                                ratingCount: {
+                                    $sum: 1,
+                                },
 
-        const kycRecords = await KYC.find({
-            mechanicId: { $in: mechanicIds },
-            status: Constants.KYC_STATUS.APPROVED,
-        })
-            .select("mechanicId")
-            .lean();
+                                averageRating: {
+                                    $avg: "$rating",
+                                },
+                            },
+                        },
+                    ],
+                    as: "ratingData",
+                },
+            },
+            {
+                $addFields: {
+                    ratingCount: {
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.ratingCount", 0,], }, 0,],
+                    },
 
-        const approvedKycMechanicIds = new Set(kycRecords.map((record) => record.mechanicId.toString()));
+                    averageRating: {
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0,], }, 0,],
+                    },
 
-        const response = mechanics.map((mechanic) => {
-            const mLat = parseFloat(mechanic.latitude) || 0;
-            const mLng = parseFloat(mechanic.longitude) || 0;
+                    hasApprovedKyc: {
+                        $gt: [{ $size: "$approvedKyc", }, 0,],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    profileCompletionCount: {
+                        $add: [
+                            {
+                                $cond: ["$hasApprovedKyc", 1, 0,],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            {
+                                                $and: [
+                                                    { $ne: [{ $ifNull: ["$address", "",], }, "",], },
+                                                ],
+                                            },
+                                            {
+                                                $and: [
+                                                    { $ne: [{ $ifNull: ["$latitude", "",], }, "",], },
+                                                    { $ne: [{ $ifNull: ["$longitude", "",], }, "",], },
+                                                    { $ne: ["$latitude", "0",], },
+                                                    { $ne: ["$longitude", "0",], },
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $ne: [{ $ifNull: ["$fullName", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$profileImage", "",], }, "",], },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $gt: [{ $size: { $ifNull: ["$serviceIds", [],], }, }, 0,],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $ne: [{ $ifNull: ["$bankAccountNumber", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankIfscCode", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankAccountHolderName", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankName", "",], }, "",], },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    profileCompletionPercentage: {
+                        $multiply: [{ $divide: ["$profileCompletionCount", 5,], }, 100,],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    distance: { $divide: ["$distanceInMeters", 1000,], },
+                },
+            },
+            {
+                $addFields: {
+                    minutes: {
+                        $round: [{ $multiply: [{ $divide: ["$distance", 30,], }, 60,], }, 0,],
+                    },
+                },
+            },
+            {
+                $sort: {
+                    profileCompletionPercentage: -1,
+                    distance: 1,
+                },
+            },
+            {
+                $facet: {
+                    metadata: [
+                        {
+                            $count: "totalRecords",
+                        },
+                    ],
+                    items: [
+                        {
+                            $skip: skip,
+                        },
+                        {
+                            $limit: limit,
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                                consultantFee: 1,
+                                distance: {
+                                    $round: ["$distance", 2,],
+                                },
+                                minutes: 1,
+                                profileCompletionCount: 1,
+                                profileCompletionPercentage: {
+                                    $round: ["$profileCompletionPercentage", 0,],
+                                },
+                                ratingCount: 1,
+                                averageRating: {
+                                    $round: ["$averageRating", 1,],
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+        ];
 
-            const R = 6371;
-
-            const dLat = ((mLat - lat) * Math.PI) / 180;
-            const dLng = ((mLng - lng) * Math.PI) / 180;
-
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos((lat * Math.PI) / 180) *
-                Math.cos((mLat * Math.PI) / 180) *
-                Math.sin(dLng / 2) *
-                Math.sin(dLng / 2);
-
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = R * c;
-            const avgSpeedKmph = 30;
-            const minutes = Math.round((distance / avgSpeedKmph) * 60);
-
-            let profileCompletionCount = 0;
-
-            if (approvedKycMechanicIds.has(mechanic._id.toString())) {
-                profileCompletionCount++;
-            };
-
-            if (mechanic.address || (mechanic.latitude && mechanic.longitude && mechanic.latitude !== "0" && mechanic.longitude !== "0")) {
-                profileCompletionCount++;
-            };
-
-            if (mechanic.fullName && mechanic.profileImage) {
-                profileCompletionCount++;
-            };
-
-            if (mechanic.serviceIds?.length > 0) {
-                profileCompletionCount++;
-            };
-
-            if (mechanic.bankAccountNumber && mechanic.bankIfscCode && mechanic.bankAccountHolderName && mechanic.bankName) {
-                profileCompletionCount++;
-            };
-
-            const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
-
-            return {
-                _id: mechanic._id,
-                fullName: mechanic.fullName,
-                email: mechanic.email,
-                phoneNumber: mechanic.phoneNumber,
-                profileImage: mechanic.profileImage,
-                latitude: mechanic.latitude,
-                longitude: mechanic.longitude,
-                address: mechanic.address,
-                consultantFee: mechanic.consultantFee,
-                distance: Math.round(distance * 100) / 100,
-                minutes: minutes,
-                profileCompletionCount,
-                profileCompletionPercentage,
-            };
-        });
-
-        response.sort((a, b) => b.profileCompletionPercentage - a.profileCompletionPercentage || a.distance - b.distance);
-
-        const totalRecords = response.length;
+        const result = await Mechanic.aggregate(pipeline);
+        const metadata = result?.[0]?.metadata?.[0];
+        const totalRecords = metadata?.totalRecords || 0;
         const totalPages = Math.ceil(totalRecords / limit);
 
-        let mechanicResponse = {
+        const mechanicResponse = {
             page,
             limit,
             totalRecords,
             totalPages,
             hasNextPage: page < totalPages,
             hasPreviousPage: page > 1,
-            items: response,
+            items: result?.[0]?.items || [],
         };
 
         return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", mechanicResponse));
