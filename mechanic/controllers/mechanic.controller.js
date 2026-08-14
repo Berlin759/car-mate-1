@@ -1849,21 +1849,22 @@ export const postBookingSendQuote = async (req, res) => {
             ...formattedQuotation
         ];
 
-        const quoteSum = booking.quotation.reduce(
-            (sum, item) => sum + (Number(item.price) || 0),
-            0
-        );
+        // const quoteSum = booking.quotation.reduce(
+        //     (sum, item) => sum + (Number(item.price) || 0),
+        //     0
+        // );
 
-        const consultantFee = Number(booking.consultantFee) || 0;
-        const discountAmount = Number(booking.discountAmount) || 0;
+        // const consultantFee = Number(booking.consultantFee) || 0;
+        // const discountAmount = Number(booking.discountAmount) || 0;
 
-        const subTotal = (consultantFee + quoteSum) - discountAmount;
-        const taxAmount = Math.round(subTotal * 0.18);
-        const totalAmount = subTotal + taxAmount;
+        // const subTotal = (consultantFee + quoteSum) - discountAmount;
+        // const taxAmount = Math.round(subTotal * 0.18);
+        // const totalAmount = subTotal + taxAmount;
 
-        booking.subTotal = subTotal;
-        booking.taxAmount = taxAmount;
-        booking.totalAmount = totalAmount;
+        // booking.subTotal = subTotal;
+        // booking.taxAmount = taxAmount;
+        // booking.totalAmount = totalAmount;
+
         booking.quotationPaymentStatus = Constants.QUOTATION_PAYMENT_STATUS.PENDING;
 
         await booking.save();

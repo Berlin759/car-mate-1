@@ -66,6 +66,10 @@ export const log1 = (msg) => {
     console.log("[" + d.toLocaleString() + " " + d.getMilliseconds() + "] :", msg);
 };
 
+export const convertToPaise = (amount) => {
+    return Math.round(amount * 100);
+};
+
 export const validatePhoneNumber = (phoneCode, phoneNumber) => {
     if (!phoneCode || !phoneNumber) return false;
     const cleanCode = phoneCode.trim();

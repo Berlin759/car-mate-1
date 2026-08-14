@@ -5,6 +5,7 @@ import {
     errorResponse,
     log1,
     successResponse,
+    convertToPaise,
 } from "../lib/general.js";
 import messages from "../utils/messages.js";
 import Mechanic from "../models/mechanic.model.js";
@@ -16,6 +17,52 @@ const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY,
     key_secret: process.env.RAZORPAY_SECRET,
 });
+
+export const createOrder = async (payload) => {
+    try {
+        const { order_id, order_amount } = payload;
+
+        const createOrderResponse = await razorpay.orders.create({
+            amount: convertToPaise(order_amount),
+            currency: Constants.BASE_CURRENCY,
+            receipt: `order_${order_id.toString()}`,
+            notes: {
+                secret: process.env.RAZORPAY_WEBHOOK_SECRET,
+                orderId: order_id,
+            },
+        });
+
+        log1(["createOrder order----->", createOrderResponse]);
+        if (!createOrderResponse) {
+            return errorResponse("Failed to create order.");
+        };
+
+        return successResponse("Order created successfully.", { order: createOrderResponse });
+    } catch (error) {
+        log1(["createOrder Error----->", error.message]);
+        return errorResponse(messages.unexpectedDataError);
+    };
+};
+
+export const verifySignature = async (payload) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = payload;
+
+        const generated_signature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
+            .update(razorpay_order_id + "|" + razorpay_payment_id)
+            .digest("hex");
+
+        if (generated_signature === razorpay_signature) {
+            return true;
+        };
+
+        return false;
+    } catch (error) {
+        log1(["verifySignature Error----->", error.message]);
+        return false;
+    };
+};
 
 export const verifyRazorpayPayment = async (payload) => {
     try {

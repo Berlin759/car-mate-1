@@ -2860,7 +2860,7 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Something went wrong!"));
         };
 
-        await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id })
+        await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id });
 
         let responseData = {
             bookingId: createBooking._id,
@@ -3261,6 +3261,7 @@ export const postBookingDetails = async (req, res) => {
                     taxAmount: 1,
                     totalAmount: 1,
                     quotation: 1,
+                    razorpayOrderId: 1,
                     quotationPaymentStatus: 1,
                     bookingPaymentStatus: 1,
                     status: 1,
@@ -3759,9 +3760,24 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
         };
 
         if (booking.bookingPaymentStatus === Constants.BOOKING_PAYMENT_STATUS.COMPLETED && booking.quotationPaymentStatus === Constants.QUOTATION_PAYMENT_STATUS.PENDING) {
+
+            const quoteSum = booking.quotation.reduce(
+                (sum, item) => sum + (Number(item.price) || 0),
+                0
+            );
+
+            const gstAmount = Math.round(quoteSum * 0.18);
+
+            const finalSubTotalAmount = booking?.subTotal + quoteSum;
+            const finalTaxAmount = booking?.taxAmount + gstAmount;
+            const finalBookingAmount = booking?.totalAmount + quoteSum + gstAmount;
+
             await Booking.updateOne(
                 { _id: booking._id },
                 {
+                    subTotal: finalSubTotalAmount,
+                    taxAmount: finalTaxAmount,
+                    totalAmount: finalBookingAmount,
                     razorpayQuotationPaymentId: razorpayPaymentId,
                     quotationPaymentStatus: Constants.QUOTATION_PAYMENT_STATUS.COMPLETED,
                 }
@@ -4075,88 +4091,6 @@ export const postTransactionList = async (req, res) => {
         return res.status(200).json(successResponse("Transaction List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postTransactionList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postVerifyRazorpayPayment = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-
-        const validate = await custom_validation(req.body, "owner.verify_razorpay_payment");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
-        };
-
-        if (!ObjectId.isValid(bookingId)) {
-            return res.status(400).json(errorResponse("Invalid booking id."));
-        };
-
-        const booking = await Booking.findOne({
-            _id: new ObjectId(bookingId),
-            ownerId: new ObjectId(ownerId),
-        });
-
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found."));
-        };
-
-        const body = razorpayOrderId + "|" + razorpayPaymentId;
-
-        const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_SECRET)
-            .update(body)
-            .digest("hex");
-
-        const isAuthentic = expectedSignature === razorpaySignature;
-
-        if (!isAuthentic) {
-            log1(["postVerifyRazorpayPayment Signature mismatch----->"]);
-            return res.status(400).json(errorResponse("Payment verification failed. Invalid signature."));
-        };
-
-        await Booking.findByIdAndUpdate(bookingId, {
-            razorpayOrderId: razorpayOrderId,
-            razorpayPaymentId: razorpayPaymentId,
-            razorpaySignature: razorpaySignature,
-        });
-
-        const transaction = await Transaction.findOne({ bookingId: new ObjectId(bookingId) });
-
-        if (transaction) {
-            await Transaction.findByIdAndUpdate(transaction._id, {
-                trxId: razorpayPaymentId,
-                status: Constants.TRANSACTION_STATUS.SUCCESS,
-                description: `Razorpay Payment - ${razorpayPaymentId}`,
-            });
-        };
-
-        const ownerData = await Owner.findById(ownerId);
-        if (
-            ownerData &&
-            ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-            ownerData.deviceToken &&
-            ownerData.deviceToken !== ""
-        ) {
-            let notificationObject = {
-                title: "Payment",
-                description: `Payment of ₹${booking.totalAmount} completed successfully via Razorpay.`,
-                ownerId: ownerId,
-                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-            };
-            await sendPushNotification(ownerData.deviceToken, notificationObject);
-        };
-
-        const response = {
-            bookingId: bookingId,
-            razorpayPaymentId: razorpayPaymentId,
-            status: Constants.TRANSACTION_STATUS.SUCCESS,
-        };
-
-        return res.status(200).json(successResponse("Payment verified successfully.", response));
-    } catch (error) {
-        log1(["Error in postVerifyRazorpayPayment ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
