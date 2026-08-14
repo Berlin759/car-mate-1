@@ -19,8 +19,6 @@ import {
     generateOtp,
     generateRandomToken,
     getTimeFormatFromMilliseconds,
-    getIpAddress,
-    getLatLngFromIP,
     generateUniqueUsername,
 } from "../lib/general.js";
 import { sendMail } from "../utils/mailSend.helper.js";
@@ -670,25 +668,12 @@ export const postHomeDetails = async (req, res) => {
             carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model");
         }
 
-        const serviceCategories = await Service.find({ parentId: null, status: Constants.SERVICE_STATUS.ACTIVE })
+        const serviceCategories = await Service.find({ status: Constants.SERVICE_STATUS.ACTIVE })
             .select("_id fullName description image")
             .lean();
 
         let nearbyLatitude = param.latitude || null;
         let nearbyLongitude = param.longitude || null;
-
-        if (!nearbyLatitude || !nearbyLongitude) {
-            const ipAddress = getIpAddress(req);
-            log1(["postHomeDetails ipAddress----->", ipAddress]);
-
-            const ipLocation = await getLatLngFromIP(ipAddress);
-            log1(["postHomeDetails ipLocation----->", ipLocation]);
-
-            if (ipLocation.flag === 1 && ipLocation.data) {
-                nearbyLatitude = ipLocation.data.latitude;
-                nearbyLongitude = ipLocation.data.longitude;
-            }
-        }
 
         let popularNearbyServices = [];
 
@@ -794,6 +779,367 @@ export const postHomeDetails = async (req, res) => {
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postSearchMechanics = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postSearchMechanics ownerId----->", ownerId]);
+        log1(["postSearchMechanics req.body----->", req.body]);
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            latitude: nearbyLatitude,
+            longitude: nearbyLongitude,
+            radius,
+            search,
+            serviceType,
+            minPrice,
+            maxPrice,
+        } = req.body;
+
+        const validate = await custom_validation(req.body, "owner.search_mechanic");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        const defaultRadius = radius !== undefined && radius !== null && radius !== "" ? parseFloat(radius) : Constants.DEFAULT_RADIUS;
+        if (Number.isNaN(defaultRadius) || defaultRadius <= 0) {
+            return res.status(400).json(errorResponse("Invalid radius."));
+        };
+
+        const lat = parseFloat(nearbyLatitude);
+        const lng = parseFloat(nearbyLongitude);
+        const radiusInMeters = defaultRadius * 1000;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        const hasSearchOrFilters =
+            (search !== undefined && search !== null && String(search).trim() !== "") ||
+            (serviceType !== undefined && serviceType !== null && String(serviceType).trim() !== "") ||
+            (minPrice !== undefined && minPrice !== null && String(minPrice).trim() !== "") ||
+            (maxPrice !== undefined && maxPrice !== null && String(maxPrice).trim() !== "");
+
+        if (!hasSearchOrFilters) {
+            return res.status(400).json(errorResponse("Please enter a search term or select at least one filter."));
+        };
+
+        let matchMechanicIds = null;
+
+        if (search || serviceType || minPrice !== undefined || maxPrice !== undefined) {
+            let serviceQuery = { status: Constants.SERVICE_STATUS.ACTIVE };
+
+            // search text filter
+            if (search && search.trim() !== "") {
+                const searchRegex = new RegExp(search.trim(), "i");
+                serviceQuery.$or = [
+                    { fullName: searchRegex },
+                    { "subCategory.fullname": searchRegex }
+                ];
+            };
+
+            // serviceType filter
+            if (serviceType) {
+
+                if (!ObjectId.isValid(serviceType)) {
+                    return res.status(400).json(errorResponse("Invalid service type."));
+                };
+
+                serviceQuery._id = new ObjectId(serviceType);
+            };
+
+            const matchedServices = await Service.find(serviceQuery).lean();
+
+            const minP = minPrice !== undefined && minPrice !== null && minPrice !== "" ? parseFloat(minPrice) : 0;
+            const maxP = maxPrice !== undefined && maxPrice !== null && maxPrice !== "" ? parseFloat(maxPrice) : Infinity;
+
+            const mechanicIdSet = new Set();
+            matchedServices.forEach(service => {
+                (service.subCategory || []).forEach(sub => {
+                    const parentMatches = search ? new RegExp(search.trim(), "i").test(service.fullName) : true;
+                    const subMatches = search ? new RegExp(search.trim(), "i").test(sub.fullname) : true;
+
+                    if (parentMatches || subMatches) {
+                        (sub.mechanicIds || []).forEach(mech => {
+                            if (mech.price >= minP && mech.price <= maxP) {
+                                mechanicIdSet.add(mech.mechanicId.toString());
+                            };
+                        });
+                    };
+                });
+            });
+
+            matchMechanicIds = Array.from(mechanicIdSet).map(id => new ObjectId(id));
+        };
+
+        const geoNearStage = {
+            $geoNear: {
+                near: {
+                    type: "Point",
+                    coordinates: [lng, lat],
+                },
+                key: "location",
+                distanceField: "distanceInMeters",
+                maxDistance: radiusInMeters,
+                spherical: true,
+                query: {
+                    status: Constants.MECHANIC_STATUS.ACTIVE,
+                },
+            },
+        };
+
+        const mechanicMatchStage = {};
+        if (matchMechanicIds !== null) {
+            if (search && search.trim() !== "") {
+                const searchRegex = new RegExp(search.trim(), "i");
+                mechanicMatchStage.$or = [
+                    { _id: { $in: matchMechanicIds } },
+                    { fullName: searchRegex }
+                ];
+            } else {
+                mechanicMatchStage._id = { $in: matchMechanicIds };
+            };
+        };
+
+        const pipeline = [
+            geoNearStage,
+            {
+                $match: mechanicMatchStage,
+            },
+            {
+                $lookup: {
+                    from: "kycs",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ["$mechanicId", "$$mechanicId",],
+                                        },
+                                        {
+                                            $eq: ["$status", Constants.KYC_STATUS.APPROVED,],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $limit: 1,
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                            },
+                        },
+                    ],
+                    as: "approvedKyc",
+                },
+            },
+            {
+                $lookup: {
+                    from: "ratings",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$mechanicId", "$$mechanicId",],
+                                },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: null,
+                                ratingCount: {
+                                    $sum: 1,
+                                },
+                                averageRating: {
+                                    $avg: "$rating",
+                                },
+                            },
+                        },
+                    ],
+                    as: "ratingData",
+                },
+            },
+            {
+                $addFields: {
+                    ratingCount: {
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.ratingCount", 0,], }, 0,],
+                    },
+                    averageRating: {
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0,], }, 0,],
+                    },
+                    hasApprovedKyc: {
+                        $gt: [{ $size: "$approvedKyc", }, 0,],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    profileCompletionCount: {
+                        $add: [
+                            {
+                                $cond: ["$hasApprovedKyc", 1, 0,],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            {
+                                                $and: [
+                                                    { $ne: [{ $ifNull: ["$address", "",], }, "",], },
+                                                ],
+                                            },
+                                            {
+                                                $and: [
+                                                    { $ne: [{ $ifNull: ["$latitude", "",], }, "",], },
+                                                    { $ne: [{ $ifNull: ["$longitude", "",], }, "",], },
+                                                    { $ne: ["$latitude", "0",], },
+                                                    { $ne: ["$longitude", "0",], },
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $ne: [{ $ifNull: ["$fullName", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$profileImage", "",], }, "",], },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $gt: [{ $size: { $ifNull: ["$serviceIds", [],], }, }, 0,],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                            {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $ne: [{ $ifNull: ["$bankAccountNumber", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankIfscCode", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankAccountHolderName", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankName", "",], }, "",], },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    profileCompletionPercentage: {
+                        $multiply: [{ $divide: ["$profileCompletionCount", 5,], }, 100,],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    distance: { $divide: ["$distanceInMeters", 1000,], },
+                },
+            },
+            {
+                $addFields: {
+                    minutes: {
+                        $round: [{ $multiply: [{ $divide: ["$distance", 30,], }, 60,], }, 0,],
+                    },
+                },
+            },
+            {
+                $sort: {
+                    profileCompletionPercentage: -1,
+                    distance: 1,
+                },
+            },
+            {
+                $facet: {
+                    metadata: [
+                        {
+                            $count: "totalRecords",
+                        },
+                    ],
+                    items: [
+                        {
+                            $skip: skip,
+                        },
+                        {
+                            $limit: limit,
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                email: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                                consultantFee: 1,
+                                distance: {
+                                    $round: ["$distance", 2,],
+                                },
+                                minutes: 1,
+                                profileCompletionCount: 1,
+                                profileCompletionPercentage: {
+                                    $round: ["$profileCompletionPercentage", 0,],
+                                },
+                                ratingCount: 1,
+                                averageRating: {
+                                    $round: ["$averageRating", 1,],
+                                },
+                                hasApprovedKyc: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await Mechanic.aggregate(pipeline).allowDiskUse(true);
+        const metadata = result?.metadata?.[0];
+        const totalRecords = metadata?.totalRecords || 0;
+
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            items: result?.items || [],
+        };
+
+        return res.status(200).json(successResponse("Search results fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postSearchMechanics ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -1136,21 +1482,7 @@ export const postServiceList = async (req, res) => {
 
         const filter = {
             status: Constants.SERVICE_STATUS.ACTIVE,
-            // "subCategory.mechanicIds.0": { $exists: true },
         };
-
-        // if (!mechanicId && (!nearbyLatitude || !nearbyLongitude)) {
-        //     const ipAddress = getIpAddress(req);
-        //     log1(["postServiceList ipAddress----->", ipAddress]);
-
-        //     const ipLocation = await getLatLngFromIP(ipAddress);
-        //     log1(["postServiceList ipLocation----->", ipLocation]);
-
-        //     if (ipLocation.flag === 1 && ipLocation.data) {
-        //         nearbyLatitude = ipLocation.data.latitude;
-        //         nearbyLongitude = ipLocation.data.longitude;
-        //     };
-        // };
 
         let nearbyMechanicIds = [];
 
@@ -1717,8 +2049,8 @@ export const postNearbyMechanics = async (req, res) => {
             },
         ];
 
-        const result = await Mechanic.aggregate(pipeline);
-        const metadata = result?.[0]?.metadata?.[0];
+        const [result] = await Mechanic.aggregate(pipeline).allowDiskUse(true);
+        const metadata = result?.metadata?.[0];
         const totalRecords = metadata?.totalRecords || 0;
         const totalPages = Math.ceil(totalRecords / limit);
 
@@ -1727,9 +2059,7 @@ export const postNearbyMechanics = async (req, res) => {
             limit,
             totalRecords,
             totalPages,
-            hasNextPage: page < totalPages,
-            hasPreviousPage: page > 1,
-            items: result?.[0]?.items || [],
+            items: result?.items || [],
         };
 
         return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", mechanicResponse));

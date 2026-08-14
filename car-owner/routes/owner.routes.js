@@ -20,6 +20,7 @@ import {
     postVerifyEmail,
     postLogout,
     postHomeDetails,
+    postSearchMechanics,
     postAddCar,
     postCarList,
     postUpdateCar,
@@ -94,6 +95,7 @@ router.post("/app-version", postAppVersion);
 
 // Home API (Public - no auth required)
 router.post("/home-details", unAuthMiddleware, postHomeDetails);
+router.post("/search-mechanics", unAuthMiddleware, postSearchMechanics);
 
 // Vehicle Management
 router.post("/add-car", authMiddleware, postAddCar);

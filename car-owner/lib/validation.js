@@ -24,6 +24,12 @@ const validate_rules = {
             email: "required",
             otp: "required",
         },
+        search_mechanic: {
+            currentPage: "required",
+            itemPerPage: "required",
+            latitude: "required",
+            longitude: "required",
+        },
         add_car: {
             vehicleNumber: "required",
         },
