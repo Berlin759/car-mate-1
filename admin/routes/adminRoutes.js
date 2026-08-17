@@ -56,6 +56,9 @@ import {
     postCouponList,
     postUpdateCoupon,
     postDeleteCoupon,
+    getCouponPage,
+    postCouponDetails,
+    postToggleCouponStatus,
     postAssignProvider,
     postRescheduleBooking,
     postSuspendOwner,
@@ -189,10 +192,13 @@ adminRouter.post("/update-password", authMiddleware, postUpdatePasswords);
 adminRouter.post("/logout", authMiddleware, postLogout);
 
 // Coupon API
+adminRouter.get("/coupons", authMiddleware, getCouponPage);
 adminRouter.post("/add-coupon", authMiddleware, postAddCoupon);
 adminRouter.post("/coupon-list", authMiddleware, postCouponList);
+adminRouter.post("/coupon-details", authMiddleware, postCouponDetails);
 adminRouter.post("/update-coupon", authMiddleware, postUpdateCoupon);
 adminRouter.post("/delete-coupon", authMiddleware, postDeleteCoupon);
+adminRouter.post("/toggle-coupon-status", authMiddleware, postToggleCouponStatus);
 
 // Booking Operations
 adminRouter.post("/assign-provider", authMiddleware, postAssignProvider);

@@ -1,0 +1,97 @@
+<%
+    function formatDate(date) {
+        if(!date){
+            return "-";
+        };
+
+        let d=new Date(date);
+        let day=('0' + d.getDate()).slice(-2);
+        let month=('0' + (d.getMonth() + 1)).slice(-2);
+        let year=d.getFullYear();
+        
+        return `${year}-${month}-${day}`;
+    };
+%>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th class="text-center">Code</th>
+                <th class="text-center">Description</th>
+                <th class="text-center">Discount</th>
+                <th class="text-center">Limits</th>
+                <th class="text-center">Usage</th>
+                <th class="text-center">Expiry Date</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (body?.couponList && body.couponList.length > 0) { %>
+                <% body.couponList.forEach(function(coupon, index) { %>
+                    <% let start_index = (parseInt(body?.payload?.currentPage || 1) - 1) * parseInt(body?.payload?.itemPerPage || 10) + index + 1; %>
+                    <tr>
+                        <td><%= start_index %></td>
+                        <td class="text-center">
+                            <strong><%= coupon.code || "-" %></strong>
+                        </td>
+                        <td class="text-center" style="white-space: normal; word-wrap: break-word; max-width: 200px;">
+                            <%= coupon.description || "-" %>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-success p-3">
+                                <% if (coupon.discountType === "percentage") { %>
+                                    <%= coupon.discountValue %>% Off
+                                <% } else { %>
+                                    <i class="fa-solid fa-indian-rupee-sign"></i> <%= coupon.discountValue %> Off
+                                <% } %>
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <div class="fs-12">
+                                Min Order: <i class="fa-solid fa-indian-rupee-sign"></i> <%= coupon.minOrderAmount %>
+                            </div>
+                            <% if (coupon.discountType === "percentage") { %>
+                                <div class="fs-12">
+                                    Max Disc: <i class="fa-solid fa-indian-rupee-sign"></i> <%= coupon.maxDiscountAmount %>
+                                </div>
+                            <% } %>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary p-2">
+                                <%= coupon.usedCount %> / <%= coupon.usageLimit || "∞" %>
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <%= formatDate(coupon.expiryDate) %>
+                        </td>
+                        <td>
+                            <div class="action-btn d-flex flex-wrap gap-2 justify-content-center">
+                                <select class="form-select form-select-sm coupon-status-select text-border text-space" data-coupon-id="<%= coupon._id %>" style="width: auto;">
+                                    <option value="true" <%= coupon.isActive ? "selected" : "" %>>Active</option>
+                                    <option value="false" <%= !coupon.isActive ? "selected" : "" %>>Inactive</option>
+                                </select>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="action-btn d-flex flex-wrap gap-2 justify-content-center">
+                                <a href="javascript:void(0);" class="edit-coupon text-primary me-2" data-coupon-id="<%= coupon._id %>" title="Edit">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                                <a href="javascript:void(0);" class="delete-coupon text-danger" data-coupon-id="<%= coupon._id %>" title="Delete">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                <% }); %>
+            <% } else { %>
+                <tr>
+                    <td colspan="9" class="text-center">No Coupons found</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>

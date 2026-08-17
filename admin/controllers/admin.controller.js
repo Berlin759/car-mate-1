@@ -4495,17 +4495,23 @@ export const postCouponList = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const [items, total] = await Promise.all([
-            Coupon.find().sort({ createdAt: -1 }).skip(skip).limit(limit), Coupon.countDocuments(),
+            Coupon.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Coupon.countDocuments(),
         ]);
 
-        let response = {
-            page,
-            limit,
-            totalRecords: total,
-            items,
-        };
+        let response = successResponse();
 
-        return res.status(200).json(successResponse("Coupon list fetched.", response));
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/coupon-list.ejs"), {
+            body: {
+                payload: req.body,
+                couponList: items,
+            },
+        });
+
+        response["total_record"] = total;
+        response["payload"] = req.body;
+
+        return res.status(200).json(response);
     } catch (error) {
         log1(["Error in postCouponList ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -4514,10 +4520,40 @@ export const postCouponList = async (req, res) => {
 
 export const postUpdateCoupon = async (req, res) => {
     try {
-        const { couponId, ...updateData } = req.body;
+        const {
+            couponId,
+            code,
+            description,
+            discountType,
+            discountValue,
+            minOrderAmount,
+            maxDiscountAmount,
+            usageLimit,
+            expiryDate,
+        } = req.body;
 
         if (!couponId || !ObjectId.isValid(couponId)) {
             return res.status(400).json(errorResponse("Invalid Coupon ID."));
+        };
+
+        if (!code || !discountValue || !expiryDate) {
+            return res.status(400).json(errorResponse("Code, discount value, and expiry date are required."));
+        };
+
+        const existing = await Coupon.findOne({ code: code.toUpperCase(), _id: { $ne: couponId } });
+        if (existing) {
+            return res.status(400).json(errorResponse("Coupon code already exists."));
+        };
+
+        let updateData = {
+            code: code.toUpperCase(),
+            description: description || "",
+            discountType: discountType || "percentage",
+            discountValue: parseFloat(discountValue),
+            minOrderAmount: parseFloat(minOrderAmount || 0),
+            maxDiscountAmount: parseFloat(maxDiscountAmount || 0),
+            usageLimit: parseInt(usageLimit || 0),
+            expiryDate: new Date(expiryDate),
         };
 
         await Coupon.findByIdAndUpdate(couponId, updateData);
@@ -4542,6 +4578,72 @@ export const postDeleteCoupon = async (req, res) => {
         return res.status(200).json(successResponse("Coupon deleted successfully."));
     } catch (error) {
         log1(["Error in postDeleteCoupon ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getCouponPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const coupons = await Coupon.find().sort({ createdAt: -1 });
+
+        return res.render("admin/coupons", {
+            header: {
+                page: "Coupon",
+                admin: admin,
+                title: "Coupon Management",
+                description: "Manage app coupons",
+                id: "coupons",
+            },
+            body: { coupons },
+            footer: {
+                js: ["admin/coupons.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getCouponPage----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postCouponDetails = async (req, res) => {
+    try {
+        const { couponId } = req.body;
+
+        if (!couponId || !ObjectId.isValid(couponId)) {
+            return res.status(400).json(errorResponse("Invalid Coupon ID."));
+        };
+
+        const coupon = await Coupon.findById(couponId);
+        if (!coupon) {
+            return res.status(400).json(errorResponse("Coupon not found."));
+        };
+
+        return res.status(200).json(successResponse("Coupon details fetched.", coupon));
+    } catch (error) {
+        log1(["Error in postCouponDetails ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postToggleCouponStatus = async (req, res) => {
+    try {
+        const { couponId, isActive } = req.body;
+
+        if (!couponId || !ObjectId.isValid(couponId)) {
+            return res.status(400).json(errorResponse("Invalid Coupon ID."));
+        };
+
+        const coupon = await Coupon.findById(couponId);
+        if (!coupon) {
+            return res.status(400).json(errorResponse("Coupon not found."));
+        };
+
+        await Coupon.findByIdAndUpdate(couponId, { isActive: isActive === "true" || isActive === true });
+
+        return res.status(200).json(successResponse(`Coupon ${isActive === "true" || isActive === true ? "activated" : "deactivated"} successfully.`));
+    } catch (error) {
+        log1(["Error in postToggleCouponStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

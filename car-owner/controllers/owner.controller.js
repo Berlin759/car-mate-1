@@ -2651,6 +2651,8 @@ export const postAddBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid selected address. Please choose a different address."));
         };
 
+        const bookingDate = moment.tz(date, "YYYY/MM/DD", Constants.CURRENT_TIMEZONE).toDate();
+
         let mechanicNewId;
 
         if (parseInt(mechanicType) === Constants.MECHANIC_TYPE_STATUS.MANUAL) {
@@ -2677,7 +2679,7 @@ export const postAddBooking = async (req, res) => {
 
             const existingBooking = await Booking.exists({
                 mechanicId: mechanicDetails._id,
-                date: new Date(date),
+                date: bookingDate,
                 slot: slot,
                 status: Constants.BOOKING_STATUS.ACCEPTED,
             });
@@ -2716,7 +2718,7 @@ export const postAddBooking = async (req, res) => {
 
             const bookedMechanics = await Booking.distinct("mechanicId", {
                 mechanicId: { $in: mechanics.map(m => m._id) },
-                date: new Date(date),
+                date: bookingDate,
                 slot: slot,
                 status: Constants.BOOKING_STATUS.ACCEPTED,
             });
@@ -2735,20 +2737,19 @@ export const postAddBooking = async (req, res) => {
         };
 
         const alreadyBooked = await Booking.exists({
-            ownerId: new ObjectId(ownerId),
-            carId: new ObjectId(carId),
-            date: new Date(date),
+            mechanicId: new ObjectId(mechanicNewId),
+            date: bookingDate,
             slot: slot,
             status: {
                 $in: [
-                    Constants.BOOKING_STATUS.PENDING,
-                    Constants.BOOKING_STATUS.ACCEPTED
+                    Constants.BOOKING_STATUS.ACCEPTED,
+                    Constants.BOOKING_STATUS.SERVICE_STARTED,
                 ]
             },
         });
 
         if (alreadyBooked) {
-            return res.status(400).json(errorResponse("You already have a booking for this slot."));
+            return res.status(400).json(errorResponse("The selected mechanic is unavailable for this time slot. Please select another slot."));
         };
 
         let serviceFee = 0;
@@ -2821,7 +2822,7 @@ export const postAddBooking = async (req, res) => {
             serviceId: new ObjectId(serviceId),
             carId: new ObjectId(carId),
             addressId: new ObjectId(addressId),
-            date: new Date(date),
+            date: bookingDate,
             slot: slot,
             address: addressDetails?.address,
             latitude: addressDetails?.latitude,
@@ -3005,6 +3006,46 @@ export const postBookingList = async (req, res) => {
                             },
                         },
                         {
+                            $lookup: {
+                                from: "ratings",
+                                let: {
+                                    bookingId: "$_id",
+                                    ownerId: new ObjectId(ownerId),
+                                },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $and: [
+                                                    {
+                                                        $eq: [
+                                                            "$bookingId",
+                                                            "$$bookingId",
+                                                        ],
+                                                    },
+                                                    {
+                                                        $eq: [
+                                                            "$ownerId",
+                                                            "$$ownerId",
+                                                        ],
+                                                    },
+                                                ],
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $limit: 1,
+                                    },
+                                    {
+                                        $project: {
+                                            _id: 1,
+                                        },
+                                    },
+                                ],
+                                as: "ratingDetails",
+                            },
+                        },
+                        {
                             $project: {
                                 invoiceNo: 1,
                                 date: 1,
@@ -3024,6 +3065,9 @@ export const postBookingList = async (req, res) => {
                                 createdAt: 1,
                                 serviceDetails: 1,
                                 mechanicDetails: 1,
+                                isRatingAdded: {
+                                    $gt: [{ $size: "$ratingDetails", }, 0,],
+                                },
                                 carDetails: {
                                     _id: "$carDetails._id",
                                     fullName: "$carDetails.fullName",
@@ -3373,6 +3417,96 @@ export const postBookingDetails = async (req, res) => {
     };
 };
 
+export const postUpdateBooking = async (req, res) => {
+    const ownerId = req.ownerId;
+    const { bookingId, addressId, date, slot } = req.body;
+
+    log1(["postUpdateBooking ownerId----->", ownerId]);
+    log1(["postUpdateBooking req.body----->", req.body]);
+
+    if (ownerLocks.get(ownerId)) {
+        log1(["A Booking is already in progress. Please wait."]);
+        return res.status(429).json(errorResponse("A Booking is already in progress. Please wait."));
+    };
+
+    ownerLocks.set(ownerId, true);
+
+    try {
+        const validate = await custom_validation(req.body, "owner.update_booking");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
+
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const bookingDetails = await Booking.findOne({
+            _id: new ObjectId(bookingId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        log1(["postUpdateBooking bookingDetails----->", bookingDetails]);
+        if (!bookingDetails) {
+            return res.status(400).json(errorResponse("This Booking is not Available."));
+        };
+
+        if (bookingDetails?.status !== Constants.BOOKING_STATUS.PENDING) {
+            return res.status(400).json(errorResponse("This booking has already been confirmed or processed, so you cannot make any further changes."));
+        };
+
+        const addressDetails = await Address.findOne({
+            _id: new ObjectId(addressId),
+            ownerId: new ObjectId(ownerId),
+        }).lean();
+
+        if (!addressDetails) {
+            return res.status(400).json(errorResponse("Invalid selected address. Please choose a different address."));
+        };
+
+        const bookingDate = moment.tz(date, "YYYY/MM/DD", Constants.CURRENT_TIMEZONE).toDate();
+
+        const alreadyBooked = await Booking.exists({
+            mechanicId: new ObjectId(bookingDetails.mechanicId),
+            date: bookingDate,
+            slot: slot,
+            status: {
+                $in: [
+                    Constants.BOOKING_STATUS.ACCEPTED,
+                    Constants.BOOKING_STATUS.SERVICE_STARTED,
+                ]
+            },
+        });
+
+        if (alreadyBooked) {
+            return res.status(400).json(errorResponse("The selected mechanic is unavailable for this time slot. Please select another slot."));
+        };
+
+        let updatePayload = {
+            addressId: new ObjectId(addressId),
+            date: bookingDate,
+            slot: slot,
+        };
+
+        let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
+        if (!updateBooking) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        return res.status(200).json(successResponse("You have successfully updated your booking!"));
+    } catch (error) {
+        log1(["Error in postUpdateBooking ----->", error]);
+        ownerLocks.delete(ownerId);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    } finally {
+        ownerLocks.delete(ownerId);
+    };
+};
+
 export const postRescheduleBooking = async (req, res) => {
     const ownerId = req.ownerId;
     const { bookingId, addressId, date, slot } = req.body;
@@ -3431,20 +3565,22 @@ export const postRescheduleBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid selected address. Please choose a different address."));
         };
 
+        const bookingDate = moment.tz(date, "YYYY/MM/DD", Constants.CURRENT_TIMEZONE).toDate();
+
         const alreadyBooked = await Booking.exists({
-            ownerId: new ObjectId(ownerId),
-            date: new Date(date),
+            mechanicId: new ObjectId(bookingDetails.mechanicId),
+            date: bookingDate,
             slot: slot,
             status: {
                 $in: [
-                    Constants.BOOKING_STATUS.PENDING,
-                    Constants.BOOKING_STATUS.ACCEPTED
+                    Constants.BOOKING_STATUS.ACCEPTED,
+                    Constants.BOOKING_STATUS.SERVICE_STARTED,
                 ]
             },
         });
 
         if (alreadyBooked) {
-            return res.status(400).json(errorResponse("You already have a booking for this slot."));
+            return res.status(400).json(errorResponse("The selected mechanic is unavailable for this time slot. Please select another slot."));
         };
 
         let serviceFee = 0;
@@ -3512,7 +3648,7 @@ export const postRescheduleBooking = async (req, res) => {
             serviceId: new ObjectId(bookingDetails?.serviceId),
             carId: new ObjectId(bookingDetails?.carId),
             addressId: new ObjectId(addressId),
-            date: new Date(date),
+            date: bookingDate,
             slot: slot,
             address: addressDetails?.address,
             latitude: addressDetails?.latitude,
@@ -4536,6 +4672,7 @@ export const postAddRating = async (req, res) => {
 
         let ratingPayload = {
             ownerId: ownerId,
+            mechanicId: bookingDetails.mechanicId,
             bookingId: bookingDetails._id,
             serviceId: bookingDetails.serviceId,
             rating: parseInt(rating),

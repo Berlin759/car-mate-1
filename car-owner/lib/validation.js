@@ -57,6 +57,12 @@ const validate_rules = {
             date: "required",
             slot: "required",
         },
+        update_booking: {
+            bookingId: "required",
+            addressId: "required",
+            date: "required",
+            slot: "required",
+        },
         reschedule_booking: {
             bookingId: "required",
             addressId: "required",

@@ -5,6 +5,7 @@ const Constants = {
     PLATFORM_NAME: "car_mate_owner_app",
     DEFAULT_COUNTRY_CODE: "IN",
     BASE_CURRENCY: 'INR',
+    CURRENT_TIMEZONE: "Asia/Kolkata",
     OTP_LENGTH: 6,
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 10,
