@@ -3292,6 +3292,20 @@ export const postBookingDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "addresses",
+                    localField: "addressId",
+                    foreignField: "_id",
+                    as: "ownerAddressDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerAddressDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
@@ -3322,6 +3336,14 @@ export const postBookingDetails = async (req, res) => {
                         fullName: "$carDetails.fullName",
                         vehicleNumber: "$carDetails.vehicleNumber",
                         model: "$carDetails.model",
+                    },
+                    ownerAddressDetails: {
+                        _id: "$ownerAddressDetails._id",
+                        label: "$ownerAddressDetails.label",
+                        address: "$ownerAddressDetails.address",
+                        latitude: "$ownerAddressDetails.latitude",
+                        longitude: "$ownerAddressDetails.longitude",
+                        isDefault: "$ownerAddressDetails.isDefault",
                     },
                 },
             },
