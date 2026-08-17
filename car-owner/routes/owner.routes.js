@@ -41,7 +41,7 @@ import {
     postAddBooking,
     postBookingList,
     postBookingDetails,
-    postUpdateBooking,
+    postRescheduleBooking,
     postCancelBooking,
     getBookingInvoice,
     postTransactionList,
@@ -126,7 +126,7 @@ router.post("/apply-coupon", authMiddleware, postApplyCoupon);
 router.post("/add-booking", unAuthMiddleware, postAddBooking);
 router.post("/booking-list", authMiddleware, postBookingList);
 router.post("/booking-details", authMiddleware, postBookingDetails);
-router.post("/update-booking", authMiddleware, postUpdateBooking);
+router.post("/reschedule-booking", authMiddleware, postRescheduleBooking);
 router.post("/cancel-booking", authMiddleware, postCancelBooking);
 router.get("/booking-invoice/:bookingId", authMiddleware, getBookingInvoice);
 

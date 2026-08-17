@@ -2857,7 +2857,7 @@ export const postAddBooking = async (req, res) => {
         log1(["postAddBooking placeorder - razorOrder : ", razorBooking]);
         if (razorBooking.flag !== 1) {
             await Booking.deleteOne({ _id: createBooking._id })
-            return res.status(400).json(errorResponse("Something went wrong!"));
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
         await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id });
@@ -3373,12 +3373,12 @@ export const postBookingDetails = async (req, res) => {
     };
 };
 
-export const postUpdateBooking = async (req, res) => {
+export const postRescheduleBooking = async (req, res) => {
     const ownerId = req.ownerId;
-    const param = req.body;
+    const { bookingId, addressId, date, slot } = req.body;
 
-    log1(["postUpdateBooking ownerId----->", ownerId]);
-    log1(["postUpdateBooking param----->", param]);
+    log1(["postRescheduleBooking ownerId----->", ownerId]);
+    log1(["postRescheduleBooking req.body----->", req.body]);
 
     if (ownerLocks.get(ownerId)) {
         log1(["A Booking is already in progress. Please wait."]);
@@ -3388,37 +3388,182 @@ export const postUpdateBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(param, "owner.update_booking");
+        const validate = await custom_validation(req.body, "owner.reschedule_booking");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
-        const bookingDetails = await Booking.findOne({
-            _id: new ObjectId(param.bookingId),
-            ownerId: new ObjectId(ownerId),
-        }).populate({ path: 'serviceId' });
+        if (!ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid booking id."));
+        };
 
-        log1(["postUpdateBooking bookingDetails----->", bookingDetails]);
+        if (!ObjectId.isValid(addressId)) {
+            return res.status(400).json(errorResponse("Invalid address id."));
+        };
+
+        const bookingDetails = await Booking.findOne({
+            _id: new ObjectId(bookingId),
+            ownerId: new ObjectId(ownerId),
+        });
+
+        log1(["postRescheduleBooking bookingDetails----->", bookingDetails]);
         if (!bookingDetails) {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
 
-        let updatePayload = {};
+        const [serviceDetails, addressDetails] = await Promise.all([
+            Service.findOne({
+                _id: new ObjectId(bookingDetails?.serviceId),
+                status: Constants.SERVICE_STATUS.ACTIVE,
+            }).lean(),
 
-        if (param.totalAmount) {
-            updatePayload["totalAmount"] = parseFloat(param.totalAmount);
+            Address.findOne({
+                _id: new ObjectId(addressId),
+                ownerId: new ObjectId(ownerId),
+            }).lean(),
+        ]);
+
+        if (!serviceDetails) {
+            return res.status(400).json(errorResponse("Invalid selected service. Please choose a different service."));
         };
 
-        if (Object.keys(updatePayload).length > 0) {
-            let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
-            if (!updateBooking) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        if (!addressDetails) {
+            return res.status(400).json(errorResponse("Invalid selected address. Please choose a different address."));
+        };
+
+        const alreadyBooked = await Booking.exists({
+            ownerId: new ObjectId(ownerId),
+            date: new Date(date),
+            slot: slot,
+            status: {
+                $in: [
+                    Constants.BOOKING_STATUS.PENDING,
+                    Constants.BOOKING_STATUS.ACCEPTED
+                ]
+            },
+        });
+
+        if (alreadyBooked) {
+            return res.status(400).json(errorResponse("You already have a booking for this slot."));
+        };
+
+        let serviceFee = 0;
+        (serviceDetails.subCategory || []).forEach(sub => {
+            const serviceMechanic = (sub.mechanicIds || []).find(
+                (m) => m.mechanicId?.toString() === bookingDetails?.mechanicId.toString()
+            );
+
+            if (serviceMechanic) {
+                serviceFee += parseFloat(serviceMechanic.price) || 0;
+            };
+        });
+
+        const mechanicDetails = await Mechanic.findOne({
+            _id: new ObjectId(bookingDetails?.mechanicId),
+            status: Constants.MECHANIC_STATUS.ACTIVE,
+        });
+
+        const invoiceNo = generateInvoiceNumber();
+        const consultantFee = parseFloat(mechanicDetails.consultantFee) || 0;
+
+        const totalFee = consultantFee + serviceFee;
+
+        let discountAmount = 0;
+        let couponId = null;
+
+        if (couponId && ObjectId.isValid(couponId)) {
+            const coupon = await Coupon.findOne({
+                _id: new ObjectId(couponId),
+                isActive: true,
+                expiryDate: { $gte: new Date() },
+            });
+            log1(["postRescheduleBooking coupon----->", coupon]);
+
+            if (coupon) {
+                if (totalFee >= coupon.minOrderAmount) {
+                    if (coupon.discountType === "percentage") {
+                        discountAmount = (totalFee * coupon.discountValue) / 100;
+                        if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+                            discountAmount = coupon.maxDiscountAmount;
+                        }
+                    } else {
+                        discountAmount = coupon.discountValue;
+                    };
+
+                    if (discountAmount > totalFee) {
+                        discountAmount = totalFee;
+                    };
+
+                    couponId = coupon._id;
+                };
             };
         };
+        log1(["postRescheduleBooking discountAmount----->", discountAmount]);
 
-        return res.status(200).json(successResponse("You have successfully updated your booking!"));
+        const subTotal = parseFloat(totalFee - discountAmount);
+
+        const taxAmount = parseFloat((subTotal * 18) / 100);
+
+        let totalPayAmount = parseFloat(subTotal + taxAmount);
+
+        let bookingData = {
+            ownerId: new ObjectId(ownerId),
+            mechanicId: bookingDetails?.mechanicId,
+            serviceId: new ObjectId(bookingDetails?.serviceId),
+            carId: new ObjectId(bookingDetails?.carId),
+            addressId: new ObjectId(addressId),
+            date: new Date(date),
+            slot: slot,
+            address: addressDetails?.address,
+            latitude: addressDetails?.latitude,
+            longitude: addressDetails?.longitude,
+            consultantFee: consultantFee,
+            totalServiceFee: serviceFee,
+            discountAmount: discountAmount,
+            subTotal: subTotal,
+            taxAmount: taxAmount,
+            totalAmount: totalPayAmount,
+            invoiceNo: invoiceNo,
+            status: Constants.BOOKING_STATUS.PENDING,
+            bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.PENDING,
+        };
+
+        if (couponId) {
+            bookingData.couponId = couponId;
+        };
+
+        log1(["postRescheduleBooking bookingData----->", bookingData]);
+
+        const createBooking = await Booking.create(bookingData);
+        log1(["postRescheduleBooking createBooking----->", createBooking]);
+        if (!createBooking) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        const razorBooking = await createOrder({
+            order_id: createBooking._id,
+            order_amount: bookingData.totalAmount,
+        });
+
+        log1(["postRescheduleBooking placeorder - razorOrder : ", razorBooking]);
+        if (razorBooking.flag !== 1) {
+            await Booking.deleteOne({ _id: createBooking._id })
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id });
+
+        let responseData = {
+            bookingId: createBooking._id,
+            ownerId: ownerId,
+            invoiceNo: invoiceNo,
+            totalAmount: totalPayAmount,
+            razorpayOrderId: razorBooking.data.order.id,
+        };
+
+        return res.status(200).json(successResponse("Reschedule Booking successfully. Please complete the payment.", responseData));
     } catch (error) {
-        log1(["Error in postUpdateBooking ----->", error]);
+        log1(["Error in postRescheduleBooking ----->", error]);
         ownerLocks.delete(ownerId);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     } finally {
