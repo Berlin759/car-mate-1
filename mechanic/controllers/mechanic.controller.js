@@ -38,6 +38,7 @@ import Earning from "../models/earning.model.js";
 import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
+import { createOrder } from "./razorpay.controller.js";
 
 const __dirname = path.resolve();
 
@@ -1849,23 +1850,35 @@ export const postBookingSendQuote = async (req, res) => {
             ...formattedQuotation
         ];
 
-        // const quoteSum = booking.quotation.reduce(
-        //     (sum, item) => sum + (Number(item.price) || 0),
-        //     0
-        // );
+        const quoteSum = booking.quotation.reduce(
+            (sum, item) => sum + (Number(item.price) || 0),
+            0
+        );
 
         // const consultantFee = Number(booking.consultantFee) || 0;
         // const discountAmount = Number(booking.discountAmount) || 0;
 
         // const subTotal = (consultantFee + quoteSum) - discountAmount;
-        // const taxAmount = Math.round(subTotal * 0.18);
-        // const totalAmount = subTotal + taxAmount;
+        const taxAmount = Math.round(quoteSum * 0.18);
+        const totalAmount = quoteSum + taxAmount;
 
         // booking.subTotal = subTotal;
         // booking.taxAmount = taxAmount;
         // booking.totalAmount = totalAmount;
 
         booking.quotationPaymentStatus = Constants.QUOTATION_PAYMENT_STATUS.PENDING;
+
+        const razorQuotationBooking = await createOrder({
+            order_id: booking._id,
+            order_amount: totalAmount,
+        });
+
+        log1(["postBookingSendQuote placeorder - razorQuotationOrder : ", razorQuotationBooking]);
+        if (razorQuotationBooking.flag !== 1) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        booking.razorpayQuotationOrderId = razorQuotationBooking.data.order.id;
 
         await booking.save();
 

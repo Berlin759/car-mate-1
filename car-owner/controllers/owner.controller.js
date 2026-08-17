@@ -3320,6 +3320,7 @@ export const postBookingDetails = async (req, res) => {
                     totalAmount: 1,
                     quotation: 1,
                     razorpayOrderId: 1,
+                    razorpayQuotationOrderId: 1,
                     quotationPaymentStatus: 1,
                     bookingPaymentStatus: 1,
                     status: 1,
