@@ -2565,6 +2565,7 @@ export const postAddBooking = async (req, res) => {
         mechanicId,
         date,
         slot,
+        couponId,
     } = req.body;
 
     log1(["postAddBooking req.body----->", req.body]);
@@ -2779,7 +2780,6 @@ export const postAddBooking = async (req, res) => {
         const totalFee = consultantFee + serviceFee;
 
         let discountAmount = 0;
-        let couponId = null;
 
         if (couponId && ObjectId.isValid(couponId)) {
             const coupon = await Coupon.findOne({
@@ -2803,8 +2803,6 @@ export const postAddBooking = async (req, res) => {
                     if (discountAmount > totalFee) {
                         discountAmount = totalFee;
                     };
-
-                    couponId = coupon._id;
                 };
             };
         };
