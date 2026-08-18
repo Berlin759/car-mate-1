@@ -427,12 +427,18 @@ export const postDeleteOwnerAccount = async (req, res) => {
         const validate = await custom_validation(req.body, "owner.delete_account");
         if (validate.flag != 1) {
             return res.status(400).json(validate);
-        }
+        };
+
+        if (parseInt(reasonCategory) === Constants.DELETE_ACCOUNT_REASON_STATUS.OTHER) {
+            if (!reasonDescription || reasonDescription.trim() === "") {
+                return res.status(404).json(errorResponse("Please enter reason."));
+            };
+        };
 
         const owner = await Owner.findById(ownerId);
         if (!owner) {
             return res.status(404).json(errorResponse("Owner not found."));
-        }
+        };
 
         owner.isDeleted = true;
         owner.loginToken = "";
@@ -442,7 +448,7 @@ export const postDeleteOwnerAccount = async (req, res) => {
         };
 
         owner.deleteAccount.push({
-            reasonCategory: reasonCategory || "",
+            reasonCategory: parseInt(reasonCategory),
             reasonDescription: reasonDescription || "",
             deletedAt: new Date(),
         });

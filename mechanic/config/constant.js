@@ -193,6 +193,16 @@ const Constants = {
         OPTIONAL: 1,
         MANDATORY: 2,
     },
+    DELETE_ACCOUNT_REASON_STATUS: {
+        ACCOUNT_SECURITY_ISSUE: 1,
+        PRIVACY_CONCERNS: 2,
+        FOUND_BETTER_PLATFORM: 3,
+        NO_LONGER_USING_PLATFORM: 4,
+        ACCOUNT_LOCKED_OR_SUSPEND: 5,
+        SWITCH_TO_DIFFERENT_CURRENCY: 6,
+        TECHNICAL_ISSUES: 7,
+        OTHER: 8,
+    },
 };
 
 export default Constants;

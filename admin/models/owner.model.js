@@ -109,6 +109,15 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.ONLINE_STATUS),
             default: Constants.ONLINE_STATUS.FALSE,
         },
+        languageCode: {
+            type: String,
+            default: "en",
+        },
+        isAutoDetectLanguage: {
+            type: Number,
+            enum: Object.values(Constants.PREFERENCES_STATUS),
+            default: Constants.PREFERENCES_STATUS.FALSE,
+        },
         isDeleted: {
             type: Boolean,
             default: false,
@@ -117,8 +126,9 @@ const ownerSchema = new Schema(
             {
                 _id: false,
                 reasonCategory: {
-                    type: String,
-                    default: "",
+                    type: Number,
+                    enum: Object.values(Constants.DELETE_ACCOUNT_REASON_STATUS),
+                    default: null,
                 },
                 reasonDescription: {
                     type: String,

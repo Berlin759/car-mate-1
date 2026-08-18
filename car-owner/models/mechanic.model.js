@@ -156,8 +156,9 @@ const mechanicSchema = new Schema(
             {
                 _id: false,
                 reasonCategory: {
-                    type: String,
-                    default: "",
+                    type: Number,
+                    enum: Object.values(Constants.DELETE_ACCOUNT_REASON_STATUS),
+                    default: null,
                 },
                 reasonDescription: {
                     type: String,

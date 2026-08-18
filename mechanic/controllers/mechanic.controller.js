@@ -454,12 +454,18 @@ export const postDeleteMechanicAccount = async (req, res) => {
         const validate = await custom_validation(req.body, "mechanic.delete_account");
         if (validate.flag != 1) {
             return res.status(400).json(validate);
-        }
+        };
+
+        if (parseInt(reasonCategory) === Constants.DELETE_ACCOUNT_REASON_STATUS.OTHER) {
+            if (!reasonDescription || reasonDescription.trim() === "") {
+                return res.status(404).json(errorResponse("Please enter reason."));
+            };
+        };
 
         const mechanic = await Mechanic.findById(mechanicId);
         if (!mechanic) {
             return res.status(404).json(errorResponse("Mechanic not found."));
-        }
+        };
 
         mechanic.isDeleted = true;
         mechanic.loginToken = "";
@@ -469,7 +475,7 @@ export const postDeleteMechanicAccount = async (req, res) => {
         };
 
         mechanic.deleteAccount.push({
-            reasonCategory: reasonCategory || "",
+            reasonCategory: parseInt(reasonCategory),
             reasonDescription: reasonDescription || "",
             deletedAt: new Date(),
         });
