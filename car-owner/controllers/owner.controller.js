@@ -4042,9 +4042,23 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
         const ownerId = req.ownerId;
         const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
+        log1(["postQuotationVerifyRazorPaySignature bookingId ----->", bookingId]);
+        log1(["postQuotationVerifyRazorPaySignature razorpayOrderId ----->", razorpayOrderId]);
+
         const validate = await custom_validation(req.body, "owner.verify_quotation_razorpay_signature");
         if (validate.flag != 1) {
             return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(bookingId)) {
+            return res.status(400).json(errorResponse("Invalid Booking ID."));
+        };
+
+        const booking = await Booking.findOne({ _id: bookingId });
+        log1(["postQuotationVerifyRazorPaySignature booking ----->", booking]);
+
+        if (!booking) {
+            return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
         };
 
         const isVerified = verifySignature({
@@ -4052,12 +4066,6 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
             razorpay_payment_id: razorpayPaymentId,
             razorpay_signature: razorpaySignature,
         });
-
-        const booking = await Booking.findOne({ bookingId });
-
-        if (!booking) {
-            return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
-        };
 
         if (!isVerified) {
             return res.status(400).json(errorResponse("Payment Failed!", { is_verifed: isVerified }));

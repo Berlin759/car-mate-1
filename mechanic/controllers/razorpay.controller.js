@@ -39,7 +39,7 @@ export const createOrder = async (payload) => {
 
         return successResponse("Order created successfully.", { order: createOrderResponse });
     } catch (error) {
-        log1(["createOrder Error----->", error.message]);
+        log1(["createOrder Error----->", error.error]);
         return errorResponse(messages.unexpectedDataError);
     };
 };
