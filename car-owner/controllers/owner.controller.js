@@ -205,7 +205,10 @@ export const getProfileDetails = async (req, res) => {
 
         const items = await Owner.aggregate(pipeline);
 
+        const unReadNotificationsCount = await Notification.countDocuments({ ownerId: new ObjectId(ownerId), isRead: false });
+
         const response = items[0] || null;
+        response["unReadNotificationsCount"] = unReadNotificationsCount || 0;
 
         return res.status(200).json(successResponse("Get Profile Details successfully!", response));
     } catch (error) {
@@ -4629,33 +4632,47 @@ export const postNotificationList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
+            type,
         } = req.body;
 
         log1(["postNotificationList ownerId----->", ownerId]);
         log1(["postNotificationList req.body----->", req.body]);
 
+        let filter = {
+            ownerId: new ObjectId(ownerId),
+        };
+
+        if (type && type !== Constants.NOTIFICATION_TYPE.DEFAULT) {
+            filter["type"] = parseInt(type);
+        };
+
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
-        const result = await Notification.aggregate([
-            { $match: { ownerId: new ObjectId(ownerId) } },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    totalCount: [{ $count: "count" }],
-                    notifications: [{ $skip: skip }, { $limit: limit }]
-                },
-            },
-        ]);
+        const [notificationList, totalCount, unReadNotificationsCount,] = await Promise.all([
+            Notification.aggregate([
+                { $match: filter },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip }, { $limit: limit },
+            ]),
 
-        const totalCount = result[0].totalCount[0] ? result[0].totalCount[0].count : 0;
-        const notificationList = result[0].notifications;
+            Notification.countDocuments({
+                ownerId: new ObjectId(ownerId),
+            }),
+
+            // Unread notifications count
+            Notification.countDocuments({
+                ownerId: new ObjectId(ownerId),
+                isRead: false
+            }),
+        ]);
 
         const response = {
             page: page,
             limit: limit,
             totalRecords: totalCount,
+            unReadNotificationsCount: unReadNotificationsCount,
             items: notificationList,
         };
 
