@@ -21,14 +21,31 @@ admin.initializeApp({
 
 export const sendPushNotification = async (registrationToken, payload) => {
     try {
-        if (!registrationToken) {
-            log1(["Device Token is required ----->", registrationToken]);
-            return errorResponse("Device Token is required");
-        };
+        // if (!registrationToken) {
+        //     log1(["Device Token is required ----->", registrationToken]);
+        //     return errorResponse("Device Token is required");
+        // };
         let messageType = payload.type ? payload.type.toString() : 0;
         log1(["sendPushNotification messageType----->", messageType]);
 
         const collapseKey = payload.bookingId ? `booking_${payload.bookingId}` : payload.transactionId ? `txn_${payload.transactionId}` : `notify_${Date.now()}`;
+
+        let addNotification;
+        if (!payload.chatId) {
+            let objectPayload = {
+                ownerId: payload.ownerId ? payload.ownerId : null,
+                bookingId: payload.bookingId ? payload.bookingId : null,
+                transactionId: payload.transactionId ? payload.transactionId : null,
+                type: payload.type,
+                title: payload.title,
+                description: payload.description,
+            };
+
+            addNotification = await Notification.create(objectPayload);
+            if (!addNotification) {
+                return errorResponse(messages.unexpectedDataError);
+            };
+        };
 
         const message = {
             notification: {
@@ -75,30 +92,12 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
         log1(["sendPushNotification Message --------->", message]);
 
-        return admin.messaging().send(message).then(async (response) => {
-            if (!payload.chatId) {
-                let objectPayload = {
-                    ownerId: payload.ownerId ? payload.ownerId : null,
-                    bookingId: payload.bookingId ? payload.bookingId : null,
-                    transactionId: payload.transactionId ? payload.transactionId : null,
-                    type: payload.type,
-                    title: payload.title,
-                    description: payload.description,
-                };
+        if (registrationToken) {
+            const response = await admin.messaging().send(message);
+            log1("Push notification sent successfully:", response);
+        };
 
-                const addNotification = await Notification.create(objectPayload);
-                if (!addNotification) {
-                    return errorResponse(messages.unexpectedDataError);
-                };
-
-                return addNotification;
-            } else {
-                return "";
-            }
-        }).catch((error) => {
-            log1(["Error sending notification ----->", error]);
-            return errorResponse(messages.unexpectedDataError);
-        });
+        return addNotification ? addNotification : "";
     } catch (error) {
         log1(["sendPushNotification Error----->", error.message]);
         return errorResponse(messages.unexpectedDataError);

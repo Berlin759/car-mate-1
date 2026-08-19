@@ -3901,6 +3901,9 @@ export const getBookingInvoice = async (req, res) => {
 export const postVerifyRazorPaySignature = async (req, res) => {
     try {
         const ownerId = req.ownerId;
+
+        log1(["postVerifyRazorPaySignature req.body ----->", req.body]);
+
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
         const validate = await custom_validation(req.body, "owner.verify_razorpay_signature");
@@ -3950,20 +3953,34 @@ export const postVerifyRazorPaySignature = async (req, res) => {
 
             await Transaction.create(transactionPayload);
 
-            if (
-                ownerData &&
-                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                ownerData.deviceToken &&
-                ownerData.deviceToken !== ""
-            ) {
-                let notificationObject = {
-                    title: "Payment Successful!",
-                    description: `Payment for booking #${booking._id} was successful. The mechanic will accept your booking request soon.`,
-                    ownerId: ownerId,
-                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+            if (ownerData) {
+                if (ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE
+                    // && ownerData.deviceToken && ownerData.deviceToken !== ""
+                ) {
+                    log1(["postVerifyRazorPaySignature notificaiton send process ----->"]);
+                    let notificationObject = {
+                        title: "Payment Successful!",
+                        description: `Payment for booking #${booking._id} was successful. The mechanic will accept your booking request soon.`,
+                        ownerId: ownerId,
+                        type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                    };
+
+                    await sendPushNotification(ownerData.deviceToken, notificationObject);
                 };
 
-                await sendPushNotification(ownerData.deviceToken, notificationObject);
+                if (ownerData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE
+                    // && ownerData.deviceToken && ownerData.deviceToken !== ""
+                ) {
+                    log1(["postVerifyRazorPaySignature booking notificaiton send process ----->"]);
+                    let notificationObject = {
+                        title: "Booking Create Successful!",
+                        description: `Your booking was create successful. The mechanic will accept your booking request soon.`,
+                        ownerId: ownerId,
+                        type: Constants.NOTIFICATION_TYPE.BOOKING,
+                    };
+
+                    await sendPushNotification(ownerData.deviceToken, notificationObject);
+                };
             };
         };
 
