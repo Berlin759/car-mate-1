@@ -4960,7 +4960,7 @@ export const postChatList = async (req, res) => {
             ownerIds: { $in: [new ObjectId(ownerId)] },
         };
 
-        const result = await Chat.aggregate([
+        const [result] = await Chat.aggregate([
             { $match: matchQuery },
             {
                 $addFields: {
@@ -4994,7 +4994,12 @@ export const postChatList = async (req, res) => {
                     as: "bookingsDetails",
                 },
             },
-            { $unwind: { path: "$bookingsDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$bookingsDetails",
+                    preserveNullAndEmptyArrays: true,
+                }
+            },
             ...(param.search && param.search.trim() !== "" ? [{
                 $match: {
                     $or: [
@@ -5048,8 +5053,8 @@ export const postChatList = async (req, res) => {
             },
         ]);
 
-        const count = result[0]?.metadata[0]?.totalCount || 0;
-        let chatList = result[0]?.chats || [];
+        const count = result?.metadata[0]?.totalCount || 0;
+        let chatList = result?.chats || [];
 
         if (chatList.length > 0) {
             chatList = await Promise.all(chatList.map(async (chat) => {
@@ -5111,7 +5116,7 @@ export const postChatMessagesList = async (req, res) => {
             ownerIds: { $in: [new ObjectId(ownerId)] },
         };
 
-        const result = await Chat.aggregate([
+        const [result] = await Chat.aggregate([
             { $match: matchQuery },
             {
                 $facet: {
@@ -5141,8 +5146,8 @@ export const postChatMessagesList = async (req, res) => {
             },
         ]);
 
-        const count = result[0]?.metadata[0]?.totalCount || 0;
-        const chats = result[0]?.chats || [];
+        const count = result?.metadata[0]?.totalCount || 0;
+        const chats = result?.chats || [];
 
         if (chats.length > 0) {
             const chatDetails = chats[0];
@@ -5255,13 +5260,13 @@ export const postSendMessageToChat = async (req, res) => {
                 // }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
 
                 const docType =
-                    uploadedFile.data.folder === "images"
+                    uploadedFile.data.folder === "upload_images"
                         ? Constants.CHAT_DOCUMENT_TYPE.PHOTO
-                        : uploadedFile.data.folder === "videos"
+                        : uploadedFile.data.folder === "upload_videos"
                             ? Constants.CHAT_DOCUMENT_TYPE.VIDEO
-                            : uploadedFile.data.folder === "audio"
+                            : uploadedFile.data.folder === "upload_audio"
                                 ? Constants.CHAT_DOCUMENT_TYPE.AUDIO
-                                : uploadedFile.data.folder === "documents"
+                                : uploadedFile.data.folder === "upload_documents"
                                     ? Constants.CHAT_DOCUMENT_TYPE.FILE
                                     : Constants.CHAT_DOCUMENT_TYPE.NONE;
 
@@ -5284,7 +5289,7 @@ export const postSendMessageToChat = async (req, res) => {
 
         const findChatQuery = {
             ownerIds: { $in: [ownerId] },
-            // mechanicIds: { $in: [new ObjectId(param.mechanicId)] },
+            mechanicIds: { $in: [new ObjectId(param.mechanicId)] },
             bookingId: new ObjectId(param.bookingId),
         };
 
@@ -5399,7 +5404,17 @@ export const postSendMessageToChat = async (req, res) => {
 
         io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: messagePayload });
 
-        return res.status(200).json(successResponse("Message sent successfully.", { chatId: chat._id, document: document }));
+        const response = {
+            chatId: chat._id,
+            document: document,
+            messages: {
+                createdAt: messagePayload?.createdAt,
+                message: messagePayload?.message,
+                type: messagePayload?.type,
+            },
+        };
+
+        return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {
         log1(["Error in postSendMessageToChat ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
