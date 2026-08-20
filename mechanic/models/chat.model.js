@@ -118,8 +118,11 @@ const chatSchema = new Schema(
     },
 );
 
-chatSchema.index({ ownerIds: 1 });
-chatSchema.index({ mechanicIds: 1 });
+chatSchema.index({
+    bookingId: 1,
+    ownerIds: 1,
+    mechanicIds: 1,
+});
 
 chatSchema.virtual('readableCreatedAt').get(function () {
     return DateInHumanReadableFormat(this.createdAt);

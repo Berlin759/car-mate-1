@@ -1553,6 +1553,58 @@ export const postBookingDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "addresses",
+                    localField: "addressId",
+                    foreignField: "_id",
+                    as: "ownerAddressDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerAddressDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "chats",
+                    let: {
+                        bookingId: "$_id",
+                        ownerId: "$ownerId",
+                        mechanicId: mechanicId,
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$bookingId", "$$bookingId",], },
+                                        { $in: ["$$ownerId", "$ownerIds",], },
+                                        { $in: ["$$mechanicId", "$mechanicIds",], },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                            },
+                        },
+                        {
+                            $limit: 1,
+                        },
+                    ],
+                    as: "chatDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$chatDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     invoiceNo: 1,
                     date: 1,
@@ -1574,6 +1626,7 @@ export const postBookingDetails = async (req, res) => {
                     serviceDetails: 1,
                     ownerDetails: 1,
                     transactionDetails: 1,
+                    chatId: "$chatDetails._id",
                     feedback: {
                         rating: "$ratingDetails.rating",
                         description: "$ratingDetails.description",
@@ -1583,6 +1636,14 @@ export const postBookingDetails = async (req, res) => {
                         fullName: "$carDetails.fullName",
                         vehicleNumber: "$carDetails.vehicleNumber",
                         model: "$carDetails.model",
+                    },
+                    ownerAddressDetails: {
+                        _id: "$ownerAddressDetails._id",
+                        label: "$ownerAddressDetails.label",
+                        address: "$ownerAddressDetails.address",
+                        latitude: "$ownerAddressDetails.latitude",
+                        longitude: "$ownerAddressDetails.longitude",
+                        isDefault: "$ownerAddressDetails.isDefault",
                     },
                 },
             },
@@ -2518,10 +2579,11 @@ export const postSendMessageToChat = async (req, res) => {
             return res.status(400).json(errorResponse("Owner not found."));
         };
 
-        let bookingDetails = null;
-        if (param.bookingId) {
-            bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId) });
-            log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
+        const bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId), status: { $in: [Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.ACCEPTED] } });
+        log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
+
+        if (!bookingDetails) {
+            return res.status(400).json(errorResponse("Chat is not Available for this booking."));
         };
 
         const messagePayload = {
@@ -2554,12 +2616,23 @@ export const postSendMessageToChat = async (req, res) => {
                     return res.status(400).json(uploadedFile);
                 };
 
-                const docType = ({
-                    images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
-                    videos: Constants.CHAT_DOCUMENT_TYPE.VIDEO,
-                    audio: Constants.CHAT_DOCUMENT_TYPE.AUDIO,
-                    documents: Constants.CHAT_DOCUMENT_TYPE.FILE,
-                }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
+                // const docType = ({
+                //     images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
+                //     videos: Constants.CHAT_DOCUMENT_TYPE.VIDEO,
+                //     audio: Constants.CHAT_DOCUMENT_TYPE.AUDIO,
+                //     documents: Constants.CHAT_DOCUMENT_TYPE.FILE,
+                // }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
+
+                const docType =
+                    uploadedFile.data.folder === "images"
+                        ? Constants.CHAT_DOCUMENT_TYPE.PHOTO
+                        : uploadedFile.data.folder === "videos"
+                            ? Constants.CHAT_DOCUMENT_TYPE.VIDEO
+                            : uploadedFile.data.folder === "audio"
+                                ? Constants.CHAT_DOCUMENT_TYPE.AUDIO
+                                : uploadedFile.data.folder === "documents"
+                                    ? Constants.CHAT_DOCUMENT_TYPE.FILE
+                                    : Constants.CHAT_DOCUMENT_TYPE.NONE;
 
                 document.push({
                     url: uploadedFile.data.url,
@@ -2580,11 +2653,8 @@ export const postSendMessageToChat = async (req, res) => {
 
         const findChatQuery = {
             mechanicIds: { $in: [mechanicId] },
-            ownerIds: { $in: [new ObjectId(param.ownerId)] },
-        };
-
-        if (param.bookingId) {
-            findChatQuery.bookingId = new ObjectId(param.bookingId);
+            // ownerIds: { $in: [new ObjectId(param.ownerId)] },
+            bookingId: new ObjectId(param.bookingId),
         };
 
         if (param.chatId) {
@@ -2594,20 +2664,15 @@ export const postSendMessageToChat = async (req, res) => {
         let chat = await Chat.findOne(findChatQuery);
 
         if (!param.chatId && !chat) {
-            const createPayload = {
+            const addChat = await Chat.create({
                 messages: [messagePayload],
                 readMessages: [
                     { byId: mechanicId, lastReadAt: currentTime }
                 ],
                 mechanicIds: [new ObjectId(mechanicId)],
                 ownerIds: [new ObjectId(param.ownerId)],
-            };
-
-            if (param.bookingId) {
-                createPayload.bookingId = new ObjectId(param.bookingId);
-            };
-
-            const addChat = await Chat.create(createPayload);
+                bookingId: new ObjectId(param.bookingId),
+            });
 
             if (!addChat) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -2635,8 +2700,7 @@ export const postSendMessageToChat = async (req, res) => {
             return res.status(200).json(successResponse("Message sent successfully.", { chatId: addChat._id, document: document }));
         };
 
-
-        let readMessages = chat.readMessages || [];
+        let readMessages = chat?.readMessages || [];
         const isRead = readMessages.find((read) => read.byId.toString() === mechanicId.toString());
 
         if (!isRead) {
@@ -2685,7 +2749,7 @@ export const postSendMessageToChat = async (req, res) => {
                     return read;
                 });
             };
-        }
+        };
 
         const updateChatQuery = {
             $push: {
