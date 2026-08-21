@@ -70,6 +70,10 @@ const chatSchema = new Schema(
                             type: Number,
                             default: 0
                         },
+                        duration: {
+                            type: String,
+                            default: ""
+                        },
                         originalName: {
                             type: String,
                             default: ""

@@ -396,12 +396,15 @@ export const uploadFile = async (file, isThumbnail = false) => {
         let folder = "others";
         let maxSizeMB = Constants.MAX_FILE_SIZE;
         let thumbnailFolder = "";
+        let fileType = "";
+
         for (const key in typeGroups) {
             const type = typeGroups[key];
             if ((type.pattern.test(ext) || type.pattern.test(mime)) && type.mimes.includes(mime)) {
                 folder = type.folder;
                 thumbnailFolder = type.thumbnailFolder ? type.thumbnailFolder : "";
                 maxSizeMB = type.maxSizeMB;
+                fileType = key;
                 break;
             };
         };
@@ -423,10 +426,26 @@ export const uploadFile = async (file, isThumbnail = false) => {
 
         const fileName = generateFileName(file.name);
         const finalPath = path.join(uploadDir, fileName);
+
         await file.mv(finalPath);
 
         const publicUrl = `/${folder}/${fileName}`;
 
+        // GET AUDIO / VIDEO DURATION
+        let duration = 0;
+        let durationFormatted = "";
+        if (fileType === "audio" || fileType === "videos") {
+            try {
+                duration = await getMediaDuration(finalPath);
+
+                durationFormatted = formatDuration(duration);
+            } catch (error) {
+                log1(["Error getting media duration ----->", error]);
+                duration = 0;
+            };
+        };
+
+        // GENERATE VIDEO THUMBNAIL
         let thumbnailUrl = "";
         if (thumbnailFolder && isThumbnail) {
             const thumbDir = path.join(rootDir, "uploads", thumbnailFolder);
@@ -458,6 +477,8 @@ export const uploadFile = async (file, isThumbnail = false) => {
             fullPath: finalPath,
             url: publicUrl,
             thumbnailUrl: thumbnailUrl,
+            duration,
+            durationFormatted,
             size: file.size,
             originalName: file.name,
         });
@@ -465,6 +486,43 @@ export const uploadFile = async (file, isThumbnail = false) => {
         log1(["Error in uploadFile ----->", error]);
         return errorResponse(messages.unexpectedDataError);
     };
+};
+
+const getMediaDuration = (filePath) => {
+    return new Promise((resolve, reject) => {
+
+        ffmpeg.ffprobe(filePath, (error, metadata) => {
+
+            if (error) {
+                return reject(error);
+            };
+
+            const duration = metadata?.format?.duration || 0;
+
+            resolve(duration);
+        });
+    });
+};
+
+const formatDuration = (duration) => {
+    const totalSeconds = Math.floor(duration);
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return [
+            String(hours).padStart(2, "0"),
+            String(minutes).padStart(2, "0"),
+            String(seconds).padStart(2, "0"),
+        ].join(":");
+    };
+
+    return [
+        String(minutes).padStart(2, "0"),
+        String(seconds).padStart(2, "0"),
+    ].join(":");
 };
 
 /**

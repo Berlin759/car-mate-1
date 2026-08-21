@@ -5275,7 +5275,8 @@ export const postSendMessageToChat = async (req, res) => {
                     thumbnailUrl: uploadedFile.data.thumbnailUrl,
                     type: docType,
                     size: uploadedFile.data.size,
-                    originalName: uploadedFile.data.originalName
+                    originalName: uploadedFile.data.originalName,
+                    duration: uploadedFile.data.durationFormatted,
                 });
             };
 
@@ -5333,7 +5334,17 @@ export const postSendMessageToChat = async (req, res) => {
 
             io.to(addChat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: addChat._id, message: messagePayload });
 
-            return res.status(200).json(successResponse("Message sent successfully.", { chatId: addChat._id, document: document }));
+            const response = {
+                chatId: addChat._id,
+                document: document,
+                messages: {
+                    createdAt: messagePayload?.createdAt,
+                    message: messagePayload?.message,
+                    type: messagePayload?.type,
+                },
+            };
+
+            return res.status(200).json(successResponse("Message sent successfully.", response));
         };
 
         let readMessages = chat?.readMessages || [];
