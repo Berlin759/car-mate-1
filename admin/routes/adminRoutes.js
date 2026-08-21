@@ -256,12 +256,12 @@ adminRouter.post("/toggle-template-status", authMiddleware, postToggleTemplateSt
 adminRouter.post("/seed-default-templates", authMiddleware, postSeedDefaultTemplates);
 
 // Language Management
-adminRouter.get("/languages", authMiddleware, getLanguagePage);
-adminRouter.post("/add-language", authMiddleware, postAddLanguage);
-adminRouter.post("/language-list", authMiddleware, postLanguageList);
-adminRouter.post("/language-details", authMiddleware, postLanguageDetails);
-adminRouter.post("/update-language", authMiddleware, postUpdateLanguage);
-adminRouter.post("/delete-language", authMiddleware, postDeleteLanguage);
-adminRouter.post("/toggle-language-status", authMiddleware, postToggleLanguageStatus);
+// adminRouter.get("/languages", authMiddleware, getLanguagePage);
+// adminRouter.post("/add-language", authMiddleware, postAddLanguage);
+// adminRouter.post("/language-list", authMiddleware, postLanguageList);
+// adminRouter.post("/language-details", authMiddleware, postLanguageDetails);
+// adminRouter.post("/update-language", authMiddleware, postUpdateLanguage);
+// adminRouter.post("/delete-language", authMiddleware, postDeleteLanguage);
+// adminRouter.post("/toggle-language-status", authMiddleware, postToggleLanguageStatus);
 
 export default adminRouter;
