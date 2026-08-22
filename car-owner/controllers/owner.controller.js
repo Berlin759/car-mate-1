@@ -1476,7 +1476,7 @@ export const postDeleteCar = async (req, res) => {
         });
 
         if (bookingList && bookingList.length > 0) {
-            return res.status(400).json(errorResponse("You are not delete this car because this car service booking alread added."));
+            return res.status(400).json(errorResponse("This vehicle cannot be deleted because it has an active service booking."));
         };
 
         await Car.findByIdAndDelete(carId);
