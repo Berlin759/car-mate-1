@@ -13,7 +13,7 @@ export const sendSmsOtp = async (phoneNumber, otp) => {
     try {
         log1(["sendSmsOtp phoneNumber----->", phoneNumber]);
 
-        if (otp === "123456") {
+        if (process.env.APP_ENV === "local") {
             return { success: true, sid: "" };
         };
 

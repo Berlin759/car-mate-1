@@ -25,7 +25,7 @@ export const sendWhatsAppOtp = async (phoneNumber, otp) => {
     try {
         log1(["sendWhatsAppOtp phoneNumber----->", phoneNumber]);
 
-        if (otp === "123456") {
+        if (process.env.APP_ENV === "local") {
             return { success: true, data: {} };
         };
 

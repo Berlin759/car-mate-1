@@ -1463,6 +1463,22 @@ export const postDeleteCar = async (req, res) => {
             return res.status(400).json(errorResponse("Car not found."));
         };
 
+        const statusesToCheck = [
+            Constants.BOOKING_STATUS.ACCEPTED,
+            Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+            Constants.BOOKING_STATUS.ARRIVED,
+            Constants.BOOKING_STATUS.SERVICE_STARTED,
+        ];
+
+        const bookingList = await Booking.find({
+            carId: new ObjectId(carId),
+            status: { $in: statusesToCheck },
+        });
+
+        if (bookingList && bookingList.length > 0) {
+            return res.status(400).json(errorResponse("You are not delete this car because this car service booking alread added."));
+        };
+
         await Car.findByIdAndDelete(carId);
 
         return res.status(200).json(successResponse("Car deleted successfully."));
@@ -2191,6 +2207,7 @@ export const postMechanicDetails = async (req, res) => {
 
         const couponDetails = {
             code: coupon?.code || "",
+            discountType: coupon?.discountType || Constants.DISCOUNT_TYPE.PERCENTAGE,
             discountValue: coupon?.discountValue || 0,
         };
 
