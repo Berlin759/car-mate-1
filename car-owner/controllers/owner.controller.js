@@ -2253,11 +2253,23 @@ export const postAddAddress = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        if (isDefault === true || isDefault === "true") {
+        const isDefaultAddress = isDefault === true || isDefault === "true";
+        let setDefaultAddress = isDefaultAddress;
+
+        if (isDefaultAddress) {
             await Address.updateMany(
                 { ownerId: new ObjectId(ownerId), isDefault: true },
                 { $set: { isDefault: false } }
             );
+        } else {
+            const existingDefaultAddress = await Address.exists({
+                ownerId: new ObjectId(ownerId),
+                isDefault: true,
+            });
+
+            if (!existingDefaultAddress) {
+                setDefaultAddress = true;
+            };
         };
 
         let payload = {
@@ -2266,7 +2278,7 @@ export const postAddAddress = async (req, res) => {
             address: address,
             latitude: latitude,
             longitude: longitude,
-            isDefault: isDefault === true || isDefault === "true",
+            isDefault: setDefaultAddress,
         };
 
         const newAddress = await Address.create(payload);
