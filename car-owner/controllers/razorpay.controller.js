@@ -194,7 +194,7 @@ export const razorpayRefund = async (payload) => {
 
         return successResponse("Refund processed successfully.", response);
     } catch (error) {
-        log1(["razorpayRefund Error----->", error.message]);
+        log1(["razorpayRefund Error----->", error]);
         return errorResponse(messages.unexpectedDataError);
     };
 };

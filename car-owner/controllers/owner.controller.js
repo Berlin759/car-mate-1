@@ -3836,14 +3836,14 @@ export const postCancelBooking = async (req, res) => {
         };
 
         let cancellationFee = 0;
-        let refundAmount = parseFloat(bookingDetails.finalPayAmount || bookingDetails.totalAmount);
+        let refundAmount = parseFloat(bookingDetails.totalAmount);
 
         if (bookingDetails.status >= Constants.BOOKING_STATUS.ACCEPTED) {
             cancellationFee = Math.round(refundAmount * 0.10);
             refundAmount = refundAmount - cancellationFee;
         };
 
-        const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id }).sort({ createdAt: 1 });
+        const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id });
 
         if (transactionDetails && transactionDetails.trxId) {
             let refundPayload = {
@@ -3863,7 +3863,9 @@ export const postCancelBooking = async (req, res) => {
             let transactionPayload = {
                 trxId: refundPayment.refundId,
                 ownerId: new ObjectId(bookingDetails?.ownerId),
+                mechanicId: new ObjectId(bookingDetails?.mechanicId),
                 serviceId: new ObjectId(bookingDetails.serviceId),
+                carId: new ObjectId(bookingDetails.carId),
                 bookingId: bookingDetails._id,
                 totalAmount: refundAmount,
                 description: "Refund For Cancelled Booking",
