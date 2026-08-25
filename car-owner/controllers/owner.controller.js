@@ -27,6 +27,7 @@ import { createOrder, razorpayRefund, verifySignature } from "./razorpay.control
 import { io } from "../index.js";
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
+import ChatMessage from "../models/chatMessage.model.js";
 import OTP from "../models/otp.model.js";
 import Booking from "../models/booking.model.js";
 import Transaction from "../models/transaction.model.js";
@@ -638,6 +639,7 @@ export const postHomeDetails = async (req, res) => {
     try {
         const ownerId = req.ownerId;
         let param = req.body;
+
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails ownerId----->", ownerId]);
 
@@ -656,138 +658,197 @@ export const postHomeDetails = async (req, res) => {
             });
 
             if (
-                param["latitude"] !== undefined && param["latitude"] !== null && param["latitude"] !== "" &&
-                param["longitude"] !== undefined && param["longitude"] !== null && param["longitude"] !== ""
+                param.latitude !== undefined && param.latitude !== null && param.latitude !== "" &&
+                param.longitude !== undefined && param.longitude !== null && param.longitude !== ""
             ) {
-                updatePayload["location"] = {
+                updatePayload.location = {
                     type: "Point",
                     coordinates: [
-                        param["longitude"],
-                        param["latitude"]
-                    ]
+                        Number(param.longitude),
+                        Number(param.latitude),
+                    ],
                 };
             };
 
             log1(["postHomeDetails updatePayload------>", updatePayload]);
 
             if (Object.keys(updatePayload).length > 0) {
-                let updateOwner = await Owner.findByIdAndUpdate(ownerId, updatePayload, { new: true });
+                let updateOwner = await Owner.findByIdAndUpdate(
+                    ownerId,
+                    {
+                        $set: updatePayload,
+                    },
+                    { new: true },
+                );
                 if (!updateOwner) {
                     return res.status(400).json(errorResponse(messages.unexpectedDataError));
                 };
             };
 
-            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model");
-        }
+            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model").lean();
+        };
 
         const serviceCategories = await Service.find({ status: Constants.SERVICE_STATUS.ACTIVE })
             .select("_id fullName description image")
             .lean();
 
-        let nearbyLatitude = param.latitude || null;
-        let nearbyLongitude = param.longitude || null;
+        const nearbyLatitude =
+            param.latitude !== undefined &&
+                param.latitude !== null &&
+                param.latitude !== ""
+                ? Number(param.latitude)
+                : null;
 
-        let popularNearbyServices = [];
+        const nearbyLongitude =
+            param.longitude !== undefined &&
+                param.longitude !== null &&
+                param.longitude !== ""
+                ? Number(param.longitude)
+                : null;
 
-        if (nearbyLatitude && nearbyLongitude) {
-            const lat = parseFloat(nearbyLatitude);
-            const lng = parseFloat(nearbyLongitude);
-            const radiusInMeters = (parseFloat(param.radius) || 10) * 1000;
+        let popularNearbyMechanics = [];
 
-            const nearbyMechanics = await Mechanic.find({
-                status: Constants.MECHANIC_STATUS.ACTIVE,
-                "location": {
-                    $near: {
-                        $geometry: {
+        if (
+            nearbyLatitude !== null &&
+            nearbyLongitude !== null &&
+            !Number.isNaN(nearbyLatitude) &&
+            !Number.isNaN(nearbyLongitude)
+        ) {
+            const radiusInKm = Number(param.radius) || 10;
+            const radiusInMeters = radiusInKm * 1000;
+
+            const nearbyMechanics = await Mechanic.aggregate([
+                {
+                    $geoNear: {
+                        near: {
                             type: "Point",
-                            coordinates: [lng, lat],
+                            coordinates: [nearbyLongitude, nearbyLatitude,],
                         },
-                        $maxDistance: radiusInMeters,
+                        distanceField: "distanceInMeters",
+                        maxDistance: radiusInMeters,
+                        spherical: true,
+                        query: {
+                            status: Constants.MECHANIC_STATUS.ACTIVE,
+                        },
                     },
                 },
-            }).select("_id serviceIds").lean();
+                { $limit: 5 },
+                {
+                    $project: {
+                        _id: 1,
+                        fullName: 1,
+                        email: 1,
+                        phoneNumber: 1,
+                        profileImage: 1,
+                        address: 1,
+                        distanceInMeters: 1
+                    },
+                },
+            ]);
 
             log1(["postHomeDetails nearbyMechanics count----->", nearbyMechanics.length]);
 
             if (nearbyMechanics.length > 0) {
-                const mechanicIds = nearbyMechanics.map(m => m._id);
+                const mechanicIds = nearbyMechanics.map(mechanic => mechanic._id);
 
-                const nearbyServices = await Service.find({
-                    status: Constants.SERVICE_STATUS.ACTIVE,
-                    "subCategory.mechanicIds.mechanicId": { $in: mechanicIds },
-                })
-                    .populate("subCategory.mechanicIds.mechanicId", "fullName email profileImage latitude longitude address")
-                    .lean();
+                const ratingData = await Rating.aggregate([
+                    {
+                        $match: {
+                            mechanicId: { $in: mechanicIds },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: "$mechanicId",
+                            totalReviews: { $sum: 1 },
+                            averageRating: { $avg: "$rating" }
+                        },
+                    },
+                ]);
 
-                const allNearbyServices = [];
-                nearbyServices.forEach(service => {
-                    (service.subCategory || []).forEach(sub => {
-                        const nearbyMechs = (sub.mechanicIds || []).filter(
-                            m => m.mechanicId && mechanicIds.some(id => id.equals(m.mechanicId._id || m.mechanicId))
-                        );
+                const ratingMap = new Map();
 
-                        if (nearbyMechs.length > 0) {
-                            const mechanicDetails = nearbyMechs[0]?.mechanicId;
-
-                            let distanceInMinutes = 0;
-
-                            if (mechanicDetails.latitude && mechanicDetails.longitude) {
-                                const mLat = parseFloat(mechanicDetails.latitude) || 0;
-                                const mLng = parseFloat(mechanicDetails.longitude) || 0;
-                                const R = 6371;
-                                const dLat = ((mLat - lat) * Math.PI) / 180;
-                                const dLng = ((mLng - lng) * Math.PI) / 180;
-                                const a =
-                                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                                    Math.cos((lat * Math.PI) / 180) *
-                                    Math.cos((mLat * Math.PI) / 180) *
-                                    Math.sin(dLng / 2) *
-                                    Math.sin(dLng / 2);
-                                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                                const distance = R * c;
-                                const avgSpeedKmph = 30;
-                                distanceInMinutes = Math.round((distance / avgSpeedKmph) * 60);
-                            };
-
-                            allNearbyServices.push({
-                                serviceId: service._id,
-                                mechanicId: mechanicDetails?._id || "",
-                                mechanicProfileImage: mechanicDetails?.profileImage || "",
-                                categoryName: sub.fullname,
-                                price: nearbyMechs[0]?.price || 0,
-                                distanceInMinutes: distanceInMinutes || 0,
-                            });
-                        }
-                    });
+                ratingData.forEach((item) => {
+                    ratingMap.set(
+                        item._id.toString(),
+                        {
+                            totalReviews: item.totalReviews,
+                            averageRating: Math.round(item.averageRating * 10) / 10
+                        },
+                    );
                 });
 
-                // Sort by distance ascending (closest first)
-                allNearbyServices.sort((a, b) => a.distanceInMinutes - b.distanceInMinutes);
+                const services = await Service.find({
+                    status: Constants.SERVICE_STATUS.ACTIVE,
+                    "subCategory.mechanicIds.mechanicId": { $in: mechanicIds },
+                }).select("_id fullName description image subCategory").lean();
 
-                // Filter for unique mechanics and limit to 5
-                popularNearbyServices = [];
-                const seenMechanics = new Set();
-                for (const item of allNearbyServices) {
-                    const mechanicIdStr = item.mechanicId?.toString();
-                    if (mechanicIdStr && !seenMechanics.has(mechanicIdStr)) {
-                        seenMechanics.add(mechanicIdStr);
-                        popularNearbyServices.push(item);
-                        if (popularNearbyServices.length >= 5) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+                const mechanicServiceMap = new Map();
+
+                mechanicIds.forEach((id) => {
+                    mechanicServiceMap.set(id.toString(), []);
+                });
+
+                for (const service of services) {
+                    for (const subCategory of service.subCategory || []) {
+                        for (const mechanicInfo of subCategory.mechanicIds || []) {
+                            const mechanicId = mechanicInfo.mechanicId?.toString();
+
+                            if (mechanicId && mechanicServiceMap.has(mechanicId)) {
+                                mechanicServiceMap.get(mechanicId).push({
+                                    serviceId: service._id.toString(),
+                                    serviceName: service.fullName || "",
+                                    serviceDescription: service.description || "",
+                                    serviceImage: service.image || "",
+                                    subCategoryId: subCategory._id?.toString() || "",
+                                    subCategoryName: subCategory.fullname || "",
+                                    price: mechanicInfo.price || 0
+                                });
+                            };
+                        };
+                    };
+                };
+
+                popularNearbyMechanics = nearbyMechanics.map(
+                    (mechanic) => {
+                        const mechanicId = mechanic._id.toString();
+                        const rating = ratingMap.get(mechanicId) || { totalReviews: 0, averageRating: 0 };
+                        const services = mechanicServiceMap.get(mechanicId) || [];
+                        const distanceInKm = Math.round((mechanic.distanceInMeters / 1000) * 10) / 10;
+                        const averageSpeedKmph = 30;
+                        const distanceInMinutes = Math.max(1, Math.round((distanceInKm / averageSpeedKmph) * 60));
+
+                        return {
+                            mechanicId,
+                            mechanicDetails: {
+                                _id: mechanic._id || "",
+                                fullName: mechanic.fullName || "",
+                                phoneNumber: mechanic.phoneNumber || "",
+                                profileImage: mechanic.profileImage || "",
+                                address: mechanic.address || ""
+                            },
+                            rating: rating.averageRating,
+                            totalReviews: rating.totalReviews,
+                            distanceInKm,
+                            distanceInMinutes,
+                            totalServices: services.length,
+                            services,
+                        };
+                    },
+                );
+            };
+        };
+
+        const locationObject = {
+            latitude: nearbyLatitude,
+            longitude: nearbyLongitude
+        };
 
         return res.status(200).json(successResponse("Home details success", {
             carList: carList,
             serviceCategories: serviceCategories,
-            popularNearbyServices: popularNearbyServices,
-            location: nearbyLatitude && nearbyLongitude ? {
-                latitude: nearbyLatitude,
-                longitude: nearbyLongitude,
-            } : null,
+            popularNearbyMechanics: popularNearbyMechanics,
+            location: nearbyLatitude !== null && nearbyLongitude !== null ? locationObject : null,
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
@@ -812,6 +873,7 @@ export const postSearchMechanics = async (req, res) => {
             serviceType,
             minPrice,
             maxPrice,
+            guestId,
         } = req.body;
 
         const validate = await custom_validation(req.body, "owner.search_mechanic");
@@ -831,6 +893,21 @@ export const postSearchMechanics = async (req, res) => {
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
+
+        let ownerObjectId = null;
+        let chatGuestId = null;
+
+        if (ownerId) {
+            if (!ObjectId.isValid(ownerId)) {
+                return res.status(400).json(errorResponse("Invalid ownerId."));
+            };
+
+            ownerObjectId = new ObjectId(ownerId);
+        } else if (guestId) {
+            chatGuestId = String(guestId);
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
 
         const hasSearchOrFilters =
             (search !== undefined && search !== null && String(search).trim() !== "") ||
@@ -923,6 +1000,39 @@ export const postSearchMechanics = async (req, res) => {
             geoNearStage,
             {
                 $match: mechanicMatchStage,
+            },
+            {
+                $lookup: {
+                    from: "chats",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$mechanicId", "$$mechanicId"], },
+                                        ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
+                                        ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                updatedAt: -1,
+                            },
+                        },
+                        { $limit: 1, },
+                        {
+                            $project: {
+                                _id: 1,
+                            },
+                        },
+                    ],
+                    as: "chatData",
+                },
             },
             {
                 $lookup: {
@@ -1118,6 +1228,20 @@ export const postSearchMechanics = async (req, res) => {
                                 longitude: 1,
                                 address: 1,
                                 consultantFee: 1,
+                                chatId: {
+                                    $let: {
+                                        vars: {
+                                            chat: { $arrayElemAt: ["$chatData", 0], },
+                                        },
+                                        in: {
+                                            $cond: [
+                                                { $ifNull: ["$$chat._id", false,], },
+                                                { $toString: "$$chat._id", },
+                                                null,
+                                            ],
+                                        },
+                                    },
+                                },
                                 distance: {
                                     $round: ["$distance", 2,],
                                 },
@@ -1780,9 +1904,10 @@ export const postServiceHistory = async (req, res) => {
 
 export const postNearbyMechanics = async (req, res) => {
     try {
-        const param = req.body;
+        const ownerId = req.ownerId;
 
-        log1(["postNearbyMechanics param----->", param]);
+        log1(["postNearbyMechanics ownerId----->", ownerId]);
+        log1(["postNearbyMechanics req.body----->", req.body]);
 
         const {
             currentPage = Constants.DEFAULT_PAGE,
@@ -1791,11 +1916,27 @@ export const postNearbyMechanics = async (req, res) => {
             longitude,
             radius,
             serviceId,
-        } = param;
+            guestId,
+        } = req.body;
 
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
+
+        let ownerObjectId = null;
+        let chatGuestId = null;
+
+        if (ownerId) {
+            if (!ObjectId.isValid(ownerId)) {
+                return res.status(400).json(errorResponse("Invalid ownerId."));
+            };
+
+            ownerObjectId = new ObjectId(ownerId);
+        } else if (guestId) {
+            chatGuestId = String(guestId);
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
 
         if (
             latitude === undefined ||
@@ -1822,12 +1963,13 @@ export const postNearbyMechanics = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid latitude or longitude."));
         };
 
-        const defaultRadius = radius !== undefined && radius !== null && radius !== "" ? parseFloat(radius) : Constants.DEFAULT_RADIUS;
-        if (Number.isNaN(defaultRadius) || defaultRadius <= 0) {
+        const parsedRadius = radius !== undefined && radius !== null && radius !== "" ? Number(radius) : Constants.DEFAULT_RADIUS;
+        if (Number.isNaN(parsedRadius) || parsedRadius <= 0) {
             return res.status(400).json(errorResponse("Invalid radius."));
         };
 
-        const radiusInMeters = defaultRadius * 1000;
+        const finalRadiusKm = Math.min(parsedRadius, Constants.MAX_RADIUS_KM);
+        const radiusInMeters = finalRadiusKm * 1000;
 
         const geoNearStage = {
             $geoNear: {
@@ -1859,6 +2001,39 @@ export const postNearbyMechanics = async (req, res) => {
             geoNearStage,
             {
                 $match: matchStage,
+            },
+            {
+                $lookup: {
+                    from: "chats",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$mechanicId", "$$mechanicId"], },
+                                        ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
+                                        ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                updatedAt: -1,
+                            },
+                        },
+                        { $limit: 1, },
+                        {
+                            $project: {
+                                _id: 1,
+                            },
+                        },
+                    ],
+                    as: "chatData",
+                },
             },
             {
                 $lookup: {
@@ -2051,13 +2226,26 @@ export const postNearbyMechanics = async (req, res) => {
                             $project: {
                                 _id: 1,
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
                                 longitude: 1,
-                                address: 1,
+                                address: { $ifNull: ["$address", ""], },
                                 consultantFee: 1,
+                                chatId: {
+                                    $let: {
+                                        vars: {
+                                            chat: { $arrayElemAt: ["$chatData", 0], },
+                                        },
+                                        in: {
+                                            $cond: [
+                                                { $ifNull: ["$$chat._id", false,], },
+                                                { $toString: "$$chat._id", },
+                                                null,
+                                            ],
+                                        },
+                                    },
+                                },
                                 distance: {
                                     $round: ["$distance", 2,],
                                 },
@@ -2093,6 +2281,360 @@ export const postNearbyMechanics = async (req, res) => {
         return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", mechanicResponse));
     } catch (error) {
         log1(["Error in postNearbyMechanics ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postPopularNearbyMechanics = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postPopularNearbyMechanics ownerId----->", ownerId]);
+        log1(["postPopularNearbyMechanics req.body----->", req.body]);
+
+        const validate = await custom_validation(req.body, "owner.search_mechanic");
+        if (validate.flag === 0) {
+            return res.status(400).json(validate);
+        };
+
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            latitude,
+            longitude,
+            radius,
+            serviceId,
+            guestId,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let ownerObjectId = null;
+        let chatGuestId = null;
+
+        if (ownerId) {
+            if (!ObjectId.isValid(ownerId)) {
+                return res.status(400).json(errorResponse("Invalid ownerId."));
+            };
+
+            ownerObjectId = new ObjectId(ownerId);
+        } else if (guestId) {
+            chatGuestId = String(guestId);
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+
+        if (Number.isNaN(lat) || Number.isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
+        };
+
+        const parsedRadius = radius !== undefined && radius !== null && radius !== "" ? Number(radius) : Constants.DEFAULT_RADIUS;
+        if (Number.isNaN(parsedRadius) || parsedRadius <= 0) {
+            return res.status(400).json(errorResponse("Invalid radius."));
+        };
+
+        const finalRadiusKm = Math.min(parsedRadius, Constants.MAX_RADIUS_KM);
+        const radiusInMeters = finalRadiusKm * 1000;
+
+        let serviceObjectId = null;
+        if (serviceId !== undefined && serviceId !== null && serviceId !== "") {
+            if (!ObjectId.isValid(serviceId)) {
+                return res.status(400).json(errorResponse("Invalid serviceId."));
+            };
+
+            serviceObjectId = new ObjectId(serviceId);
+        };
+
+        const pipeline = [
+            {
+                $geoNear: {
+                    near: {
+                        type: "Point",
+                        coordinates: [lng, lat],
+                    },
+                    key: "location",
+                    distanceField: "distanceInMeters",
+                    maxDistance: radiusInMeters,
+                    spherical: true,
+                    query: {
+                        status: Constants.MECHANIC_STATUS.ACTIVE,
+                    },
+                },
+            },
+        ];
+
+        if (serviceObjectId) {
+            pipeline.push({
+                $lookup: {
+                    from: "services",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                _id: serviceObjectId,
+                                status: Constants.SERVICE_STATUS.ACTIVE,
+                            },
+                        },
+                        {
+                            $unwind: "$subCategory",
+                        },
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: [
+                                        "$$mechanicId",
+                                        {
+                                            $map: {
+                                                input: "$subCategory.mechanicIds",
+                                                as: "mechanic",
+                                                in: "$$mechanic.mechanicId",
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        { $limit: 1, },
+                    ],
+                    as: "matchedService",
+                },
+            });
+
+            pipeline.push({
+                $match: {
+                    "matchedService.0": { $exists: true, },
+                },
+            });
+        };
+
+        pipeline.push({
+            $facet: {
+                metadata: [{ $count: "totalRecords", },],
+                data: [
+                    { $skip: skip, },
+                    { $limit: limit, },
+                    {
+                        $lookup: {
+                            from: "chats",
+                            let: {
+                                mechanicId: "$_id",
+                            },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $and: [
+                                                { $eq: ["$mechanicId", "$$mechanicId"], },
+                                                ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
+                                                ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                            ],
+                                        },
+                                    },
+                                },
+                                {
+                                    $sort: {
+                                        updatedAt: -1,
+                                    },
+                                },
+                                { $limit: 1, },
+                                {
+                                    $project: {
+                                        _id: 1,
+                                    },
+                                },
+                            ],
+                            as: "chatData",
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: "ratings",
+                            let: {
+                                mechanicId: "$_id",
+                            },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: { $eq: ["$mechanicId", "$$mechanicId",], },
+                                    },
+                                },
+                                {
+                                    $group: {
+                                        _id: null,
+                                        totalReviews: { $sum: 1, },
+                                        avgRating: { $avg: "$rating", },
+                                    },
+                                },
+                            ],
+                            as: "ratingData",
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: "services",
+                            let: {
+                                mechanicId: "$_id",
+                            },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        status: Constants.SERVICE_STATUS.ACTIVE,
+                                    },
+                                },
+                                {
+                                    $unwind: {
+                                        path: "$subCategory",
+                                        preserveNullAndEmptyArrays: false,
+                                    },
+                                },
+                                {
+                                    $unwind: {
+                                        path: "$subCategory.mechanicIds",
+                                        preserveNullAndEmptyArrays: false,
+                                    },
+                                },
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $eq: ["$subCategory.mechanicIds.mechanicId", "$$mechanicId",],
+                                        },
+                                    },
+                                },
+                                {
+                                    $project: {
+                                        _id: 0,
+                                        serviceId: { $toString: "$_id", },
+                                        serviceName: "$fullName",
+                                        serviceDescription: "$description",
+                                        serviceImage: "$image",
+                                        subCategoryId: {
+                                            $cond: [
+                                                { $ne: ["$subCategory._id", null,], },
+                                                { $toString: "$subCategory._id", },
+                                                "",
+                                            ],
+                                        },
+                                        subCategoryName: "$subCategory.fullname",
+                                        price: "$subCategory.mechanicIds.price",
+                                    },
+                                },
+                            ],
+                            as: "servicesData",
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            fullName: { $ifNull: ["$fullName", ""], },
+                            phoneNumber: { $ifNull: ["$phoneNumber", ""], },
+                            profileImage: { $ifNull: ["$profileImage", ""], },
+                            address: { $ifNull: ["$address", ""], },
+                            consultantFee: { $ifNull: ["$consultantFee", 0], },
+                            chatId: {
+                                $let: {
+                                    vars: {
+                                        chat: { $arrayElemAt: ["$chatData", 0], },
+                                    },
+                                    in: {
+                                        $cond: [
+                                            { $ifNull: ["$$chat._id", false,], },
+                                            { $toString: "$$chat._id", },
+                                            null,
+                                        ],
+                                    },
+                                },
+                            },
+                            distanceInKm: {
+                                $round: [
+                                    { $divide: ["$distanceInMeters", 1000,], },
+                                    1,
+                                ],
+                            },
+                            distanceInMinutes: {
+                                $round: [
+                                    {
+                                        $multiply: [
+                                            {
+                                                $divide: [
+                                                    { $divide: ["$distanceInMeters", 1000,], },
+                                                    30,
+                                                ],
+                                            },
+                                            60,
+                                        ],
+                                    },
+                                    0,
+                                ],
+                            },
+                            rating: {
+                                $round: [
+                                    {
+                                        $ifNull: [
+                                            { $arrayElemAt: ["$ratingData.avgRating", 0,], },
+                                            0,
+                                        ],
+                                    },
+                                    1,
+                                ],
+                            },
+                            totalReviews: {
+                                $ifNull: [
+                                    { $arrayElemAt: ["$ratingData.totalReviews", 0,], },
+                                    0,
+                                ],
+                            },
+                            totalServices: { $size: "$servicesData", },
+                            services: "$servicesData",
+                        },
+                    },
+                ],
+            },
+        });
+
+        const [aggregationResult = {
+            metadata: [],
+            data: [],
+        }] = await Mechanic.aggregate(pipeline);
+
+        const totalRecords = aggregationResult.metadata?.[0]?.totalRecords || 0;
+        const mechanics = aggregationResult.data || [];
+
+        const popularNearbyMechanics = mechanics.map((mechanic) => ({
+            mechanicId: mechanic._id.toString(),
+            chatId: mechanic.chatId ? mechanic.chatId : null,
+            mechanicDetails: {
+                _id: mechanic._id,
+                fullName: mechanic.fullName,
+                phoneNumber: mechanic.phoneNumber,
+                profileImage: mechanic.profileImage,
+                address: mechanic.address,
+                consultantFee: mechanic.consultantFee,
+            },
+            rating: mechanic.rating || 0,
+            totalReviews: mechanic.totalReviews || 0,
+            distanceInKm: mechanic.distanceInKm || 0,
+            distanceInMinutes: mechanic.distanceInMinutes || 0,
+            totalServices: mechanic.totalServices || 0,
+            services: mechanic.services || [],
+        }));
+
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            item: popularNearbyMechanics,
+        };
+
+        return res.status(200).json(successResponse("Popular nearby mechanics list retrieved successfully.", response));
+    } catch (error) {
+        log1(["Error in postPopularNearbyMechanics ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
@@ -3810,10 +4352,10 @@ export const postRescheduleBooking = async (req, res) => {
 
 export const postCancelBooking = async (req, res) => {
     const ownerId = req.ownerId;
-    const param = req.body;
+    const { bookingId, reason } = req.body;
 
     log1(["postCancelBooking ownerId----->", ownerId]);
-    log1(["postCancelBooking param----->", param]);
+    log1(["postCancelBooking req.body----->", req.body]);
 
     if (ownerLocks.get(ownerId)) {
         log1(["A Booking Cancel is already in progress. Please wait."]);
@@ -3823,12 +4365,12 @@ export const postCancelBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(param, "owner.cancel_booking");
+        const validate = await custom_validation(req.body, "owner.cancel_booking");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
-        let filter = { _id: new ObjectId(param.bookingId) };
+        let filter = { _id: new ObjectId(bookingId) };
 
         const bookingDetails = await Booking.findOne({ ...filter }).populate([
             { path: "ownerId" },
@@ -3890,7 +4432,7 @@ export const postCancelBooking = async (req, res) => {
 
         let updatePayload = {
             cancelById: new ObjectId(ownerId),
-            cancelReason: param.reason,
+            cancelReason: reason,
             cancelTime: new Date(),
             cancellationFee: cancellationFee,
             status: Constants.BOOKING_STATUS.CANCELLED,
@@ -4513,7 +5055,7 @@ export const getVerifyPayment = async (req, res) => {
             razorpay_payment_link_status,
         } = req.query;
 
-        log1(["getVerifyPayment query params----->", req.query]);
+        log1(["getVerifyPayment query req.query----->", req.query]);
 
         let isSuccess = false;
         let invoiceNo = "";
@@ -4756,19 +5298,19 @@ export const postNotificationList = async (req, res) => {
 export const postUpdateNotification = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { allRead, singleRead, notificationId } = req.body;
 
         log1(["postUpdateNotification ownerId----->", ownerId]);
-        log1(["postUpdateNotification param----->", param]);
+        log1(["postUpdateNotification req.body----->", req.body]);
 
-        if (param.allRead === true) {
+        if (allRead === true) {
             await Notification.updateMany({ ownerId: new ObjectId(ownerId), isRead: false }, { isRead: true });
-        } else if (param.singleRead === true) {
-            if (!mongoose.Types.ObjectId.isValid(param.notificationId)) {
+        } else if (singleRead === true) {
+            if (!mongoose.Types.ObjectId.isValid(notificationId)) {
                 return res.status(400).json(errorResponse("Invalid notification id."));
             };
 
-            await Notification.findOneAndUpdate({ _id: new ObjectId(param.notificationId), ownerId: new ObjectId(ownerId) }, { isRead: true });
+            await Notification.findOneAndUpdate({ _id: new ObjectId(notificationId), ownerId: new ObjectId(ownerId) }, { isRead: true });
         };
 
         return res.status(200).json(successResponse("Notification Read Successfully."));
@@ -4979,144 +5521,93 @@ export const postRatingList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { currentPage, itemPerPage, guestId } = req.body;
 
         log1(["postChatList ownerId----->", ownerId]);
-        log1(["postChatList param----->", param]);
+        log1(["postChatList req.body----->", req.body]);
 
-        const limit = parseInt(param.itemPerPage) || 10;
-        const skip = (param.currentPage - 1) * limit || 0;
+        const limit = parseInt(itemPerPage) || 10;
+        const skip = (currentPage - 1) * limit || 0;
 
-        const matchQuery = {
-            ownerIds: { $in: [new ObjectId(ownerId)] },
+        let matchQuery = {};
+        if (ownerId) {
+            matchQuery = { ownerId: new ObjectId(ownerId) };
+        } else if (guestId) {
+            matchQuery = { guestId: guestId };
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        const [result] = await Chat.aggregate([
-            { $match: matchQuery },
-            {
-                $addFields: {
-                    chatMechanicId: {
-                        $arrayElemAt: [
-                            {
-                                $filter: {
-                                    input: "$mechanicIds",
-                                    cond: { $ne: ["$$this", null] }
-                                }
-                            },
-                            0
-                        ]
-                    }
-                }
-            },
-            {
-                $lookup: {
-                    from: "mechanics",
-                    localField: "chatMechanicId",
-                    foreignField: "_id",
-                    as: "chatMechanic",
-                },
-            },
-            { $unwind: "$chatMechanic" },
-            {
-                $lookup: {
-                    from: "bookings",
-                    localField: "bookingId",
-                    foreignField: "_id",
-                    as: "bookingsDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$bookingsDetails",
-                    preserveNullAndEmptyArrays: true,
-                }
-            },
-            ...(param.search && param.search.trim() !== "" ? [{
-                $match: {
-                    $or: [
-                        { "chatMechanic.fullName": { $regex: param.search, $options: "i" } },
-                    ],
-                },
-            }] : []),
-            {
-                $facet: {
-                    metadata: [
-                        { $count: 'totalCount' },
-                    ],
-                    chats: [
-                        {
-                            $project: {
-                                _id: 1,
-                                ownerIds: 1,
-                                mechanicIds: 1,
-                                messages: 1,
-                                readMessages: 1,
-                                chatMechanic: {
-                                    _id: 1,
-                                    fullName: 1,
-                                    profileImage: 1,
-                                    isOnline: 1
-                                },
-                                bookingsDetails: {
-                                    _id: 1,
-                                    status: 1,
-                                },
-                                lastMessage: {
-                                    $cond: [
-                                        { $gt: [{ $size: { $ifNull: ["$messages", []] } }, 0] },
-                                        { $arrayElemAt: ["$messages", -1] },
-                                        null
-                                    ],
-                                },
-                                createdAt: 1,
-                                sortKey: {
-                                    $ifNull: ["$lastMessage.createdAt", "$createdAt"]
-                                },
-                            },
-                        },
-                        {
-                            $sort: { "lastMessage.createdAt": -1 }
-                        },
-                        { $skip: skip },
-                        { $limit: limit },
-                    ],
-                },
-            },
-        ]);
+        const count = await Chat.countDocuments(matchQuery);
+        const chats = await Chat.find(matchQuery)
+            .sort({ lastMessageAt: -1, createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("mechanicId")
+            .populate("bookingId");
 
-        const count = result?.metadata[0]?.totalCount || 0;
-        let chatList = result?.chats || [];
+        let chatList = [];
+        if (chats.length > 0) {
+            chatList = await Promise.all(chats.map(async (chat) => {
+                const myId = ownerId ? ownerId.toString() : guestId;
+                const findReadMessages = chat?.readMessages?.find((read) => read.byId === myId);
 
-        if (chatList.length > 0) {
-            chatList = await Promise.all(chatList.map(async (chat) => {
-                const findReadMessages = chat?.readMessages?.find((read) => read.byId.toString() === ownerId.toString());
+                let unreadMsgCount = 0;
                 if (findReadMessages) {
-                    const unreadMessages = chat?.messages?.filter((message) => message.createdAt > findReadMessages.lastReadAt);
-                    chat.unreadMsgCount = unreadMessages?.length || 0;
+                    unreadMsgCount = await ChatMessage.countDocuments({
+                        chatId: chat._id,
+                        createdAt: { $gt: findReadMessages.lastReadAt }
+                    });
                 } else {
-                    chat.unreadMsgCount = chat?.messages?.length || 0;
+                    unreadMsgCount = await ChatMessage.countDocuments({
+                        chatId: chat._id
+                    });
                 };
 
-                if (chat.lastMessage.byId.toString() === ownerId.toString()) {
-                    const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId.toString() !== ownerId.toString());
-                    if (findReceiverReadMessages) {
-                        chat.lastMessage.isMessageSeen = findReceiverReadMessages.lastReadAt < chat.lastMessage.createdAt ? false : true;
-                    } else {
-                        chat.lastMessage.isMessageSeen = false;
+                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+                let lastMessageObj = null;
+                if (lastMessageDoc) {
+                    lastMessageObj = lastMessageDoc.toObject();
+
+                    if (lastMessageObj.byId === myId) {
+                        const receiverId = chat.mechanicId?._id?.toString();
+                        const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
+                        if (findReceiverReadMessages) {
+                            lastMessageObj.isMessageSeen = findReceiverReadMessages.lastReadAt >= lastMessageObj.createdAt;
+                        } else {
+                            lastMessageObj.isMessageSeen = false;
+                        };
                     };
                 };
 
-                const updatedChat = chat;
-                delete updatedChat.messages;
-
-                return updatedChat;
+                return {
+                    _id: chat._id,
+                    ownerId: chat.ownerId,
+                    guestId: chat.guestId,
+                    ownerIds: chat.ownerId ? [chat.ownerId] : [],
+                    mechanicIds: chat.mechanicId ? [chat.mechanicId._id] : [],
+                    chatMechanic: chat.mechanicId ? {
+                        _id: chat.mechanicId._id,
+                        fullName: chat.mechanicId.fullName,
+                        profileImage: chat.mechanicId.profileImage,
+                        isOnline: chat.mechanicId.isOnline
+                    } : null,
+                    bookingsDetails: chat.bookingId ? {
+                        _id: chat.bookingId._id,
+                        status: chat.bookingId.status
+                    } : null,
+                    unreadMsgCount,
+                    lastMessage: lastMessageObj,
+                    createdAt: chat.createdAt,
+                    updatedAt: chat.updatedAt,
+                };
             }));
         };
 
         const response = {
             chatMessagesList: chatList,
-            page: Number(param.currentPage),
-            limit: Number(param.itemPerPage),
+            page: Number(currentPage),
+            limit: Number(itemPerPage),
             totalRecords: count,
         };
 
@@ -5127,152 +5618,154 @@ export const postChatList = async (req, res) => {
     };
 };
 
-export const postChatMessagesList = async (req, res) => {
+export const postChatMessagesDetails = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { chatId, guestId, currentPage, itemPerPage } = req.body;
 
-        log1(["postChatMessagesList ownerId----->", ownerId]);
-        log1(["postChatMessagesList param----->", param]);
+        log1(["postChatMessagesDetails ownerId----->", ownerId]);
+        log1(["postChatMessagesDetails req.body----->", req.body]);
 
-        const limit = parseInt(param.itemPerPage) || 20;
-        const skip = (param.currentPage - 1) * limit || 0;
+        const limit = parseInt(itemPerPage) || 20;
+        const skip = (currentPage - 1) * limit || 0;
 
-        if (!param.chatId || !mongoose.Types.ObjectId.isValid(param.chatId)) {
+        if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
             return res.status(400).json(errorResponse("Invalid Chat id."));
         };
 
-        const matchQuery = {
-            _id: new ObjectId(param.chatId),
-            ownerIds: { $in: [new ObjectId(ownerId)] },
+        const myId = ownerId ? ownerId.toString() : guestId;
+        if (!myId) {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        const [result] = await Chat.aggregate([
-            { $match: matchQuery },
-            {
-                $facet: {
-                    metadata: [
-                        { $unwind: "$messages" },
-                        { $count: "totalCount" },
-                    ],
-                    chats: [
-                        {
-                            $project: {
-                                _id: 1,
-                                ownerIds: 1,
-                                readMessages: 1,
-                                createdAt: 1,
-                                updatedAt: 1,
-                                messages: {
-                                    $slice: [
-                                        { $sortArray: { input: "$messages", sortBy: { createdAt: -1 } } },
-                                        skip,
-                                        limit,
-                                    ],
-                                },
-                            },
-                        },
-                    ],
-                },
-            },
-        ]);
-
-        const count = result?.metadata[0]?.totalCount || 0;
-        const chats = result?.chats || [];
-
-        if (chats.length > 0) {
-            const chatDetails = chats[0];
-            let readMessages = chatDetails?.readMessages || [];
-            const currentTime = moment().utc().toDate();
-
-            if (readMessages.length && readMessages.find((read) => read.byId.toString() === ownerId.toString())) {
-                readMessages = readMessages.map((read) => {
-                    if (read.byId.toString() === ownerId.toString()) {
-                        read.lastReadAt = currentTime;
-                    };
-                    return read;
-                });
-            } else {
-                readMessages.push({
-                    // by: Constants.CHAT_MESSAGE_BY.OWNER,
-                    byId: new ObjectId(ownerId),
-                    lastReadAt: currentTime,
-                });
-            };
-
-            await Chat.findOneAndUpdate(matchQuery, { readMessages: readMessages }, { new: true });
+        let matchQuery = { _id: new ObjectId(chatId) };
+        if (ownerId) {
+            matchQuery.ownerId = new ObjectId(ownerId);
+        } else {
+            matchQuery.guestId = guestId;
         };
+
+        const chat = await Chat.findOne(matchQuery);
+        if (!chat) {
+            return res.status(404).json(errorResponse("Chat not found."));
+        };
+
+        const count = await ChatMessage.countDocuments({ chatId: chat._id });
+        const messagesList = await ChatMessage.find({ chatId: chat._id })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        let readMessages = chat.readMessages || [];
+        const currentTime = moment().utc().toDate();
+
+        const findIndex = readMessages.findIndex((read) => read.byId === myId);
+        if (findIndex !== -1) {
+            readMessages[findIndex].lastReadAt = currentTime;
+        } else {
+            readMessages.push({
+                byId: myId,
+                lastReadAt: currentTime,
+            });
+        };
+
+        await Chat.findByIdAndUpdate(chat._id, { readMessages });
 
         const response = {
-            chatMessagesList: chats[0]?.messages?.reverse() || [],
-            page: Number(param.currentPage),
-            limit: Number(param.itemPerPage),
+            chatMessagesList: messagesList.reverse(),
+            page: Number(currentPage),
+            limit: Number(itemPerPage),
             totalRecords: count,
         };
 
         return res.status(200).json(successResponse("Chat List Get Successfully.", response));
     } catch (error) {
-        log1(["Error in postChatMessagesList ----->", error]);
+        log1(["Error in postChatMessagesDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
 
-export const postSendMessageToChat = async (req, res) => {
+export const postSendMessage = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const param = req.body;
+        const { mechanicId, bookingId, chatId, message, latitude, longitude, address, guestId } = req.body;
 
-        log1(["postSendMessageToChat ownerId----->", ownerId]);
-        log1(["postSendMessageToChat param----->", param]);
-        log1(["postSendMessageToChat req.files----->", req.files]);
+        log1(["postSendMessage ownerId----->", ownerId]);
+        log1(["postSendMessage req.body----->", req.body]);
+        log1(["postSendMessage req.files----->", req.files]);
 
         const currentTime = moment().utc().toDate();
 
-        const validate = await custom_validation(param, "owner.send_message_to_chat");
+        const validate = await custom_validation(req.body, "owner.send_message_to_chat");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
-        let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
-        let receiverMechanic = await Mechanic.findOne({ _id: new ObjectId(param.mechanicId) });
-
-        if (!ownerData) {
-            log1(["postSendMessageToChat owner ----->", ownerData]);
-            return res.status(400).json(errorResponse("Owner not found."));
+        if (!ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
         };
 
+        let receiverMechanic = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
+        log1(["postSendMessage receiverMechanic ----->", receiverMechanic]);
         if (!receiverMechanic) {
-            log1(["postSendMessageToChat receiverMechanic ----->", receiverMechanic]);
             return res.status(400).json(errorResponse("Mechanic not found."));
         };
 
-        const bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId), status: { $in: [Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.ACCEPTED] } });
-        log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
+        if (!ownerId && !guestId) {
+            return res.status(400).json(errorResponse("Please provide a valid guest ID."));
+        };
 
-        if (!bookingDetails) {
-            return res.status(400).json(errorResponse("Chat is not Available for this booking."));
+        const myId = ownerId ? ownerId.toString() : guestId;
+        if (!myId) {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
+        let ownerName = "";
+        if (ownerId) {
+            let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
+            if (!ownerData) {
+                return res.status(400).json(errorResponse("Owner not found."));
+            };
+
+            ownerName = ownerData.fullName;
+        } else {
+            ownerName = "Guest User";
+        };
+
+        let bookingDetails = null;
+        if (bookingId) {
+            bookingDetails = await Booking.findOne({ _id: new ObjectId(bookingId) });
+            if (!bookingDetails) {
+                return res.status(400).json(errorResponse("Chat is not Available for this booking."));
+            };
         };
 
         const messagePayload = {
-            byId: new ObjectId(ownerId),
+            byId: myId,
             createdAt: currentTime,
         };
 
         let document = [];
         let notificationDescription = "Chat Message";
-        if (param.message && param.message != null && param.message != "") {
-            messagePayload.message = param.message;
-            messagePayload.type = Constants.CHAT_MESSAGE_TYPE.TEXT;
-            notificationDescription = param.message;
-        } else if (param.latitude && param.latitude != null && param.latitude != "" && param.longitude && param.longitude != null && param.longitude != "") {
-            messagePayload.location = {
-                latitude: param.latitude,
-                longitude: param.longitude,
-                address: param?.address ? param.address : ""
-            };
+        let messageText = "";
+        let messageType = Constants.CHAT_MESSAGE_TYPE.TEXT;
 
+        if (message && message != null && message != "") {
+            messagePayload.message = message;
+            messagePayload.type = Constants.CHAT_MESSAGE_TYPE.TEXT;
+            notificationDescription = message;
+            messageText = message;
+            messageType = Constants.CHAT_MESSAGE_TYPE.TEXT;
+        } else if (latitude && latitude != null && latitude != "" && longitude && longitude != null && longitude != "") {
+            messagePayload.location = {
+                latitude: latitude,
+                longitude: longitude,
+                address: address ? address : "",
+            };
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.LOCATION;
-            notificationDescription = ownerData.fullName + " sent location";
+            notificationDescription = ownerName + " sent location";
+            messageText = "Sent a location";
+            messageType = Constants.CHAT_MESSAGE_TYPE.LOCATION;
         } else if (req.files) {
             let allfiles = Array.isArray(req.files["files"]) ? req.files["files"] : [req.files["files"]];
 
@@ -5282,13 +5775,6 @@ export const postSendMessageToChat = async (req, res) => {
                 if (uploadedFile.flag === 0) {
                     return res.status(400).json(uploadedFile);
                 };
-
-                // const docType = ({
-                //     images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
-                //     videos: Constants.CHAT_DOCUMENT_TYPE.VIDEO,
-                //     audio: Constants.CHAT_DOCUMENT_TYPE.AUDIO,
-                //     documents: Constants.CHAT_DOCUMENT_TYPE.FILE,
-                // }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
 
                 const docType =
                     uploadedFile.data.folder === "upload_images"
@@ -5313,89 +5799,107 @@ export const postSendMessageToChat = async (req, res) => {
 
             messagePayload.document = document;
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.DOCUMENT;
-
-            notificationDescription = ownerData.fullName + " sent document";
+            notificationDescription = ownerName + " sent document";
+            messageText = "Sent a document";
+            messageType = Constants.CHAT_MESSAGE_TYPE.DOCUMENT;
         } else {
             return res.status(400).json(errorResponse("Invalid chat message."));
         };
 
-        const findChatQuery = {
-            ownerIds: { $in: [ownerId] },
-            mechanicIds: { $in: [new ObjectId(param.mechanicId)] },
-            bookingId: new ObjectId(param.bookingId),
+        let chat = null;
+        if (chatId) {
+            chat = await Chat.findOne({ _id: new ObjectId(chatId) });
+        } else {
+            const findChatQuery = {
+                mechanicId: new ObjectId(mechanicId),
+                bookingId: bookingId ? new ObjectId(bookingId) : null,
+            };
+            if (ownerId) {
+                findChatQuery.ownerId = new ObjectId(ownerId);
+            } else {
+                findChatQuery.guestId = guestId;
+            };
+            chat = await Chat.findOne(findChatQuery);
         };
 
-        if (param.chatId) {
-            findChatQuery._id = new ObjectId(param.chatId);
-        };
-
-        let chat = await Chat.findOne(findChatQuery);
-
-        if (!param.chatId && !chat) {
-            const addChat = await Chat.create({
-                messages: [messagePayload],
+        if (!chat) {
+            const createPayload = {
+                mechanicId: new ObjectId(mechanicId),
+                bookingId: bookingId ? new ObjectId(bookingId) : null,
+                lastMessage: messageText,
+                lastMessageType: messageType,
+                lastMessageAt: currentTime,
                 readMessages: [
-                    { byId: ownerId, lastReadAt: currentTime }
+                    { byId: myId, lastReadAt: currentTime }
                 ],
-                ownerIds: [new ObjectId(ownerId)],
-                mechanicIds: [new ObjectId(param.mechanicId)],
-                bookingId: new ObjectId(param.bookingId),
-            });
+            };
+            if (ownerId) {
+                createPayload.ownerId = new ObjectId(ownerId);
+            } else {
+                createPayload.guestId = guestId;
+            };
 
-            if (!addChat) {
+            chat = await Chat.create(createPayload);
+            if (!chat) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
             };
-
-            if (
-                receiverMechanic.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                receiverMechanic.deviceToken &&
-                receiverMechanic.deviceToken !== "" &&
-                receiverMechanic.deviceToken !== null &&
-                receiverMechanic.deviceToken !== undefined
-            ) {
-                let notificationObject = {
-                    title: ownerData.fullName,
-                    description: notificationDescription,
-                    mechanicId: receiverMechanic._id,
-                    chatId: addChat._id,
-                    type: Constants.NOTIFICATION_TYPE.CHAT,
-                };
-                await sendPushNotification(receiverMechanic.deviceToken, notificationObject);
-            };
-
-            io.to(addChat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: addChat._id, message: messagePayload });
-
-            const response = {
-                chatId: addChat._id,
-                document: document,
-                messages: {
-                    createdAt: messagePayload?.createdAt,
-                    message: messagePayload?.message,
-                    type: messagePayload?.type,
-                },
-            };
-
-            return res.status(200).json(successResponse("Message sent successfully.", response));
-        };
-
-        let readMessages = chat?.readMessages || [];
-        const isRead = readMessages.find((read) => read.byId.toString() === ownerId.toString());
-
-        if (!isRead) {
-            readMessages.push({
-                byId: new ObjectId(ownerId),
-                lastReadAt: currentTime,
-            });
         } else {
-            readMessages = readMessages.map((read) => {
-                if (read.byId.toString() === ownerId.toString()) {
-                    read.lastReadAt = currentTime;
+            let readMessages = chat.readMessages || [];
+            const isRead = readMessages.find((read) => read.byId === myId);
+
+            if (!isRead) {
+                readMessages.push({
+                    byId: myId,
+                    lastReadAt: currentTime,
+                });
+            } else {
+                readMessages = readMessages.map((read) => {
+                    if (read.byId === myId) {
+                        read.lastReadAt = currentTime;
+                    };
+
+                    return read;
+                });
+            };
+
+            if (chat.mechanicDetailsPageIds.includes(receiverMechanic._id.toString())) {
+                const receiverId = receiverMechanic._id.toString();
+                const isReceiverRead = readMessages.find((read) => read.byId === receiverId);
+                if (!isReceiverRead) {
+                    readMessages.push({
+                        byId: receiverId,
+                        lastReadAt: currentTime,
+                    });
+                } else {
+                    readMessages = readMessages.map((read) => {
+                        if (read.byId === receiverId) {
+                            read.lastReadAt = currentTime;
+                        };
+
+                        return read;
+                    });
                 };
-                return read;
+            };
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: messageText,
+                lastMessageType: messageType,
+                lastMessageAt: currentTime,
+                readMessages,
             });
         };
 
-        if (!chat.mechanicDetailsPageIds.includes(receiverMechanic._id)) {
+        const chatMessage = await ChatMessage.create({
+            chatId: chat._id,
+            byId: myId,
+            message: messagePayload.message || "",
+            document: messagePayload.document || [],
+            location: messagePayload.location,
+            type: messagePayload.type,
+            createdAt: currentTime,
+        });
+
+        if (!chat.mechanicDetailsPageIds.includes(receiverMechanic._id.toString())) {
             if (
                 receiverMechanic.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 receiverMechanic.deviceToken &&
@@ -5404,61 +5908,34 @@ export const postSendMessageToChat = async (req, res) => {
                 receiverMechanic.deviceToken !== undefined
             ) {
                 let notificationObject = {
-                    title: ownerData.fullName,
+                    title: ownerName,
                     description: notificationDescription,
                     mechanicId: receiverMechanic._id,
                     chatId: chat._id,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
+
                 await sendPushNotification(receiverMechanic.deviceToken, notificationObject);
             };
-        } else {
-            const isReceiverRead = readMessages.find((read) => read.byId.toString() === receiverMechanic._id.toString());
-
-            if (!isReceiverRead) {
-                readMessages.push({
-                    byId: new ObjectId(receiverMechanic._id),
-                    lastReadAt: currentTime,
-                });
-            } else {
-                readMessages = readMessages.map((read) => {
-                    if (read.byId.toString() === receiverMechanic._id.toString()) {
-                        read.lastReadAt = currentTime;
-                    };
-                    return read;
-                });
-            };
         };
 
-        const updateChatQuery = {
-            $push: {
-                messages: messagePayload,
-            },
-            readMessages: readMessages,
-        };
-
-        const updatedChat = await Chat.findOneAndUpdate(findChatQuery, updateChatQuery, { new: true });
-        if (!updatedChat) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        messagePayload.sender = { fullName: ownerData.fullName };
-
-        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: messagePayload });
+        const emitPayload = chatMessage.toObject();
+        emitPayload.sender = { fullName: ownerName };
+        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: emitPayload });
 
         const response = {
             chatId: chat._id,
             document: document,
             messages: {
-                createdAt: messagePayload?.createdAt,
-                message: messagePayload?.message,
-                type: messagePayload?.type,
+                createdAt: chatMessage.createdAt,
+                message: chatMessage.message,
+                type: chatMessage.type,
             },
         };
 
         return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {
-        log1(["Error in postSendMessageToChat ----->", error]);
+        log1(["Error in postSendMessage ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

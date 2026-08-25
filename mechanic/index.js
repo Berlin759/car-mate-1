@@ -55,8 +55,10 @@ io.on("connection", async (socket) => {
     socket.mechanicId = mechanicId;
     socket.authToken = authToken;
 
-    io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "online" });
-    await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
+    if (mechanicId && ObjectId.isValid(mechanicId)) {
+        io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "online" });
+        await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
+    };
 
     socket.on(Constants.SOCKET_EVENTS.JOIN_CHAT_ROOM, ({ chatId }) => {
         socket.join(chatId);
@@ -67,34 +69,35 @@ io.on("connection", async (socket) => {
     });
 
     socket.on(Constants.SOCKET_EVENTS.IN_OUT_DETAILS_PAGE, async ({ chatId, mechanicId, isOnDetailsPage }) => {
+        if (!chatId || !mechanicId) return;
+        const mechanicIdStr = mechanicId.toString();
         if (isOnDetailsPage) {
             await Chat.updateOne(
                 { _id: new ObjectId(chatId) },
-                { $addToSet: { mechanicDetailsPageIds: new ObjectId(mechanicId) } }
+                { $addToSet: { mechanicDetailsPageIds: new ObjectId(mechanicIdStr) } }
             );
         } else {
             await Chat.updateOne(
                 { _id: new ObjectId(chatId) },
-                { $pull: { mechanicDetailsPageIds: new ObjectId(mechanicId) } }
+                { $pull: { mechanicDetailsPageIds: new ObjectId(mechanicIdStr) } }
             );
-        }
+        };
     });
 
     socket.on(Constants.SOCKET_EVENTS.IS_READ_MESSAGE, async ({ chatId, mechanicId }) => {
+        if (!chatId || !mechanicId) return;
+        const mechanicIdStr = mechanicId.toString();
         let chatDetails = await Chat.findById(chatId);
+        if (!chatDetails) return;
         let readMessages = chatDetails?.readMessages || [];
         const currentTime = moment().utc().toDate();
 
-        if (readMessages.length && readMessages.find((read) => read.byId.toString() === mechanicId.toString())) {
-            readMessages = readMessages.map((read) => {
-                if (read.byId.toString() === mechanicId.toString()) {
-                    read.lastReadAt = currentTime;
-                };
-                return read;
-            });
+        const findIndex = readMessages.findIndex((read) => read.byId === mechanicIdStr);
+        if (findIndex !== -1) {
+            readMessages[findIndex].lastReadAt = currentTime;
         } else {
             readMessages.push({
-                byId: new ObjectId(mechanicId),
+                byId: mechanicIdStr,
                 lastReadAt: currentTime,
             });
         };
@@ -103,11 +106,13 @@ io.on("connection", async (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        let mechanicDetails = await Mechanic.findById(socket.mechanicId).select("loginToken");
-        if (mechanicDetails && mechanicDetails.loginToken === socket.authToken) {
-            io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "offline" });
-            await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
-        }
+        if (socket.mechanicId && ObjectId.isValid(socket.mechanicId)) {
+            let mechanicDetails = await Mechanic.findById(socket.mechanicId).select("loginToken");
+            if (mechanicDetails && mechanicDetails.loginToken === socket.authToken) {
+                io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "offline" });
+                await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
+            };
+        };
     });
 });
 

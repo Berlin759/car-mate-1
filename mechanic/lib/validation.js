@@ -44,8 +44,6 @@ const validate_rules = {
             longitude: "required",
         },
         send_message_to_chat: {
-            ownerId: "required",
-            bookingId: "required",
         },
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",

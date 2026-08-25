@@ -42,8 +42,14 @@ export const postLogin = async (req, res) => {
         const mechanic = await Mechanic.findOne({ phoneNumber: phone_number });
         log1(["PostLogin mechanic ----->", mechanic]);
 
+        const token = await generateRandomToken();
+        const currentTime = moment().utc().valueOf();
+        const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
+
         if (mechanic) {
             if (mechanic.status === Constants.MECHANIC_STATUS.PENDING) {
+                await OTP.findOneAndUpdate({ phoneNumber: phone_number }, { expireAt: expire_at, }, { new: true });
+
                 return res.status(400).json(errorResponse("Your account is not verify, Please complete the verification process.", { phoneNumber: phone_number, is_verify: false }));
             } else if (mechanic.status === Constants.MECHANIC_STATUS.SUSPENDED) {
                 return res.status(400).json(errorResponse("Your account has been suspended. Please contact support."));
@@ -53,9 +59,6 @@ export const postLogin = async (req, res) => {
         await OTP.deleteMany({ phoneNumber: phone_number });
 
         const otp = await generateOtp();
-        const token = await generateRandomToken();
-        const currentTime = moment().utc().valueOf();
-        const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
 
         const otpPayload = {
             phoneNumber: phone_number,

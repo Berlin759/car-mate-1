@@ -26,6 +26,7 @@ import { io } from "../index.js";
 import Mechanic from "../models/mechanic.model.js";
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
+import ChatMessage from "../models/chatMessage.model.js";
 import OTP from "../models/otp.model.js";
 import Booking from "../models/booking.model.js";
 import Transaction from "../models/transaction.model.js";
@@ -2327,128 +2328,83 @@ export const postChatList = async (req, res) => {
         const skip = (param.currentPage - 1) * limit || 0;
 
         const matchQuery = {
-            mechanicIds: { $in: [new ObjectId(mechanicId)] },
+            mechanicId: new ObjectId(mechanicId),
         };
 
-        const [result] = await Chat.aggregate([
-            { $match: matchQuery },
-            {
-                $addFields: {
-                    chatOwnerId: {
-                        $arrayElemAt: [
-                            {
-                                $filter: {
-                                    input: "$ownerIds",
-                                    cond: { $ne: ["$$this", null] }
-                                }
-                            },
-                            0
-                        ]
-                    }
-                }
-            },
-            {
-                $lookup: {
-                    from: "owners",
-                    localField: "chatOwnerId",
-                    foreignField: "_id",
-                    as: "chatOwner"
-                }
-            },
-            { $unwind: "$chatOwner" },
-            {
-                $lookup: {
-                    from: "bookings",
-                    localField: "bookingId",
-                    foreignField: "_id",
-                    as: "bookingsDetails"
-                }
-            },
-            {
-                $unwind: {
-                    path: "$bookingsDetails",
-                    preserveNullAndEmptyArrays: true,
-                }
-            },
-            ...(param.search && param.search.trim() !== "" ? [{
-                $match: {
-                    $or: [
-                        { "chatOwner.fullName": { $regex: param.search, $options: "i" } },
-                    ],
-                },
-            }] : []),
-            {
-                $facet: {
-                    metadata: [
-                        { $count: 'totalCount' },
-                    ],
-                    chats: [
-                        {
-                            $project: {
-                                _id: 1,
-                                mechanicIds: 1,
-                                ownerIds: 1,
-                                messages: 1,
-                                readMessages: 1,
-                                chatOwner: {
-                                    _id: 1,
-                                    fullName: 1,
-                                    profileImage: 1,
-                                    isOnline: 1
-                                },
-                                bookingsDetails: {
-                                    _id: 1,
-                                    status: 1,
-                                },
-                                lastMessage: {
-                                    $cond: [
-                                        { $gt: [{ $size: { $ifNull: ["$messages", []] } }, 0] },
-                                        { $arrayElemAt: ["$messages", -1] },
-                                        null
-                                    ],
-                                },
-                                createdAt: 1,
-                                sortKey: {
-                                    $ifNull: ["$lastMessage.createdAt", "$createdAt"]
-                                },
-                            },
-                        },
-                        {
-                            $sort: { "lastMessage.createdAt": -1 }
-                        },
-                        { $skip: skip },
-                        { $limit: limit },
-                    ],
-                },
-            },
-        ]);
+        const count = await Chat.countDocuments(matchQuery);
+        const chats = await Chat.find(matchQuery)
+            .sort({ lastMessageAt: -1, createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("ownerId")
+            .populate("bookingId");
 
-        const count = result?.metadata[0]?.totalCount || 0;
-        let chatList = result?.chats || [];
+        let chatList = [];
+        if (chats.length > 0) {
+            chatList = await Promise.all(chats.map(async (chat) => {
+                const findReadMessages = chat?.readMessages?.find((read) => read.byId === mechanicId.toString());
 
-        if (chatList.length > 0) {
-            chatList = await Promise.all(chatList.map(async (chat) => {
-                const findReadMessages = chat?.readMessages?.find((read) => read.byId.toString() === mechanicId.toString());
+                let unreadMsgCount = 0;
                 if (findReadMessages) {
-                    const unreadMessages = chat?.messages?.filter((message) => message.createdAt > findReadMessages.lastReadAt);
-                    chat.unreadMsgCount = unreadMessages?.length || 0;
+                    unreadMsgCount = await ChatMessage.countDocuments({
+                        chatId: chat._id,
+                        createdAt: { $gt: findReadMessages.lastReadAt }
+                    });
                 } else {
-                    chat.unreadMsgCount = chat?.messages?.length || 0;
+                    unreadMsgCount = await ChatMessage.countDocuments({
+                        chatId: chat._id
+                    });
                 };
 
-                if (chat.lastMessage.byId.toString() === mechanicId.toString()) {
-                    const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId.toString() !== mechanicId.toString());
-                    if (findReceiverReadMessages) {
-                        chat.lastMessage.isMessageSeen = findReceiverReadMessages.lastReadAt < chat.lastMessage.createdAt ? false : true;
-                    } else {
-                        chat.lastMessage.isMessageSeen = false;
+                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+                let lastMessageObj = null;
+                if (lastMessageDoc) {
+                    lastMessageObj = lastMessageDoc.toObject();
+
+                    if (lastMessageObj.byId === mechanicId.toString()) {
+                        const receiverId = chat.ownerId ? chat.ownerId._id.toString() : chat.guestId;
+                        const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
+                        if (findReceiverReadMessages) {
+                            lastMessageObj.isMessageSeen = findReceiverReadMessages.lastReadAt >= lastMessageObj.createdAt;
+                        } else {
+                            lastMessageObj.isMessageSeen = false;
+                        };
                     };
-                }
+                };
 
-                const updatedChat = chat;
-                delete updatedChat.messages;
+                let chatOwner = null;
+                if (chat.ownerId) {
+                    chatOwner = {
+                        _id: chat.ownerId._id,
+                        fullName: chat.ownerId.fullName,
+                        profileImage: chat.ownerId.profileImage,
+                        isOnline: chat.ownerId.isOnline
+                    };
+                } else {
+                    chatOwner = {
+                        _id: chat.guestId,
+                        fullName: "Guest User",
+                        profileImage: "",
+                        isOnline: Constants.ONLINE_STATUS.FALSE
+                    };
+                };
 
-                return updatedChat;
+                return {
+                    _id: chat._id,
+                    ownerId: chat.ownerId?._id || null,
+                    guestId: chat.guestId,
+                    ownerIds: chat.ownerId ? [chat.ownerId._id] : [],
+                    mechanicIds: [chat.mechanicId],
+                    chatOwner,
+                    bookingsDetails: chat.bookingId ? {
+                        _id: chat.bookingId._id,
+                        status: chat.bookingId.status
+                    } : null,
+                    unreadMsgCount,
+                    lastMessage: lastMessageObj,
+                    createdAt: chat.createdAt,
+                    updatedAt: chat.updatedAt
+                };
             }));
         };
 
@@ -2481,68 +2437,38 @@ export const postChatMessagesList = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid Chat id."));
         };
 
-        const matchQuery = {
+        const chat = await Chat.findOne({
             _id: new ObjectId(param.chatId),
-            mechanicIds: { $in: [new ObjectId(mechanicId)] },
+            mechanicId: new ObjectId(mechanicId)
+        });
+
+        if (!chat) {
+            return res.status(404).json(errorResponse("Chat not found."));
         };
 
-        const [result] = await Chat.aggregate([
-            { $match: matchQuery },
-            {
-                $facet: {
-                    metadata: [
-                        { $unwind: "$messages" },
-                        { $count: "totalCount" },
-                    ],
-                    chats: [
-                        {
-                            $project: {
-                                _id: 1,
-                                mechanicIds: 1,
-                                readMessages: 1,
-                                createdAt: 1,
-                                updatedAt: 1,
-                                messages: {
-                                    $slice: [
-                                        { $sortArray: { input: "$messages", sortBy: { createdAt: -1 } } },
-                                        skip,
-                                        limit,
-                                    ],
-                                },
-                            },
-                        },
-                    ],
-                },
-            },
-        ]);
+        const count = await ChatMessage.countDocuments({ chatId: chat._id });
+        const messagesList = await ChatMessage.find({ chatId: chat._id })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        const count = result?.metadata[0]?.totalCount || 0;
-        const chats = result?.chats || [];
+        let readMessages = chat.readMessages || [];
+        const currentTime = moment().utc().toDate();
 
-        if (chats.length > 0) {
-            const chatDetails = chats[0];
-            let readMessages = chatDetails?.readMessages || [];
-            const currentTime = moment().utc().toDate();
-
-            if (readMessages.length && readMessages.find((read) => read.byId.toString() === mechanicId.toString())) {
-                readMessages = readMessages.map((read) => {
-                    if (read.byId.toString() === mechanicId.toString()) {
-                        read.lastReadAt = currentTime;
-                    };
-                    return read;
-                });
-            } else {
-                readMessages.push({
-                    byId: new ObjectId(mechanicId),
-                    lastReadAt: currentTime,
-                });
-            };
-
-            await Chat.findOneAndUpdate(matchQuery, { readMessages: readMessages }, { new: true });
+        const findIndex = readMessages.findIndex((read) => read.byId === mechanicId.toString());
+        if (findIndex !== -1) {
+            readMessages[findIndex].lastReadAt = currentTime;
+        } else {
+            readMessages.push({
+                byId: mechanicId.toString(),
+                lastReadAt: currentTime,
+            });
         };
+
+        await Chat.findByIdAndUpdate(chat._id, { readMessages });
 
         const response = {
-            chatMessagesList: chats[0]?.messages?.reverse() || [],
+            chatMessagesList: messagesList.reverse(),
             page: Number(param.currentPage),
             limit: Number(param.itemPerPage),
             totalRecords: count,
@@ -2558,59 +2484,72 @@ export const postChatMessagesList = async (req, res) => {
 export const postSendMessageToChat = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const { ownerId, guestId, chatId, bookingId, message, latitude, longitude, address } = req.body;
 
         log1(["postSendMessageToChat mechanicId----->", mechanicId]);
-        log1(["postSendMessageToChat param----->", param]);
+        log1(["postSendMessageToChat req.body----->", req.body]);
         log1(["postSendMessageToChat req.files----->", req.files]);
 
         const currentTime = moment().utc().toDate();
 
-        const validate = await custom_validation(param, "mechanic.send_message_to_chat");
+        const validate = await custom_validation(req.body, "mechanic.send_message_to_chat");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
         let mechanicData = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
-        let receiverOwner = await Owner.findOne({ _id: new ObjectId(param.ownerId) });
-
         if (!mechanicData) {
-            log1(["postSendMessageToChat mechanic ----->", mechanicData]);
             return res.status(400).json(errorResponse("Mechanic not found."));
         };
 
-        if (!receiverOwner) {
-            log1(["postSendMessageToChat receiverOwner ----->", receiverOwner]);
-            return res.status(400).json(errorResponse("Owner not found."));
+        if (!ownerId && !guestId && !chatId) {
+            return res.status(400).json(errorResponse("ownerId, guestId, or chatId is required."));
         };
 
-        const bookingDetails = await Booking.findOne({ _id: new ObjectId(param.bookingId), status: { $in: [Constants.BOOKING_STATUS.ARRIVED, Constants.BOOKING_STATUS.SERVICE_STARTED, Constants.BOOKING_STATUS.ACCEPTED] } });
-        log1(["postSendMessageToChat bookingDetails----->", bookingDetails]);
-
-        if (!bookingDetails) {
-            return res.status(400).json(errorResponse("Chat is not Available for this booking."));
+        let bookingDetails = null;
+        if (bookingId) {
+            bookingDetails = await Booking.findOne({ _id: new ObjectId(bookingId) });
+            if (!bookingDetails) {
+                return res.status(400).json(errorResponse("Booking not found."));
+            };
         };
+
+        let receiverOwner = null;
+        if (ownerId) {
+            receiverOwner = await Owner.findOne({ _id: new ObjectId(ownerId) });
+            if (!receiverOwner) {
+                return res.status(400).json(errorResponse("Owner not found."));
+            };
+        };
+
+        const receiverId = ownerId ? ownerId.toString() : guestId;
 
         const messagePayload = {
-            byId: new ObjectId(mechanicId),
+            byId: mechanicId.toString(),
             createdAt: currentTime,
         };
 
         let document = [];
         let notificationDescription = "Chat Message";
-        if (param.message && param.message != null && param.message != "") {
-            messagePayload.message = param.message;
-            messagePayload.type = Constants.CHAT_MESSAGE_TYPE.TEXT;
-            notificationDescription = param.message;
-        } else if (param.latitude && param.latitude != null && param.latitude != "" && param.longitude && param.longitude != null && param.longitude != "") {
-            messagePayload.location = {
-                latitude: param.latitude,
-                longitude: param.longitude,
-                address: param?.address ? param.address : ""
-            };
+        let messageText = "";
+        let messageType = Constants.CHAT_MESSAGE_TYPE.TEXT;
 
+        if (message && message != null && message != "") {
+            messagePayload.message = message;
+            messagePayload.type = Constants.CHAT_MESSAGE_TYPE.TEXT;
+            notificationDescription = message;
+            messageText = message;
+            messageType = Constants.CHAT_MESSAGE_TYPE.TEXT;
+        } else if (latitude && latitude != null && latitude != "" && longitude && longitude != null && longitude != "") {
+            messagePayload.location = {
+                latitude: latitude,
+                longitude: longitude,
+                address: address ? address : "",
+            };
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.LOCATION;
             notificationDescription = mechanicData.fullName + " sent location";
+            messageText = "Sent a location";
+            messageType = Constants.CHAT_MESSAGE_TYPE.LOCATION;
         } else if (req.files) {
             let allfiles = Array.isArray(req.files["files"]) ? req.files["files"] : [req.files["files"]];
 
@@ -2620,13 +2559,6 @@ export const postSendMessageToChat = async (req, res) => {
                 if (uploadedFile.flag === 0) {
                     return res.status(400).json(uploadedFile);
                 };
-
-                // const docType = ({
-                //     images: Constants.CHAT_DOCUMENT_TYPE.PHOTO,
-                //     videos: Constants.CHAT_DOCUMENT_TYPE.VIDEO,
-                //     audio: Constants.CHAT_DOCUMENT_TYPE.AUDIO,
-                //     documents: Constants.CHAT_DOCUMENT_TYPE.FILE,
-                // }[uploadedFile.data.folder] || Constants.CHAT_DOCUMENT_TYPE.NONE);
 
                 const docType =
                     uploadedFile.data.folder === "upload_images"
@@ -2651,90 +2583,113 @@ export const postSendMessageToChat = async (req, res) => {
 
             messagePayload.document = document;
             messagePayload.type = Constants.CHAT_MESSAGE_TYPE.DOCUMENT;
-
             notificationDescription = mechanicData.fullName + " sent document";
+            messageText = "Sent a document";
+            messageType = Constants.CHAT_MESSAGE_TYPE.DOCUMENT;
         } else {
             return res.status(400).json(errorResponse("Invalid chat message."));
         };
 
-        const findChatQuery = {
-            mechanicIds: { $in: [mechanicId] },
-            ownerIds: { $in: [new ObjectId(param.ownerId)] },
-            bookingId: new ObjectId(param.bookingId),
+        let chat = null;
+        if (chatId) {
+            chat = await Chat.findOne({ _id: new ObjectId(chatId), mechanicId: new ObjectId(mechanicId) });
+        } else {
+            const findChatQuery = {
+                mechanicId: new ObjectId(mechanicId),
+                bookingId: bookingId ? new ObjectId(bookingId) : null,
+            };
+            if (ownerId) {
+                findChatQuery.ownerId = new ObjectId(ownerId);
+            } else {
+                findChatQuery.guestId = guestId;
+            };
+
+            chat = await Chat.findOne(findChatQuery);
         };
 
-        if (param.chatId) {
-            findChatQuery._id = new ObjectId(param.chatId);
-        };
-
-        let chat = await Chat.findOne(findChatQuery);
-
-        if (!param.chatId && !chat) {
-            const addChat = await Chat.create({
-                messages: [messagePayload],
+        if (!chat) {
+            const createPayload = {
+                mechanicId: new ObjectId(mechanicId),
+                bookingId: bookingId ? new ObjectId(bookingId) : null,
+                lastMessage: messageText,
+                lastMessageType: messageType,
+                lastMessageAt: currentTime,
                 readMessages: [
-                    { byId: mechanicId, lastReadAt: currentTime }
+                    { byId: mechanicId.toString(), lastReadAt: currentTime }
                 ],
-                mechanicIds: [new ObjectId(mechanicId)],
-                ownerIds: [new ObjectId(param.ownerId)],
-                bookingId: new ObjectId(param.bookingId),
-            });
+            };
+            if (ownerId) {
+                createPayload.ownerId = new ObjectId(ownerId);
+            } else if (guestId) {
+                createPayload.guestId = guestId;
+            } else {
+                return res.status(400).json(errorResponse("ownerId or guestId is required."));
+            };
 
-            if (!addChat) {
+            chat = await Chat.create(createPayload);
+            if (!chat) {
                 return res.status(400).json(errorResponse(messages.unexpectedDataError));
             };
-
-            if (
-                receiverOwner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                receiverOwner.deviceToken &&
-                receiverOwner.deviceToken !== "" &&
-                receiverOwner.deviceToken !== null &&
-                receiverOwner.deviceToken !== undefined
-            ) {
-                let notificationObject = {
-                    title: mechanicData.fullName,
-                    description: notificationDescription,
-                    ownerId: receiverOwner._id,
-                    chatId: addChat._id,
-                    type: Constants.NOTIFICATION_TYPE.CHAT,
-                };
-                await sendPushNotification(receiverOwner.deviceToken, notificationObject);
-            };
-
-            io.to(addChat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: addChat._id, message: messagePayload });
-
-            const response = {
-                chatId: addChat._id,
-                document: document,
-                messages: {
-                    createdAt: messagePayload?.createdAt,
-                    message: messagePayload?.message,
-                    type: messagePayload?.type,
-                },
-            };
-
-            return res.status(200).json(successResponse("Message sent successfully.", response));
-        };
-
-        let readMessages = chat?.readMessages || [];
-        const isRead = readMessages.find((read) => read.byId.toString() === mechanicId.toString());
-
-        if (!isRead) {
-            readMessages.push({
-                byId: new ObjectId(mechanicId),
-                lastReadAt: currentTime,
-            });
         } else {
-            readMessages = readMessages.map((read) => {
-                if (read.byId.toString() === mechanicId.toString()) {
-                    read.lastReadAt = currentTime;
+            let readMessages = chat.readMessages || [];
+            const isRead = readMessages.find((read) => read.byId === mechanicId.toString());
+
+            if (!isRead) {
+                readMessages.push({
+                    byId: mechanicId.toString(),
+                    lastReadAt: currentTime,
+                });
+            } else {
+                readMessages = readMessages.map((read) => {
+                    if (read.byId === mechanicId.toString()) {
+                        read.lastReadAt = currentTime;
+                    };
+
+                    return read;
+                });
+            };
+
+            const targetReceiverId = chat.ownerId ? chat.ownerId.toString() : chat.guestId;
+            if (chat.ownerDetailsPageIds.includes(targetReceiverId)) {
+                const isReceiverRead = readMessages.find((read) => read.byId === targetReceiverId);
+                if (!isReceiverRead) {
+                    readMessages.push({
+                        byId: targetReceiverId,
+                        lastReadAt: currentTime,
+                    });
+                } else {
+                    readMessages = readMessages.map((read) => {
+                        if (read.byId === targetReceiverId) {
+                            read.lastReadAt = currentTime;
+                        };
+
+                        return read;
+                    });
                 };
-                return read;
+            };
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: messageText,
+                lastMessageType: messageType,
+                lastMessageAt: currentTime,
+                readMessages,
             });
         };
 
-        if (!chat.ownerDetailsPageIds.includes(receiverOwner._id)) {
+        const chatMessage = await ChatMessage.create({
+            chatId: chat._id,
+            byId: mechanicId.toString(),
+            message: messagePayload.message || "",
+            document: messagePayload.document || [],
+            location: messagePayload.location,
+            type: messagePayload.type,
+            createdAt: currentTime,
+        });
+
+        const targetReceiverId = chat.ownerId ? chat.ownerId.toString() : chat.guestId;
+        if (!chat.ownerDetailsPageIds.includes(targetReceiverId)) {
             if (
+                receiverOwner &&
                 receiverOwner.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 receiverOwner.deviceToken &&
                 receiverOwner.deviceToken !== "" &&
@@ -2748,48 +2703,22 @@ export const postSendMessageToChat = async (req, res) => {
                     chatId: chat._id,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
+
                 await sendPushNotification(receiverOwner.deviceToken, notificationObject);
             };
-        } else {
-            const isReceiverRead = readMessages.find((read) => read.byId.toString() === receiverOwner._id.toString());
-            if (!isReceiverRead) {
-                readMessages.push({
-                    byId: new ObjectId(receiverOwner._id),
-                    lastReadAt: currentTime,
-                });
-            } else {
-                readMessages = readMessages.map((read) => {
-                    if (read.byId.toString() === receiverOwner._id.toString()) {
-                        read.lastReadAt = currentTime;
-                    };
-                    return read;
-                });
-            };
         };
 
-        const updateChatQuery = {
-            $push: {
-                messages: messagePayload,
-            },
-            readMessages: readMessages,
-        };
-
-        const updatedChat = await Chat.findOneAndUpdate(findChatQuery, updateChatQuery, { new: true });
-        if (!updatedChat) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
-        };
-
-        messagePayload.sender = { fullName: mechanicData.fullName };
-
-        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: messagePayload });
+        const emitPayload = chatMessage.toObject();
+        emitPayload.sender = { fullName: mechanicData.fullName };
+        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: emitPayload });
 
         const response = {
             chatId: chat._id,
             document: document,
             messages: {
-                createdAt: messagePayload?.createdAt,
-                message: messagePayload?.message,
-                type: messagePayload?.type,
+                createdAt: chatMessage.createdAt,
+                message: chatMessage.message,
+                type: chatMessage.type,
             },
         };
 

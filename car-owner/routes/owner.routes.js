@@ -30,6 +30,7 @@ import {
     postLanguageList,
     postAppVersion,
     postNearbyMechanics,
+    postPopularNearbyMechanics,
     postMechanicDetails,
     postAddAddress,
     postAddressList,
@@ -56,8 +57,8 @@ import {
     postAddRating,
     postRatingList,
     postChatList,
-    postChatMessagesList,
-    postSendMessageToChat,
+    postChatMessagesDetails,
+    postSendMessage,
     postFileDispute,
     postGenerateCallCaptcha,
     postVerifyCallCaptcha,
@@ -110,6 +111,7 @@ router.post("/service-history", authMiddleware, postServiceHistory);
 
 // Mechanic API (Public - no auth required)
 router.post("/nearby-mechanics", unAuthMiddleware, postNearbyMechanics);
+router.post("/popular-nearby-mechanics", unAuthMiddleware, postPopularNearbyMechanics);
 router.post("/mechanic-details", unAuthMiddleware, postMechanicDetails);
 
 // Address API
@@ -153,9 +155,9 @@ router.post("/add-rating", authMiddleware, postAddRating);
 router.post("/rating-list", authMiddleware, postRatingList);
 
 // Chat Routes
-router.post("/chat-list", authMiddleware, postChatList);
-router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
-router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
+router.post("/chat-list", unAuthMiddleware, postChatList);
+router.post("/chat-messages-details", unAuthMiddleware, postChatMessagesDetails);
+router.post("/send-message", unAuthMiddleware, postSendMessage);
 
 // Dispute
 router.post("/file-dispute", authMiddleware, postFileDispute);

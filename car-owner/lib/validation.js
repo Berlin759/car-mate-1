@@ -100,7 +100,7 @@ const validate_rules = {
         },
         send_message_to_chat: {
             mechanicId: "required",
-            bookingId: "required",
+            // bookingId: "required",
         },
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
