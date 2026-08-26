@@ -643,212 +643,280 @@ export const postHomeDetails = async (req, res) => {
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails ownerId----->", ownerId]);
 
-        let carList = [];
-
-        if (ownerId) {
-            let ownerData = await Owner.findById(ownerId);
-            log1(["postHomeDetails ownerData----->", ownerData]);
-            let updatePayload = {};
-
-            const simpleFields = ["countryName", "countryCode", "latitude", "longitude", "timezone"];
-            simpleFields.forEach((field) => {
-                if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
-                    updatePayload[field] = param[field];
-                };
-            });
-
-            if (
-                param.latitude !== undefined && param.latitude !== null && param.latitude !== "" &&
-                param.longitude !== undefined && param.longitude !== null && param.longitude !== ""
-            ) {
-                updatePayload.location = {
-                    type: "Point",
-                    coordinates: [
-                        Number(param.longitude),
-                        Number(param.latitude),
-                    ],
-                };
-            };
-
-            log1(["postHomeDetails updatePayload------>", updatePayload]);
-
-            if (Object.keys(updatePayload).length > 0) {
-                let updateOwner = await Owner.findByIdAndUpdate(
-                    ownerId,
-                    {
-                        $set: updatePayload,
-                    },
-                    { new: true },
-                );
-                if (!updateOwner) {
-                    return res.status(400).json(errorResponse(messages.unexpectedDataError));
-                };
-            };
-
-            carList = await Car.find({ ownerId: ownerId, status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model").lean();
-        };
-
-        const serviceCategories = await Service.find({ status: Constants.SERVICE_STATUS.ACTIVE })
-            .select("_id fullName description image")
-            .lean();
+        const { latitude, longitude, radius, } = param;
 
         const nearbyLatitude =
-            param.latitude !== undefined &&
-                param.latitude !== null &&
-                param.latitude !== ""
-                ? Number(param.latitude)
+            latitude !== undefined &&
+                latitude !== null &&
+                latitude !== ""
+                ? Number(latitude)
                 : null;
 
         const nearbyLongitude =
-            param.longitude !== undefined &&
-                param.longitude !== null &&
-                param.longitude !== ""
-                ? Number(param.longitude)
+            longitude !== undefined &&
+                longitude !== null &&
+                longitude !== ""
+                ? Number(longitude)
                 : null;
+
+        if (
+            (nearbyLatitude !== null || nearbyLongitude !== null) &&
+            (
+                !Number.isFinite(nearbyLatitude) ||
+                !Number.isFinite(nearbyLongitude) ||
+                nearbyLatitude < -90 ||
+                nearbyLatitude > 90 ||
+                nearbyLongitude < -180 ||
+                nearbyLongitude > 180
+            )
+        ) {
+            return res.status(400).json(errorResponse("Invalid latitude or longitude."));
+        };
+
+        const requestedRadius = radius !== undefined && radius !== null && radius !== "" ? Number(radius) : Constants.DEFAULT_RADIUS;
+
+        if (!Number.isFinite(requestedRadius) || requestedRadius <= 0) {
+            return res.status(400).json(errorResponse("Invalid radius."));
+        };
+
+        const finalRadiusKm = Math.min(requestedRadius, Constants.MAX_RADIUS_KM || 100);
+        const radiusInMeters = finalRadiusKm * 1000;
+
+        const ownerUpdatePayload = {};
+
+        if (ownerId) {
+            const simpleFields = [
+                "countryName",
+                "countryCode",
+                "latitude",
+                "longitude",
+                "timezone",
+            ];
+
+            for (const field of simpleFields) {
+                if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
+                    ownerUpdatePayload[field] = param[field];
+                };
+            };
+
+            if (nearbyLatitude !== null && nearbyLongitude !== null) {
+                ownerUpdatePayload.location = {
+                    type: "Point",
+                    coordinates: [nearbyLongitude, nearbyLatitude,],
+                };
+            };
+        };
+
+        const serviceCategoriesPromise = Service.find({ status: Constants.SERVICE_STATUS.ACTIVE, }).select("_id fullName description image").lean();
+
+        const ownerDataPromise = ownerId
+            ? Promise.all([
+                Object.keys(ownerUpdatePayload).length > 0
+                    ? Owner.findByIdAndUpdate(ownerId, { $set: ownerUpdatePayload, }, { new: false, }).lean()
+                    : Promise.resolve(null),
+
+                Car.find({ ownerId, status: Constants.CAR_STATUS.VALID, }).select("_id fullName vehicleNumber registerNumber images model").lean(),
+            ])
+            : Promise.resolve([null, [],]);
+
+        const [serviceCategories, ownerResult,] = await Promise.all([
+            serviceCategoriesPromise,
+            ownerDataPromise,
+        ]);
+
+        const [updatedOwner, carList] = ownerResult;
+
+        if (ownerId && Object.keys(ownerUpdatePayload).length > 0 && !updatedOwner) {
+            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        const serviceList = serviceCategories.map((service) => ({
+            categoryId: service._id.toString(),
+            categoryName: service.fullName || "",
+            categoryImage: service.image || "",
+            categoryDescription: service.description || "",
+        }));
 
         let popularNearbyMechanics = [];
 
-        if (
-            nearbyLatitude !== null &&
-            nearbyLongitude !== null &&
-            !Number.isNaN(nearbyLatitude) &&
-            !Number.isNaN(nearbyLongitude)
-        ) {
-            const radiusInKm = Number(param.radius) || 10;
-            const radiusInMeters = radiusInKm * 1000;
+        const hasValidLocation = nearbyLatitude !== null && nearbyLongitude !== null;
 
-            const nearbyMechanics = await Mechanic.aggregate([
+        if (hasValidLocation) {
+            const mechanicPipeline = [
                 {
                     $geoNear: {
                         near: {
                             type: "Point",
                             coordinates: [nearbyLongitude, nearbyLatitude,],
                         },
+                        key: "location",
                         distanceField: "distanceInMeters",
                         maxDistance: radiusInMeters,
                         spherical: true,
                         query: {
                             status: Constants.MECHANIC_STATUS.ACTIVE,
+                            "serviceIds.0": { $exists: true, },
+                            isDeleted: false,
                         },
                     },
                 },
-                { $limit: 5 },
+                {
+                    $limit: 5,
+                },
+                {
+                    $lookup: {
+                        from: "ratings",
+                        let: {
+                            mechanicId: "$_id",
+                        },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: { $eq: ["$mechanicId", "$$mechanicId",], },
+                                },
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalReviews: { $sum: 1, },
+                                    averageRating: { $avg: "$rating", },
+                                },
+                            },
+                        ],
+                        as: "ratingData",
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "services",
+                        let: {
+                            mechanicId: "$_id",
+                        },
+                        pipeline: [
+                            {
+                                $match: {
+                                    status: Constants.SERVICE_STATUS.ACTIVE,
+                                },
+                            },
+                            {
+                                $unwind: {
+                                    path: "$subCategory",
+                                    preserveNullAndEmptyArrays: false,
+                                },
+                            },
+                            {
+                                $unwind: {
+                                    path: "$subCategory.mechanicIds",
+                                    preserveNullAndEmptyArrays: false,
+                                },
+                            },
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$subCategory.mechanicIds.mechanicId", "$$mechanicId",],
+                                    },
+                                },
+                            },
+                            {
+                                $project: {
+                                    _id: 0,
+                                    categoryId: { $toString: "$_id", },
+                                    categoryName: { $ifNull: ["$fullName", "",], },
+                                    categoryImage: { $ifNull: ["$image", "",], },
+                                    categoryDescription: { $ifNull: ["$description", "",], },
+                                },
+                            },
+                        ],
+                        as: "servicesData",
+                    },
+                },
                 {
                     $project: {
                         _id: 1,
-                        fullName: 1,
-                        email: 1,
-                        phoneNumber: 1,
-                        profileImage: 1,
-                        address: 1,
-                        distanceInMeters: 1
+                        fullName: { $ifNull: ["$fullName", "",], },
+                        phoneNumber: { $ifNull: ["$phoneNumber", "",], },
+                        profileImage: { $ifNull: ["$profileImage", "",], },
+                        address: { $ifNull: ["$address", "",], },
+                        consultantFee: { $ifNull: ["$consultantFee", 0], },
+                        distanceInKm: {
+                            $round: [
+                                { $divide: ["$distanceInMeters", 1000,], },
+                                1,
+                            ],
+                        },
+                        distanceInMinutes: {
+                            $round: [
+                                {
+                                    $multiply: [
+                                        {
+                                            $divide: [
+                                                { $divide: ["$distanceInMeters", 1000,], },
+                                                30,
+                                            ],
+                                        },
+                                        60,
+                                    ],
+                                },
+                                0,
+                            ],
+                        },
+                        rating: {
+                            $round: [
+                                {
+                                    $ifNull: [
+                                        { $arrayElemAt: ["$ratingData.averageRating", 0,], },
+                                        0,
+                                    ],
+                                },
+                                1,
+                            ],
+                        },
+                        totalReviews: {
+                            $ifNull: [
+                                { $arrayElemAt: ["$ratingData.totalReviews", 0,], },
+                                0,
+                            ],
+                        },
+                        totalServices: { $size: "$servicesData", },
+                        services: "$servicesData",
                     },
                 },
-            ]);
+            ];
 
-            log1(["postHomeDetails nearbyMechanics count----->", nearbyMechanics.length]);
+            popularNearbyMechanics = await Mechanic.aggregate(mechanicPipeline);
+        };
 
-            if (nearbyMechanics.length > 0) {
-                const mechanicIds = nearbyMechanics.map(mechanic => mechanic._id);
-
-                const ratingData = await Rating.aggregate([
-                    {
-                        $match: {
-                            mechanicId: { $in: mechanicIds },
-                        },
+        const formattedMechanics = popularNearbyMechanics.map(
+            (mechanic) => {
+                const item = {
+                    mechanicId: mechanic._id.toString(),
+                    mechanicDetails: {
+                        _id: mechanic._id.toString(),
+                        fullName: mechanic.fullName,
+                        phoneNumber: mechanic.phoneNumber,
+                        profileImage: mechanic.profileImage,
+                        address: mechanic.address,
+                        consultantFee: mechanic.consultantFee,
                     },
-                    {
-                        $group: {
-                            _id: "$mechanicId",
-                            totalReviews: { $sum: 1 },
-                            averageRating: { $avg: "$rating" }
-                        },
-                    },
-                ]);
-
-                const ratingMap = new Map();
-
-                ratingData.forEach((item) => {
-                    ratingMap.set(
-                        item._id.toString(),
-                        {
-                            totalReviews: item.totalReviews,
-                            averageRating: Math.round(item.averageRating * 10) / 10
-                        },
-                    );
-                });
-
-                const services = await Service.find({
-                    status: Constants.SERVICE_STATUS.ACTIVE,
-                    "subCategory.mechanicIds.mechanicId": { $in: mechanicIds },
-                }).select("_id fullName description image subCategory").lean();
-
-                const mechanicServiceMap = new Map();
-
-                mechanicIds.forEach((id) => {
-                    mechanicServiceMap.set(id.toString(), []);
-                });
-
-                for (const service of services) {
-                    for (const subCategory of service.subCategory || []) {
-                        for (const mechanicInfo of subCategory.mechanicIds || []) {
-                            const mechanicId = mechanicInfo.mechanicId?.toString();
-
-                            if (mechanicId && mechanicServiceMap.has(mechanicId)) {
-                                mechanicServiceMap.get(mechanicId).push({
-                                    serviceId: service._id.toString(),
-                                    serviceName: service.fullName || "",
-                                    serviceDescription: service.description || "",
-                                    serviceImage: service.image || "",
-                                    subCategoryId: subCategory._id?.toString() || "",
-                                    subCategoryName: subCategory.fullname || "",
-                                    price: mechanicInfo.price || 0
-                                });
-                            };
-                        };
-                    };
+                    rating: mechanic.rating || 0,
+                    totalReviews: mechanic.totalReviews || 0,
+                    distanceInKm: mechanic.distanceInKm || 0,
+                    distanceInMinutes: mechanic.distanceInMinutes || 1,
+                    totalServices: mechanic.totalServices || 0,
+                    services: mechanic.services || [],
                 };
 
-                popularNearbyMechanics = nearbyMechanics.map(
-                    (mechanic) => {
-                        const mechanicId = mechanic._id.toString();
-                        const rating = ratingMap.get(mechanicId) || { totalReviews: 0, averageRating: 0 };
-                        const services = mechanicServiceMap.get(mechanicId) || [];
-                        const distanceInKm = Math.round((mechanic.distanceInMeters / 1000) * 10) / 10;
-                        const averageSpeedKmph = 30;
-                        const distanceInMinutes = Math.max(1, Math.round((distanceInKm / averageSpeedKmph) * 60));
+                return item;
+            },
+        );
 
-                        return {
-                            mechanicId,
-                            mechanicDetails: {
-                                _id: mechanic._id || "",
-                                fullName: mechanic.fullName || "",
-                                phoneNumber: mechanic.phoneNumber || "",
-                                profileImage: mechanic.profileImage || "",
-                                address: mechanic.address || ""
-                            },
-                            rating: rating.averageRating,
-                            totalReviews: rating.totalReviews,
-                            distanceInKm,
-                            distanceInMinutes,
-                            totalServices: services.length,
-                            services,
-                        };
-                    },
-                );
-            };
-        };
-
-        const locationObject = {
-            latitude: nearbyLatitude,
-            longitude: nearbyLongitude
-        };
+        const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
+            location: locationObject,
             carList: carList,
-            serviceCategories: serviceCategories,
-            popularNearbyMechanics: popularNearbyMechanics,
-            location: nearbyLatitude !== null && nearbyLongitude !== null ? locationObject : null,
+            serviceCategories: serviceList,
+            popularNearbyMechanics: formattedMechanics,
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
@@ -2363,6 +2431,9 @@ export const postPopularNearbyMechanics = async (req, res) => {
                     spherical: true,
                     query: {
                         status: Constants.MECHANIC_STATUS.ACTIVE,
+                        "serviceIds.0": {
+                            $exists: true,
+                        },
                     },
                 },
             },
@@ -2510,19 +2581,10 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                 {
                                     $project: {
                                         _id: 0,
-                                        serviceId: { $toString: "$_id", },
-                                        serviceName: "$fullName",
-                                        serviceDescription: "$description",
-                                        serviceImage: "$image",
-                                        subCategoryId: {
-                                            $cond: [
-                                                { $ne: ["$subCategory._id", null,], },
-                                                { $toString: "$subCategory._id", },
-                                                "",
-                                            ],
-                                        },
-                                        subCategoryName: "$subCategory.fullname",
-                                        price: "$subCategory.mechanicIds.price",
+                                        categoryId: { $toString: "$_id", },
+                                        categoryName: "$fullName",
+                                        categoryImage: "$image",
+                                        categoryDescription: "$description",
                                     },
                                 },
                             ],

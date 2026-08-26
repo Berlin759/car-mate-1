@@ -351,18 +351,18 @@ export const postUpdateMechanicProfile = async (req, res) => {
 export const postDeviceTokenUpdate = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const { deviceToken } = req.body;
 
         log1(["postDeviceTokenUpdate mechanicId ----->", mechanicId]);
-        log1(["postDeviceTokenUpdate param ----->", param]);
+        log1(["postDeviceTokenUpdate req.body ----->", req.body]);
 
-        const validate = await custom_validation(param, "mechanic.updateDeviceToken");
+        const validate = await custom_validation(req.body, "mechanic.updateDeviceToken");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
         let updateObj = {
-            deviceToken: param.deviceToken,
+            deviceToken: deviceToken,
         };
 
         let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updateObj, { new: true });
@@ -1661,10 +1661,10 @@ export const postBookingDetails = async (req, res) => {
 
 export const postBookingUpdateStatus = async (req, res) => {
     const mechanicId = req.mechanicId;
-    const param = req.body;
+    const { bookingId, status, checklist, reason, beforePhotos, afterPhotos, materialCost } = req.body;
 
     log1(["postBookingUpdateStatus mechanicId----->", mechanicId]);
-    log1(["postBookingUpdateStatus param----->", param]);
+    log1(["postBookingUpdateStatus req.body----->", req.body]);
 
     if (mechanicLocks.get(mechanicId)) {
         log1(["A Booking Status Update is already in progress. Please wait."]);
@@ -1674,23 +1674,23 @@ export const postBookingUpdateStatus = async (req, res) => {
     mechanicLocks.set(mechanicId, true);
 
     try {
-        const validate = await custom_validation(param, "mechanic.booking_update_status");
+        const validate = await custom_validation(req.body, "mechanic.booking_update_status");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
 
-        if (!ObjectId.isValid(param.bookingId)) {
+        if (!ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid booking id."));
         };
 
-        const newStatus = parseInt(param.status);
+        const newStatus = parseInt(status);
         const validStatuses = Object.values(Constants.BOOKING_STATUS);
         if (!validStatuses.includes(newStatus)) {
             return res.status(400).json(errorResponse("Invalid status."));
         };
 
         const bookingDetails = await Booking.findOne({
-            _id: new ObjectId(param.bookingId),
+            _id: new ObjectId(bookingId),
             mechanicId: new ObjectId(mechanicId),
         }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" });
 
@@ -1701,8 +1701,8 @@ export const postBookingUpdateStatus = async (req, res) => {
         };
 
         let updatePayload = { status: newStatus };
-        if (param.checklist && Array.isArray(param.checklist)) {
-            updatePayload.checklist = param.checklist;
+        if (checklist && Array.isArray(checklist)) {
+            updatePayload.checklist = checklist;
         };
 
         let notificationTitle = "";
@@ -1753,12 +1753,12 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("Cannot cancel booking after service has started."));
                 };
 
-                if (!param.reason) {
+                if (!reason) {
                     return res.status(400).json(errorResponse("Please enter reason for cancel service."));
                 };
 
                 updatePayload.cancelById = new ObjectId(mechanicId);
-                updatePayload.cancelReason = param.reason || "";
+                updatePayload.cancelReason = reason || "";
                 updatePayload.cancelTime = new Date();
 
                 notificationTitle = "Booking Cancelled";
@@ -1795,8 +1795,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                 };
 
                 updatePayload.startTime = new Date();
-                if (param.beforePhotos && Array.isArray(param.beforePhotos)) {
-                    updatePayload.beforePhotos = param.beforePhotos;
+                if (beforePhotos && Array.isArray(beforePhotos)) {
+                    updatePayload.beforePhotos = beforePhotos;
                 };
 
                 notificationTitle = "Service Started";
@@ -1817,12 +1817,12 @@ export const postBookingUpdateStatus = async (req, res) => {
                 };
 
                 updatePayload.endTime = new Date();
-                if (param.afterPhotos && Array.isArray(param.afterPhotos)) {
-                    updatePayload.afterPhotos = param.afterPhotos;
+                if (afterPhotos && Array.isArray(afterPhotos)) {
+                    updatePayload.afterPhotos = afterPhotos;
                 };
 
-                if (param.materialCost) {
-                    updatePayload.materialCost = parseFloat(param.materialCost);
+                if (materialCost) {
+                    updatePayload.materialCost = parseFloat(materialCost);
                 };
 
                 notificationTitle = "Service Completed";
@@ -2078,23 +2078,23 @@ export const postNotificationList = async (req, res) => {
 export const postUpdateNotification = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const { allRead, singleRead, notificationId } = req.body;
 
         log1(["postUpdateNotification mechanicId----->", mechanicId]);
-        log1(["postUpdateNotification param----->", param]);
+        log1(["postUpdateNotification req.body----->", req.body]);
 
-        if (Object.keys(param).length === 0) {
+        if (Object.keys(req.body).length === 0) {
             return res.status(400).json(errorResponse("Invalid payload data."));
         };
 
-        if (param.allRead === true) {
+        if (allRead === true) {
             await Notification.updateMany({ mechanicId: new ObjectId(mechanicId), isRead: false }, { isRead: true });
-        } else if (param.singleRead === true) {
-            if (!mongoose.Types.ObjectId.isValid(param.notificationId)) {
+        } else if (singleRead === true) {
+            if (!mongoose.Types.ObjectId.isValid(notificationId)) {
                 return res.status(400).json(errorResponse("Invalid notification id."));
             };
 
-            await Notification.findOneAndUpdate({ _id: new ObjectId(param.notificationId), mechanicId: new ObjectId(mechanicId) }, { isRead: true });
+            await Notification.findOneAndUpdate({ _id: new ObjectId(notificationId), mechanicId: new ObjectId(mechanicId) }, { isRead: true });
         };
 
         return res.status(200).json(successResponse("Notification Read Successfully."));
@@ -2319,13 +2319,13 @@ export const postTransactionList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const { itemPerPage, currentPage } = req.body;
 
         log1(["postChatList mechanicId----->", mechanicId]);
-        log1(["postChatList param----->", param]);
+        log1(["postChatList req.body----->", req.body]);
 
-        const limit = parseInt(param.itemPerPage) || 10;
-        const skip = (param.currentPage - 1) * limit || 0;
+        const limit = parseInt(itemPerPage) || 10;
+        const skip = (currentPage - 1) * limit || 0;
 
         const matchQuery = {
             mechanicId: new ObjectId(mechanicId),
@@ -2410,8 +2410,8 @@ export const postChatList = async (req, res) => {
 
         const response = {
             chatMessagesList: chatList,
-            page: Number(param.currentPage),
-            limit: Number(param.itemPerPage),
+            page: Number(currentPage),
+            limit: Number(itemPerPage),
             totalRecords: count,
         };
 
@@ -2422,23 +2422,23 @@ export const postChatList = async (req, res) => {
     };
 };
 
-export const postChatMessagesList = async (req, res) => {
+export const postChatMessagesDetails = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const param = req.body;
+        const { itemPerPage, currentPage, chatId } = req.body;
 
-        log1(["postChatMessagesList mechanicId----->", mechanicId]);
-        log1(["postChatMessagesList param----->", param]);
+        log1(["postChatMessagesDetails mechanicId----->", mechanicId]);
+        log1(["postChatMessagesDetails req.body----->", req.body]);
 
-        const limit = parseInt(param.itemPerPage) || 20;
-        const skip = (param.currentPage - 1) * limit || 0;
+        const limit = parseInt(itemPerPage) || 20;
+        const skip = (currentPage - 1) * limit || 0;
 
-        if (!param.chatId || !mongoose.Types.ObjectId.isValid(param.chatId)) {
+        if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
             return res.status(400).json(errorResponse("Invalid Chat id."));
         };
 
         const chat = await Chat.findOne({
-            _id: new ObjectId(param.chatId),
+            _id: new ObjectId(chatId),
             mechanicId: new ObjectId(mechanicId)
         });
 
@@ -2469,26 +2469,26 @@ export const postChatMessagesList = async (req, res) => {
 
         const response = {
             chatMessagesList: messagesList.reverse(),
-            page: Number(param.currentPage),
-            limit: Number(param.itemPerPage),
+            page: Number(currentPage),
+            limit: Number(itemPerPage),
             totalRecords: count,
         };
 
         return res.status(200).json(successResponse("Chat List Get Successfully.", response));
     } catch (error) {
-        log1(["Error in postChatMessagesList ----->", error]);
+        log1(["Error in postChatMessagesDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };
 
-export const postSendMessageToChat = async (req, res) => {
+export const postSendMessage = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
         const { ownerId, guestId, chatId, bookingId, message, latitude, longitude, address } = req.body;
 
-        log1(["postSendMessageToChat mechanicId----->", mechanicId]);
-        log1(["postSendMessageToChat req.body----->", req.body]);
-        log1(["postSendMessageToChat req.files----->", req.files]);
+        log1(["postSendMessage mechanicId----->", mechanicId]);
+        log1(["postSendMessage req.body----->", req.body]);
+        log1(["postSendMessage req.files----->", req.files]);
 
         const currentTime = moment().utc().toDate();
 
@@ -2724,7 +2724,7 @@ export const postSendMessageToChat = async (req, res) => {
 
         return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {
-        log1(["Error in postSendMessageToChat ----->", error]);
+        log1(["Error in postSendMessage ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

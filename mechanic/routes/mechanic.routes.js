@@ -32,8 +32,8 @@ import {
     postTransactionList,
     postUpdateNotification,
     postChatList,
-    postChatMessagesList,
-    postSendMessageToChat,
+    postChatMessagesDetails,
+    postSendMessage,
     postSubmitKYC,
     postPerformanceMetrics,
     postReviewsReceived,
@@ -108,8 +108,8 @@ router.post("/transaction-list", authMiddleware, postTransactionList);
 
 // Chat Routes
 router.post("/chat-list", authMiddleware, postChatList);
-router.post("/chat-messages-details", authMiddleware, postChatMessagesList);
-router.post("/send-chat-message", authMiddleware, postSendMessageToChat);
+router.post("/chat-messages-details", authMiddleware, postChatMessagesDetails);
+router.post("/send-message", authMiddleware, postSendMessage);
 
 // KYC API
 router.post("/submit-kyc", authMiddleware, postSubmitKYC);

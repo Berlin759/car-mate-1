@@ -43,8 +43,7 @@ const validate_rules = {
             latitude: "required",
             longitude: "required",
         },
-        send_message_to_chat: {
-        },
+        send_message_to_chat: {},
         update_profile: {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
         },

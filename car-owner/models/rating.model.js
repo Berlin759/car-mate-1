@@ -47,6 +47,10 @@ ratingSchema.virtual('readableCreatedAt').get(function () {
     return DateInHumanReadableFormat(this.createdAt);
 });
 
+ratingSchema.index({
+    mechanicId: 1,
+});
+
 const Rating = mongoose.model("Rating", ratingSchema);
 
 export default Rating;
