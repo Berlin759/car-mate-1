@@ -4781,6 +4781,8 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
 
             const gstAmount = Math.round(quoteSum * 0.18);
 
+            const totalQuotationAmount = quoteSum + gstAmount;
+
             const finalSubTotalAmount = booking?.subTotal + quoteSum;
             const finalTaxAmount = booking?.taxAmount + gstAmount;
             const finalBookingAmount = booking?.totalAmount + quoteSum + gstAmount;
@@ -4796,19 +4798,12 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
                 }
             );
 
-            let totalQuotationFee = 0;
-            (booking.quotation || []).forEach(item => {
-                totalQuotationFee += parseFloat(item.price) || 0;
-            });
-
             await Transaction.updateOne(
                 { bookingId: booking._id },
                 {
                     $set: {
-                        totalQuotationAmount: totalQuotationFee,
-                    },
-                    $inc: {
-                        totalAmount: totalQuotationFee,
+                        totalQuotationAmount: quoteSum,
+                        totalAmount: finalBookingAmount,
                     },
                 }
             );
@@ -4823,7 +4818,7 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
             ) {
                 let notificationObject = {
                     title: "Payment Successful!",
-                    description: `Payment for booking quotation amount ₹${totalQuotationFee} was successful.`,
+                    description: `Payment for booking quotation amount ₹${totalQuotationAmount || 0} was successful.`,
                     ownerId: ownerId,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
