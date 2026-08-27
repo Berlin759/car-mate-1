@@ -9,7 +9,7 @@ const captchaSchema = new Schema(
             required: true,
         },
         callerId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         callerType: {
@@ -18,7 +18,7 @@ const captchaSchema = new Schema(
             default: Constants.USER_ROLE.OWNER,
         },
         receiverId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         receiverType: {

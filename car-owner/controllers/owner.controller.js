@@ -3533,12 +3533,23 @@ export const postBookingList = async (req, res) => {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
             status,
-            serviceId,
+            search,
         } = req.body;
 
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
+
+        const searchText = String(search || "").trim();
+
+        const serviceSearchMatch = searchText
+            ? {
+                "serviceDetails.fullName": {
+                    $regex: searchText,
+                    $options: "i",
+                },
+            }
+            : null;
 
         const ownerMatch = {
             ownerId: new ObjectId(ownerId),
@@ -3546,14 +3557,6 @@ export const postBookingList = async (req, res) => {
 
         const match = {
             ...ownerMatch,
-        };
-
-        if (serviceId) {
-            if (!ObjectId.isValid(serviceId)) {
-                return res.status(400).json(errorResponse("Invalid service id."));
-            };
-
-            match.serviceId = new ObjectId(serviceId);
         };
 
         if (status !== undefined && status !== null && status !== "") {
@@ -3586,13 +3589,6 @@ export const postBookingList = async (req, res) => {
                             $match: match,
                         },
                         {
-                            $sort: {
-                                createdAt: -1,
-                            },
-                        },
-                        { $skip: skip },
-                        { $limit: limit },
-                        {
                             $lookup: {
                                 from: "services",
                                 localField: "serviceId",
@@ -3603,9 +3599,19 @@ export const postBookingList = async (req, res) => {
                         {
                             $unwind: {
                                 path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: true,
+                                preserveNullAndEmptyArrays: false,
                             },
                         },
+                        // Search service name
+                        ...(serviceSearchMatch ? [{ $match: serviceSearchMatch, },] : []),
+
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
+                        { $skip: skip, },
+                        { $limit: limit, },
                         {
                             $lookup: {
                                 from: "mechanics",
@@ -3724,6 +3730,23 @@ export const postBookingList = async (req, res) => {
                         {
                             $match: match,
                         },
+                        {
+                            $lookup: {
+                                from: "services",
+                                localField: "serviceId",
+                                foreignField: "_id",
+                                as: "serviceDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$serviceDetails",
+                                preserveNullAndEmptyArrays: false,
+                            },
+                        },
+
+                        // Same search filter for correct total count
+                        ...(serviceSearchMatch ? [{ $match: serviceSearchMatch, },] : []),
                         {
                             $count: "count",
                         },
@@ -6071,14 +6094,12 @@ export const postGenerateCallCaptcha = async (req, res) => {
             return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        // Generate a random 5-character uppercase alphanumeric captcha code
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let captchaCode = "";
         for (let i = 0; i < 5; i++) {
             captchaCode += chars.charAt(Math.floor(Math.random() * chars.length));
         };
 
-        // Generate dynamic SVG
         const width = 150;
         const height = 50;
         let noiseLines = '';
@@ -6114,14 +6135,13 @@ export const postGenerateCallCaptcha = async (req, res) => {
 
         const captchaSvg = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
-        // Expires in 5 minutes
         const expiryTime = Constants.CAPTCHA_EXPIRY_MINUTES;
         const expiresAt = new Date(Date.now() + expiryTime * 60 * 1000);
 
         await Captcha.deleteMany({
-            callerId: userId,
+            callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
-            receiverId: new ObjectId(mechanicId),
+            receiverId: mechanicId.toString(),
             receiverType: Constants.USER_ROLE.MECHANIC,
         });
 
@@ -6129,7 +6149,7 @@ export const postGenerateCallCaptcha = async (req, res) => {
             code: captchaCode,
             callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
-            receiverId: new ObjectId(mechanicId),
+            receiverId: mechanicId.toString(),
             receiverType: Constants.USER_ROLE.MECHANIC,
             expiresAt,
         });
@@ -6191,7 +6211,7 @@ export const postVerifyCallCaptcha = async (req, res) => {
             _id: new ObjectId(captchaId),
             callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
-            receiverId: new ObjectId(mechanicId),
+            receiverId: mechanicId.toString(),
             receiverType: Constants.USER_ROLE.MECHANIC,
             expiresAt: { $gt: new Date() },
         });
@@ -6215,7 +6235,7 @@ export const postVerifyCallCaptcha = async (req, res) => {
         await CallLog.create({
             callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
-            receiverId: new ObjectId(mechanicId),
+            receiverId: mechanicId.toString(),
             receiverType: Constants.USER_ROLE.MECHANIC,
             status: Constants.CALL_STATUS.VERIFIED,
         });

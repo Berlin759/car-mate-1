@@ -5,7 +5,7 @@ import Constants from "../config/constant.js";
 const callLogSchema = new Schema(
     {
         callerId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         callerType: {
@@ -14,7 +14,7 @@ const callLogSchema = new Schema(
             default: Constants.USER_ROLE.OWNER,
         },
         receiverId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         receiverType: {
