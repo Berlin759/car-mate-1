@@ -19,6 +19,7 @@ import { sendOtp } from "../lib/twilioHelper.js";
 import Owner from "../models/owner.model.js";
 import OTP from "../models/otp.model.js";
 import { sendPushNotification } from "./pushNotification.js";
+import Chat from "../models/chat.model.js";
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();
@@ -129,7 +130,7 @@ export const postVerifyOtp = async (req, res) => {
     try {
         log1(["postVerifyOtp req.body ----->", req.body]);
 
-        const { phone_number, otp } = req.body;
+        const { phone_number, otp, guestId } = req.body;
 
         const validate = await custom_validation(req.body, "owner.verify_otp");
         if (validate.flag === 0) {
@@ -173,6 +174,10 @@ export const postVerifyOtp = async (req, res) => {
         log1(["postVerifyOtp ownerData ----->", ownerData]);
 
         await OTP.deleteMany({ phoneNumber: verifyOtpNumber.phoneNumber });
+
+        if (guestId) {
+            await Chat.updateMany({ guestId }, { ownerId: ownerData._id, guestId: null });
+        };
 
         let response = {
             _id: ownerData._id,

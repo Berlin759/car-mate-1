@@ -15,6 +15,7 @@ const Constants = {
     OTP_RESEND_TIME: 1000 * 60 * 2,
     MAX_FILE_SIZE: 10,
     MAX_VIDEO_FILE_SIZE: 15,
+    CAPTCHA_EXPIRY_MINUTES: 5,
     SEND_MAIL: false,
 
     SOCKET_EVENTS: {

@@ -163,7 +163,7 @@ router.post("/send-message", unAuthMiddleware, postSendMessage);
 router.post("/file-dispute", authMiddleware, postFileDispute);
 
 // Call Captcha Verification
-router.post("/generate-call-captcha", authMiddleware, postGenerateCallCaptcha);
-router.post("/verify-call-captcha", authMiddleware, postVerifyCallCaptcha);
+router.post("/generate-call-captcha", unAuthMiddleware, postGenerateCallCaptcha);
+router.post("/verify-call-captcha", unAuthMiddleware, postVerifyCallCaptcha);
 
 export default router;

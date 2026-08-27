@@ -5,7 +5,7 @@ import Constants from "../config/constant.js";
 const callLogSchema = new Schema(
     {
         callerId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         callerType: {

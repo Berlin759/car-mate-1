@@ -4628,7 +4628,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                 status: Constants.TRANSACTION_STATUS.SUCCESS,
             };
 
-            await Transaction.create(transactionPayload);
+            const createTransaction = await Transaction.create(transactionPayload);
 
             if (ownerData) {
                 if (ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE
@@ -4639,6 +4639,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                         title: "Payment Successful!",
                         description: `Payment for booking #${booking._id} was successful. The mechanic will accept your booking request soon.`,
                         ownerId: ownerId,
+                        transactionId: createTransaction._id,
                         type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                     };
 
@@ -4653,6 +4654,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                         title: "Booking Create Successful!",
                         description: `Your booking was create successful. The mechanic will accept your booking request soon.`,
                         ownerId: ownerId,
+                        bookingId: booking._id,
                         type: Constants.NOTIFICATION_TYPE.BOOKING,
                     };
 
@@ -4798,7 +4800,7 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
                 }
             );
 
-            await Transaction.updateOne(
+            const transactionUpdate = await Transaction.updateOne(
                 { bookingId: booking._id },
                 {
                     $set: {
@@ -4820,6 +4822,7 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
                     title: "Payment Successful!",
                     description: `Payment for booking quotation amount ₹${totalQuotationAmount || 0} was successful.`,
                     ownerId: ownerId,
+                    transactionId: transactionUpdate._id,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
 
@@ -4868,23 +4871,24 @@ export const postBookingPaymentFail = async (req, res) => {
                 status: Constants.TRANSACTION_STATUS.FAILED,
                 description: `Razorpay Payment failed for bookingId - ${booking._id}`,
             });
-        };
 
-        const ownerData = await Owner.findById(ownerId);
-        if (
-            ownerData &&
-            ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-            ownerData.deviceToken &&
-            ownerData.deviceToken !== ""
-        ) {
-            let notificationObject = {
-                title: "Payment Failed",
-                description: `Payment of ₹${booking.totalAmount} failed.`,
-                ownerId: ownerId,
-                type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+            const ownerData = await Owner.findById(ownerId);
+            if (
+                ownerData &&
+                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.deviceToken &&
+                ownerData.deviceToken !== ""
+            ) {
+                let notificationObject = {
+                    title: "Payment Failed",
+                    description: `Payment of ₹${booking.totalAmount} failed.`,
+                    ownerId: ownerId,
+                    transactionId: transaction._id,
+                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                };
+
+                await sendPushNotification(ownerData.deviceToken, notificationObject);
             };
-
-            await sendPushNotification(ownerData.deviceToken, notificationObject);
         };
 
         return res.status(200).json(successResponse("Booking payment failed successfully!"));
@@ -5279,7 +5283,9 @@ export const postRazorpayWebhook = async (req, res) => {
                         let notificationObject = {
                             title: booking.ownerId.fullName,
                             description: "Car owner send request for service booking.",
+                            ownerId: booking.ownerId._id,
                             mechanicId: booking.mechanicId._id,
+                            bookingId: booking._id,
                             type: Constants.NOTIFICATION_TYPE.BOOKING,
                         };
                         await sendPushNotification(booking.mechanicId.deviceToken, notificationObject);
@@ -6029,7 +6035,7 @@ export const postFileDispute = async (req, res) => {
 export const postGenerateCallCaptcha = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const { mechanicId } = req.body;
+        const { mechanicId, guestId } = req.body;
 
         const validate = await custom_validation(req.body, "owner.generate_call_captcha");
         if (validate.flag != 1) {
@@ -6043,6 +6049,26 @@ export const postGenerateCallCaptcha = async (req, res) => {
         const mechanicDetails = await Mechanic.findById(mechanicId);
         if (!mechanicDetails) {
             return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        if (!ownerId && !guestId) {
+            return res.status(400).json(errorResponse("Please provide a valid guest ID."));
+        };
+
+        let userId = "";
+        if (ownerId) {
+            let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
+            if (!ownerData) {
+                return res.status(400).json(errorResponse("Owner not found."));
+            };
+
+            userId = ownerId.toString();
+        } else {
+            userId = guestId.toString();
+        };
+
+        if (!userId) {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
         // Generate a random 5-character uppercase alphanumeric captcha code
@@ -6089,11 +6115,11 @@ export const postGenerateCallCaptcha = async (req, res) => {
         const captchaSvg = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
         // Expires in 5 minutes
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        const expiryTime = Constants.CAPTCHA_EXPIRY_MINUTES;
+        const expiresAt = new Date(Date.now() + expiryTime * 60 * 1000);
 
-        // Delete any existing active call captchas between this caller and receiver to keep DB clean
         await Captcha.deleteMany({
-            callerId: new ObjectId(ownerId),
+            callerId: userId,
             callerType: Constants.USER_ROLE.OWNER,
             receiverId: new ObjectId(mechanicId),
             receiverType: Constants.USER_ROLE.MECHANIC,
@@ -6101,7 +6127,7 @@ export const postGenerateCallCaptcha = async (req, res) => {
 
         const newCaptcha = await Captcha.create({
             code: captchaCode,
-            callerId: new ObjectId(ownerId),
+            callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
             receiverId: new ObjectId(mechanicId),
             receiverType: Constants.USER_ROLE.MECHANIC,
@@ -6110,7 +6136,7 @@ export const postGenerateCallCaptcha = async (req, res) => {
 
         const response = {
             captchaId: newCaptcha._id,
-            captchaSvg: captchaSvg
+            captchaSvg: captchaSvg,
         };
 
         return res.status(200).json(successResponse("Captcha generated successfully.", response));
@@ -6123,7 +6149,10 @@ export const postGenerateCallCaptcha = async (req, res) => {
 export const postVerifyCallCaptcha = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const { captchaId, captchaCode, mechanicId } = req.body;
+        const { captchaId, captchaCode, mechanicId, guestId } = req.body;
+
+        log1(["postVerifyCallCaptcha ownerId ----->", ownerId]);
+        log1(["postVerifyCallCaptcha req.body ----->", req.body]);
 
         const validate = await custom_validation(req.body, "owner.verify_call_captcha");
         if (validate.flag != 1) {
@@ -6138,10 +6167,29 @@ export const postVerifyCallCaptcha = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid Mechanic Id."));
         };
 
-        // Find and check captcha
+        if (!ownerId && !guestId) {
+            return res.status(400).json(errorResponse("Please provide a valid guest ID."));
+        };
+
+        let userId = "";
+        if (ownerId) {
+            let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
+            if (!ownerData) {
+                return res.status(400).json(errorResponse("Owner not found."));
+            };
+
+            userId = ownerId.toString();
+        } else {
+            userId = guestId.toString();
+        };
+
+        if (!userId) {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
         const captcha = await Captcha.findOne({
             _id: new ObjectId(captchaId),
-            callerId: new ObjectId(ownerId),
+            callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
             receiverId: new ObjectId(mechanicId),
             receiverType: Constants.USER_ROLE.MECHANIC,
@@ -6152,24 +6200,26 @@ export const postVerifyCallCaptcha = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid or expired captcha."));
         };
 
-        // Compare case-insensitively
-        if (captcha.code.toUpperCase() !== captchaCode.trim().toUpperCase()) {
+        const storedCaptcha = String(captcha.code || "").trim();
+        const enteredCaptcha = String(captchaCode || "").trim();
+
+        const isInvalidCaptcha = storedCaptcha !== enteredCaptcha;
+        log1(["postVerifyCallCaptcha isInvalidCaptcha ----->", isInvalidCaptcha,]);
+
+        if (isInvalidCaptcha) {
             return res.status(400).json(errorResponse("Incorrect captcha code."));
         };
 
-        // Successfully verified, delete the captcha so it can't be reused
         await Captcha.deleteOne({ _id: captcha._id });
 
-        // Store Call Log
         await CallLog.create({
-            callerId: new ObjectId(ownerId),
+            callerId: userId.toString(),
             callerType: Constants.USER_ROLE.OWNER,
             receiverId: new ObjectId(mechanicId),
             receiverType: Constants.USER_ROLE.MECHANIC,
             status: Constants.CALL_STATUS.VERIFIED,
         });
 
-        // Get target's (mechanic) contact details
         const mechanic = await Mechanic.findById(mechanicId).select("phoneNumber phoneCode");
         if (!mechanic) {
             return res.status(404).json(errorResponse("Mechanic not found."));

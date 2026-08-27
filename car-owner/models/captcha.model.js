@@ -9,7 +9,7 @@ const captchaSchema = new Schema(
             required: true,
         },
         callerId: {
-            type: Schema.Types.ObjectId,
+            type: String,
             required: true,
         },
         callerType: {

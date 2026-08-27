@@ -34,6 +34,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
         if (!payload.chatId) {
             let objectPayload = {
                 ownerId: payload.ownerId ? payload.ownerId : null,
+                mechanicId: payload.mechanicId ? payload.mechanicId : null,
                 bookingId: payload.bookingId ? payload.bookingId : null,
                 transactionId: payload.transactionId ? payload.transactionId : null,
                 type: payload.type,
