@@ -20,6 +20,7 @@ import Owner from "../models/owner.model.js";
 import OTP from "../models/otp.model.js";
 import { sendPushNotification } from "./pushNotification.js";
 import Chat from "../models/chat.model.js";
+import ChatMessage from "../models/chatMessage.model.js";
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();
@@ -176,7 +177,60 @@ export const postVerifyOtp = async (req, res) => {
         await OTP.deleteMany({ phoneNumber: verifyOtpNumber.phoneNumber });
 
         if (guestId) {
-            await Chat.updateMany({ guestId }, { ownerId: ownerData._id, guestId: null });
+            const guestIdString = String(guestId).trim();
+            const ownerId = ownerData._id;
+            const ownerIdString = ownerId.toString();
+
+            const guestChats = await Chat.find({ guestId: guestIdString }).select("_id").lean();
+
+            const chatIds = guestChats.map((chat) => chat._id);
+
+            if (chatIds.length > 0) {
+                const [chatUpdateResult, messageUpdateResult] = await Promise.all([
+                    Chat.updateMany(
+                        {
+                            _id: { $in: chatIds },
+                        },
+                        [
+                            {
+                                $set: {
+                                    ownerId: ownerId,
+                                    readMessages: {
+                                        $map: {
+                                            input: { $ifNull: ["$readMessages", []] },
+                                            as: "item",
+                                            in: {
+                                                byId: {
+                                                    $cond: [
+                                                        {
+                                                            $eq: ["$$item.byId", guestIdString],
+                                                        },
+                                                        ownerIdString,
+                                                        "$$item.byId",
+                                                    ],
+                                                },
+                                                lastReadAt: "$$item.lastReadAt",
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    ),
+
+                    ChatMessage.updateMany(
+                        {
+                            chatId: { $in: chatIds },
+                            byId: guestIdString,
+                        },
+                        {
+                            $set: {
+                                byId: ownerIdString,
+                            },
+                        },
+                    ),
+                ]);
+            };
         };
 
         let response = {

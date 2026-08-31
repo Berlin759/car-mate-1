@@ -21,10 +21,6 @@ admin.initializeApp({
 
 export const sendPushNotification = async (registrationToken, payload) => {
     try {
-        if (!registrationToken) {
-            log1(["Device Token is required ----->", registrationToken]);
-            return errorResponse("Device Token is required");
-        };
         let messageType = payload.type ? payload.type.toString() : 0;
         log1(["sendPushNotification messageType----->", messageType]);
 
@@ -37,7 +33,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 mechanicId: payload.mechanicId ? payload.mechanicId : null,
                 bookingId: payload.bookingId ? payload.bookingId : null,
                 transactionId: payload.transactionId ? payload.transactionId : null,
-                type: payload.type,
+                type: payload.type || Constants.NOTIFICATION_TYPE.DEFAULT,
                 title: payload.title,
                 description: payload.description,
             };
@@ -57,7 +53,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 collapseKey: collapseKey,
                 priority: "high",
                 notification: {
-                    channelId: "default",   // optional, but recommended
+                    channelId: "default",
                     sound: "default",
                 },
             },
@@ -68,10 +64,9 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 transactionId: payload.transactionId ? payload.transactionId.toString() : "",
                 chatId: payload.chatId ? payload.chatId.toString() : ""
             },
-            // iOS collapse control + grouping
             apns: {
                 headers: {
-                    "apns-collapse-id": collapseKey,   // prevents collapse
+                    "apns-collapse-id": collapseKey,
                 },
                 payload: {
                     aps: {
@@ -84,10 +79,6 @@ export const sendPushNotification = async (registrationToken, payload) => {
                     },
                 },
             },
-            // apns:{
-            //     title: payload.title ? payload.title : "Notification",
-            //     body: payload.description ? payload.description : "Notification Send",
-            // },
             token: registrationToken,
         };
 

@@ -88,6 +88,13 @@ const Constants = {
         FALSE: 1,
         TRUE: 2,
     },
+    NOTIFICATION_TYPE: {
+        DEFAULT: 1,
+        BOOKING: 2,
+        TRANSACTION: 3,
+        CHAT: 4,
+        REVIEWS: 5,
+    },
     SECURITY_SETTING_STATUS: {
         FALSE: 1,
         TRUE: 2,

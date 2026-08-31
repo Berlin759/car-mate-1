@@ -96,6 +96,14 @@ const mechanicSchema = new Schema(
             type: String,
             default: "",
         },
+        razorpayContactId: {
+            type: String,
+            default: "",
+        },
+        razorpayFundAccountId: {
+            type: String,
+            default: "",
+        },
         earningBalance: {
             type: Number,
             default: 0,

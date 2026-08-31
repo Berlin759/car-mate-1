@@ -6,6 +6,7 @@ import session from "express-session";
 import fileUpload from "express-fileupload";
 import connectDB from "./utils/db.helper.js";
 import { log1 } from "./lib/general.js";
+import { initCronJobs } from "./utils/cron.js";
 import errorHandler from "./utils/errorHandler.js";
 import adminRouter from "./routes/adminRoutes.js";
 import Constants from "./config/constant.js";
@@ -87,6 +88,7 @@ connectDB().then(() => {
     app.listen(PORT, async () => {
         log1(["Server is running on PORT ----->", process.env.PORT]);
         log1(["Server URL ----->", process.env.SERVER_URL]);
+        initCronJobs();
     });
 }).catch((error) => {
     log1(["Error in connecting to database ----->", error]);

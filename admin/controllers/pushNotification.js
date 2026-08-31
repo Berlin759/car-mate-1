@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import admin from "firebase-admin";
 import Constants from "../config/constant.js";
 import messages from "../utils/messages.js";
-import { errorResponse, log1, successResponse, } from "../lib/general.js";
+import { errorResponse, log1, successResponse } from "../lib/general.js";
 import Notification from "../models/notification.model.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,8 +21,8 @@ admin.initializeApp({
 
 export const sendPushNotification = async (registrationToken, payload) => {
     try {
-        let messageType = payload.type ? payload.type.toString() : 0;
-        log1(["sendPushNotification messageType----->", messageType]);
+        let messageType = payload.type ? payload.type.toString() : "0";
+        log1(["sendPushNotification messageType ----->", messageType]);
 
         const collapseKey = payload.bookingId ? `booking_${payload.bookingId}` : payload.transactionId ? `txn_${payload.transactionId}` : `notify_${Date.now()}`;
 
@@ -47,7 +47,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
         const message = {
             notification: {
                 title: payload.title ? payload.title : "Notification",
-                body: payload.description ? payload.description : "Notification Send",
+                body: payload.description ? payload.description : "Notification Sent",
             },
             android: {
                 collapseKey: collapseKey,
@@ -59,7 +59,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
             },
             data: {
                 key1: 'value1',
-                messageType: messageType ? messageType : 0,
+                messageType: messageType ? messageType : "0",
                 bookingId: payload.bookingId ? payload.bookingId.toString() : "",
                 transactionId: payload.transactionId ? payload.transactionId.toString() : "",
                 chatId: payload.chatId ? payload.chatId.toString() : ""
@@ -72,7 +72,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                     aps: {
                         alert: {
                             title: payload.title ? payload.title : "Notification",
-                            body: payload.description ? payload.description : "Notification Send",
+                            body: payload.description ? payload.description : "Notification Sent",
                         },
                         'thread-id': collapseKey,
                         sound: "default",
@@ -86,12 +86,12 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
         if (registrationToken) {
             const response = await admin.messaging().send(message);
-            log1("Push notification sent successfully:", response);
-        };
+            log1(["Push notification sent successfully:", response]);
+        }
 
         return addNotification ? addNotification : "";
     } catch (error) {
-        log1(["sendPushNotification Error----->", error.message]);
+        log1(["sendPushNotification Error ----->", error.message]);
         return errorResponse(messages.unexpectedDataError);
-    };
+    }
 };
