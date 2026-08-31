@@ -37,18 +37,28 @@
         return map[status] || { text: "Unknown", class: "alert-gray" };
     };
 
+    function getPayoutStatusBadge(status) {
+        const map = {
+            1: { text: "Pending", class: "alert-pending", textClass: "text-warning" },
+            2: { text: "Completed", class: "alert-success", textClass: "text-success" },
+            3: { text: "Failed", class: "alert-end", textClass: "text-danger" },
+        };
+        return map[status] || { text: "Unknown", class: "alert-gray", textClass: "text-gray" };
+    };
+
     let txn = body?.transaction || {};
     let txnStatus = getTransactionStatusBadge(txn.status);
     let bookStatus = txn.bookingDetails ? getBookingStatusBadge(txn.bookingDetails.status) : null;
+    let payoutStatus = txn.earningDetails ? getPayoutStatusBadge(txn.earningDetails.status) : null;
 %>
 
 <div class="d-flex align-items-center justify-content-between mb-30">
     <a href="/transactions" class="btn btn-outline-secondary d-flex align-items-center gap-2">
         <i class="fa-solid fa-arrow-left"></i> Back to List
     </a>
-    <div class="d-flex align-items-center gap-2">
+    <!-- <div class="d-flex align-items-center gap-2">
         <span class="bet-status <%= txnStatus.class %>"><%= txnStatus.text %></span>
-    </div>
+    </div> -->
 </div>
 
 <div class="row">
@@ -59,7 +69,7 @@
                     <i class="fa-solid fa-money-bill-transfer text-success fs-5"></i>
                 </div>
                 <div>
-                    <h5 class="mb-0"><%= txn.invoiceId || "-" %></h5>
+                    <h5 class="mb-1"><%= txn.invoiceId || "-" %></h5>
                     <span class="text-gray">Transaction ID: <%= txn._id || "-" %></span>
                 </div>
             </div>
@@ -75,7 +85,7 @@
                     <i class="fa-solid fa-hashtag text-primary"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">TRX ID</span>
+                    <span class="fs-14 text-gray d-block mb-1">TRX ID</span>
                     <span class="fw-md"><%= txn.trxId || "-" %></span>
                 </div>
             </div>
@@ -88,7 +98,7 @@
                     <i class="fa-solid fa-user text-success"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Car Owner</span>
+                    <span class="fs-14 text-gray d-block mb-1">Car Owner</span>
                     <span class="fw-md"><%= txn.ownerDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -101,7 +111,7 @@
                     <i class="fa-solid fa-wrench text-warning"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Mechanic</span>
+                    <span class="fs-14 text-gray d-block mb-1">Mechanic</span>
                     <span class="fw-md"><%= txn.mechanicDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -114,7 +124,7 @@
                     <i class="fa-solid fa-cog text-purple"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Service</span>
+                    <span class="fs-14 text-gray d-block mb-1">Service</span>
                     <span class="fw-md"><%= txn.serviceDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -127,7 +137,7 @@
                     <i class="fa-solid fa-car text-primary"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Vehicle</span>
+                    <span class="fs-14 text-gray d-block mb-1">Vehicle</span>
                     <span class="fw-md"><%= txn.carDetails?.vehicleNumber || "-" %></span>
                     <span class="text-gray fs-12 d-block"><%= txn.carDetails?.model || "" %></span>
                 </div>
@@ -141,7 +151,7 @@
                     <i class="fa-solid fa-calendar text-success"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Date</span>
+                    <span class="fs-14 text-gray d-block mb-1">Date</span>
                     <span class="fw-md"><%= formatDateFull(txn.createdAt) || "-" %></span>
                 </div>
             </div>
@@ -155,19 +165,19 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Booking Invoice No</span>
-            <span class="fw-md"><%= txn.bookingDetails.invoiceNo || "-" %></span>
+            <span class="text-gray fs-14 d-block mb-1">Booking ID</span>
+            <span class="fw-md"><%= txn.bookingId || "-" %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Booking Date</span>
+            <span class="text-gray fs-14 d-block mb-1">Booking Date</span>
             <span class="fw-md"><%= formatDateFull(txn.bookingDetails.date) || "-" %></span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Booking Slot</span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Booking Slot</span>
             <span class="fw-md"><%= txn.bookingDetails.slot || "-" %></span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Booking Status</span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Booking Status</span>
             <% if (bookStatus) { %>
                 <span class="bet-status <%= bookStatus.class %>"><%= bookStatus.text %></span>
             <% } else { %>
@@ -183,20 +193,26 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Total Amount</span>
+            <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
             <span class="fw-md fs-16">&#8377; <%= txn.totalAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Admin Charge</span>
-            <span class="fw-md">&#8377; <%= txn.adminCharge || 0 %></span>
+            <span class="text-gray fs-14 d-block mb-1">Admin Charge</span>
+            <span class="fw-md">&#8377; <%= txn?.earningDetails?.adminCharge || 0 %></span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Provider Payout</span>
-            <span class="fw-md fs-16 text-success">&#8377; <%= (txn.totalAmount || 0) - (txn.adminCharge || 0) %></span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Provider Payout</span>
+            <span class="fw-md fs-16 <%= payoutStatus ? payoutStatus.textClass : 'text-success' %>">
+                &#8377; <%= txn?.earningDetails?.finalPayoutAmount || 0 %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Description</span>
-            <span class="fw-md"><%= txn.description || "-" %></span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Payout Status</span>
+            <% if (payoutStatus) { %>
+                <span class="bet-status <%= payoutStatus.class %>"><%= payoutStatus.text %></span>
+            <% } else { %>
+                <span class="text-gray">-</span>
+            <% } %>
         </div>
     </div>
 </div>
@@ -205,12 +221,12 @@
     <h6 class="mb-3">Other Details</h6>
     <hr>
     <div class="row">
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Created Date</span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Created Date</span>
             <span class="fw-md"><%= formatDateFull(txn.createdAt) || "-" %></span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Last Updated</span>
+        <div class="col-md-6">
+            <span class="text-gray fs-14 d-block mb-1">Last Updated</span>
             <span class="fw-md"><%= formatDateFull(txn.updatedAt) || "-" %></span>
         </div>
     </div>

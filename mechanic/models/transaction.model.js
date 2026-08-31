@@ -32,10 +32,6 @@ const transactionSchema = new Schema(
             type: String,
             default: "",
         },
-        adminCharge: {
-            type: Number,
-            default: 0,
-        },
         tipAmount: {
             type: Number,
             default: 0,

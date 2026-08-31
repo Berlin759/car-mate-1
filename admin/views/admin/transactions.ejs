@@ -1,30 +1,6 @@
 <%- include('../header.ejs') %>
     <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
         <div class="filter-area" id="transaction-filter-section">
-            <!-- <div class="dropdown filter-dropdown">
-                <button type="button" class="filter-btn dropdown-toggle" id="method-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
-                        <img src="/images/circle-plus.svg" alt="">
-                        Payment Method
-                    </span>
-                    <div class="hr-line-sm d-none"></div>
-                    <div class="filter-data d-none"></div>
-                </button>
-                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
-                    <li>
-                        <a class="dropdown-item transaction-method-filter" data-method="1" data-method-text="Cash">Cash</a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item transaction-method-filter" data-method="2" data-method-text="Wallet">Wallet</a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item transaction-method-filter" data-method="3" data-method-text="Credit Card">Credit Card</a>
-                    </li>
-                    <button id="clear-method-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
-                        Clear filters
-                    </button>
-                </ul>
-            </div> -->
             <div class="dropdown filter-dropdown">
                 <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="fs-14 fw-md d-flex align-items-center gap-1">
@@ -48,6 +24,30 @@
                         <a class="dropdown-item transaction-status-filter" data-status="4" data-status-text="Refunded">Refunded</a>
                     </li>
                     <button id="clear-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
+                        Clear filters
+                    </button>
+                </ul>
+            </div>
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="payout-status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Payout Status
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li>
+                        <a class="dropdown-item payout-status-filter" data-status="1" data-status-text="Pending">Pending</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item payout-status-filter" data-status="2" data-status-text="Completed">Completed</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item payout-status-filter" data-status="3" data-status-text="Failed">Failed</a>
+                    </li>
+                    <button id="clear-payout-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
                         Clear filters
                     </button>
                 </ul>

@@ -3858,12 +3858,108 @@ export const postBookingDetails = async (req, res) => {
                     createdAt: -1,
                 },
             },
-
             {
                 $lookup: {
                     from: "services",
-                    localField: "serviceId",
-                    foreignField: "_id",
+                    let: {
+                        mechanicId: "$mechanicId",
+                        serviceId: "$serviceId",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                status: Constants.SERVICE_STATUS.ACTIVE,
+                                $expr: {
+                                    $eq: ["$_id", "$$serviceId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                categoryId: { $toString: "$_id" },
+                                categoryName: { $ifNull: ["$fullName", ""] },
+                                categoryImage: { $ifNull: ["$image", ""] },
+                                categoryDescription: { $ifNull: ["$description", ""] },
+                                subCategory: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: { $ifNull: ["$subCategory", []] },
+                                                as: "sub",
+                                                cond: {
+                                                    $gt: [
+                                                        {
+                                                            $size: {
+                                                                $filter: {
+                                                                    input: { $ifNull: ["$$sub.mechanicIds", []] },
+                                                                    as: "mechanic",
+                                                                    cond: {
+                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                        0,
+                                                    ],
+                                                },
+                                            },
+                                        },
+                                        as: "sub",
+                                        in: {
+                                            subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
+                                            price: {
+                                                $let: {
+                                                    vars: {
+                                                        mechanicData: {
+                                                            $arrayElemAt: [
+                                                                {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ["$$sub.mechanicIds", []],
+                                                                        },
+                                                                        as: "mechanic",
+                                                                        cond: {
+                                                                            $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                0,
+                                                            ],
+                                                        },
+                                                    },
+                                                    in: { $ifNull: ["$$mechanicData.price", 0] },
+                                                },
+                                            },
+                                            description: {
+                                                $let: {
+                                                    vars: {
+                                                        mechanicData: {
+                                                            $arrayElemAt: [
+                                                                {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ["$$sub.mechanicIds", []],
+                                                                        },
+                                                                        as: "mechanic",
+                                                                        cond: {
+                                                                            $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                0,
+                                                            ],
+                                                        },
+                                                    },
+                                                    in: { $ifNull: ["$$mechanicData.description", ""] },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
                     as: "serviceDetails",
                 },
             },
@@ -3911,7 +4007,6 @@ export const postBookingDetails = async (req, res) => {
                             $project: {
                                 invoiceId: 1,
                                 trxId: 1,
-                                adminCharge: 1,
                                 totalAmount: 1,
                                 totalQuotationAmount: 1,
                                 description: 1,
@@ -4027,6 +4122,7 @@ export const postBookingDetails = async (req, res) => {
                     razorpayQuotationOrderId: 1,
                     quotationPaymentStatus: 1,
                     bookingPaymentStatus: 1,
+                    cancelReason: 1,
                     status: 1,
                     createdAt: 1,
                     serviceDetails: 1,
@@ -5084,7 +5180,6 @@ export const postTransactionList = async (req, res) => {
                                 invoiceId: 1,
                                 trxId: 1,
                                 totalAmount: 1,
-                                adminCharge: 1,
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
@@ -5126,6 +5221,152 @@ export const postTransactionList = async (req, res) => {
         return res.status(200).json(successResponse("Transaction List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postTransactionList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postTransactionDetails = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        log1(["postTransactionDetails ownerId----->", ownerId]);
+        log1(["postTransactionDetails req.body----->", req.body]);
+
+        const { transactionId } = req.body;
+
+        if (!transactionId || !ObjectId.isValid(transactionId)) {
+            return res.status(400).json(errorResponse("Invalid transaction id."));
+        };
+
+        const match = {
+            _id: new ObjectId(transactionId),
+            ownerId: new ObjectId(ownerId),
+        };
+
+        const pipeline = [
+            {
+                $match: match,
+            },
+            {
+                $sort: {
+                    createdAt: -1,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    localField: "serviceId",
+                    foreignField: "_id",
+                    as: "serviceDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                                image: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                address: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    invoiceId: 1,
+                    trxId: 1,
+                    totalAmount: 1,
+                    description: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+
+                    serviceDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
+
+                    bookingDetails: {
+                        _id: "$bookingDetails._id",
+                        invoiceNo: "$bookingDetails.invoiceNo",
+                        date: "$bookingDetails.date",
+                        slot: "$bookingDetails.slot",
+                        status: "$bookingDetails.status",
+                    },
+                },
+            },
+        ];
+
+        const [result] = await Transaction.aggregate(pipeline);
+
+        return res.status(200).json(successResponse("Transaction details get successfully.", result));
+    } catch (error) {
+        log1(["Error in postTransactionDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
     };
 };

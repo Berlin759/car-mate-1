@@ -19,13 +19,13 @@
             <tr>
                 <th>#</th>
                 <th>Payment ID</th>
-                <th>Booking</th>
+                <th>Booking ID</th>
                 <th>Car Owner</th>
                 <th>Mechanic</th>
                 <th>Service Name</th>
-                <th>Car Name</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Payout Status</th>
                 <th>Date</th>
                 <th>Action</th>
             </tr>
@@ -36,12 +36,11 @@
                     <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
                     <tr>
                         <td><%= start_index %></td>
-                        <td><%= transaction?._id %></td>
-                        <td><%= transaction?.bookingDetails?._id || "-" %></td>
+                        <td><%= transaction?.trxId %></td>
+                        <td><%= transaction?.bookingId || "-" %></td>
                         <td><%= transaction?.ownerDetails?.fullName || "-" %></td>
                         <td><%= transaction?.mechanicDetails?.fullName || "-" %></td>
                         <td><%= transaction?.serviceDetails?.fullName || "-" %></td>
-                        <td><%= transaction?.carDetails?.fullName || "-" %></td>
                         <td>$<%= transaction?.totalAmount || 0 %></td>
                         <td>
                             <% if(transaction?.status === 2) { %>
@@ -52,6 +51,19 @@
                                 <span class="bet-status alert-gray">Refunded</span>
                             <% } else { %>
                                 <span class="bet-status alert-pending">Pending</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <% if(transaction?.earningDetails) { %>
+                                <% if(transaction?.earningDetails?.status === 3) { %>
+                                    <span class="bet-status alert-accept">Failed</span>
+                                <% } else if(transaction?.earningDetails?.status === 2) { %>
+                                    <span class="bet-status alert-end">Completed</span>
+                                <% } else { %>
+                                    <span class="bet-status alert-pending">Pending</span>
+                                <% } %>
+                            <% } else { %>
+                                -
                             <% } %>
                         </td>
                         <td><%= formatDate(transaction?.createdAt) || "-" %></td>
@@ -79,7 +91,7 @@
                 <% }) %>
             <% } else { %>
                 <tr>
-                    <td colspan="9" class="text-center">No transactions found</td>
+                    <td colspan="11" class="text-center">No transactions found</td>
                 </tr>
             <% } %>
         </tbody>

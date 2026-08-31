@@ -37,10 +37,6 @@ const transactionSchema = new Schema(
             type: String,
             default: "",
         },
-        adminCharge: {
-            type: Number,
-            default: 0,
-        },
         totalAmount: {
             type: Number,
             default: 0,

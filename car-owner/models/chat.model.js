@@ -78,15 +78,10 @@ const chatSchema = new Schema(
 );
 
 chatSchema.index({
+    bookingId: 1,
     ownerId: 1,
-    mechanicId: 1,
-    updatedAt: -1,
-});
-
-chatSchema.index({
     guestId: 1,
     mechanicId: 1,
-    updatedAt: -1,
 });
 
 chatSchema.virtual('readableCreatedAt').get(function () {

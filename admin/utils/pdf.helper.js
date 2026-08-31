@@ -19,6 +19,12 @@ const STATUS_MAP = {
     4: { text: "Refunded", color: COLORS.warning },
 };
 
+const PAYOUT_STATUS_MAP = {
+    1: { text: "Pending", color: COLORS.pending },
+    2: { text: "Completed", color: COLORS.success },
+    3: { text: "Failed", color: COLORS.danger },
+};
+
 function formatDate(date) {
     if (!date) return "-";
 
@@ -50,11 +56,13 @@ export function generateTransactionPDF(transaction, res) {
     const MR = 50;
     const CW = doc.page.width - ML - MR;
     const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
+    const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
     // Header background
     doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
     doc.fontSize(18).fillColor(COLORS.white).font("Helvetica-Bold").text("Transaction Receipt", ML, 18, { width: CW, align: "center" });
     doc.fontSize(10).fillColor(COLORS.white).font("Helvetica").text(`Status: ${status.text}`, ML, 46, { width: CW, align: "center" });
+    doc.fontSize(10).fillColor(COLORS.white).font("Helvetica").text(`Payout Status: ${payoutStatus.text}`, ML, 46, { width: CW, align: "center" });
 
     let y = 85;
 
@@ -78,8 +86,9 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Created Date:", formatDate(transaction?.createdAt), 320, y);
         y += 28;
 
-        drawField(doc, "Admin Charge:", `$${transaction?.adminCharge || 0}`, ML, y);
-        drawField(doc, "Total Amount:", `$${transaction?.totalAmount || 0}`, 320, y);
+        drawField(doc, "Service Amount:", `$${transaction?.earningDetails?.serviceAmount || 0}`, ML, y);
+        drawField(doc, "Admin Charge:", `$${transaction?.earningDetails?.adminCharge || 0}`, ML, y);
+        drawField(doc, "Total Amount:", `$${transaction?.earningDetails?.finalPayoutAmount || 0}`, 320, y);
         y += 28;
     });
 
@@ -154,7 +163,10 @@ function drawCell(doc, text, x, y, w, opts = {}) {
     doc.restore();
 };
 
-export function generateAllTransactionsPDF(transactions, res) {
+export function generateAllTransactionsPDF(transactionData, res) {
+    const transactions = transactionData?.transactionList || [];
+    const earningSummary = transactionData?.earningsSummary || { totalCompletePayout: 0, totalPendingPayouts: 0 };
+
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0 });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -183,16 +195,19 @@ export function generateAllTransactionsPDF(transactions, res) {
     const failedCount = transactions.filter((t) => t?.status === 3).length;
     const refundedCount = transactions.filter((t) => t?.status === 4).length;
     const pendingCount = transactions.filter((t) => t?.status === 1).length;
+    const completePayoutCount = earningSummary.totalCompletePayout || 0;
+    const pendingPayoutCount = earningSummary.totalPendingPayouts || 0;
 
     doc.fontSize(9).fillColor(COLORS.dark).font("Helvetica");
     doc.text(`Total: ${transactions.length}`, ML, y, { width: 150, lineBreak: false });
     doc.text(`Revenue: $${totalAmount.toFixed(2)}`, ML + 150, y, { width: 150, lineBreak: false });
     doc.text(`Completed: ${successCount}  |  Pending: ${pendingCount}  |  Failed: ${failedCount}  |  Refunded: ${refundedCount}`, ML + 300, y, { width: USABLE_W - 300, lineBreak: false });
+    doc.text(`Payout Completed: ${completePayoutCount}  |  Pending Payout: ${pendingPayoutCount}`, ML + 300, y, { width: USABLE_W - 300, lineBreak: false });
     y += 18;
 
     // Column definitions — must sum to USABLE_W
-    const headers = ["#", "Payment ID", "Booking ID", "Owner", "Mechanic", "Service", "Car", "Amount", "Admin Chg", "Status", "Date"];
-    const colWidths = [25, 85, 85, 80, 80, 80, 75, 60, 60, 65, 75];
+    const headers = ["#", "Payment ID", "Booking ID", "Owner", "Mechanic", "Service", "Car", "Amount", "Admin Chg", "Status", "Payout Status", "Date"];
+    const colWidths = [25, 85, 85, 80, 80, 80, 75, 60, 60, 65, 65, 75];
     const colX = [];
     let xAcc = ML;
 
@@ -242,6 +257,7 @@ export function generateAllTransactionsPDF(transactions, res) {
         doc.save().moveTo(ML, y).lineTo(ML + USABLE_W, y).strokeColor(COLORS.lightGray).lineWidth(0.3).stroke().restore();
 
         const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
+        const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
         const rowData = [
             String(index + 1),
@@ -252,8 +268,9 @@ export function generateAllTransactionsPDF(transactions, res) {
             String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
             String(transaction?.carDetails?.fullName || "-").substring(0, 12),
             `$${transaction?.totalAmount || 0}`,
-            `$${transaction?.adminCharge || 0}`,
+            `$${transaction?.earningDetails?.adminCharge || 0}`,
             status.text,
+            payoutStatus.text,
             formatDate(transaction?.createdAt),
         ];
 

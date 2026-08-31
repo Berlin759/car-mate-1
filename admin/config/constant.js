@@ -71,6 +71,11 @@ const Constants = {
         FAILED: 3,
         REFUND: 4,
     },
+    EARNING_STATUS: {
+        PENDING: 1,
+        SUCCESS: 2,
+        FAILED: 3,
+    },
     IS_SUSPENDED_STATUS: {
         UNSUSPENDED: 0,
         SUSPENDED: 1,

@@ -27,6 +27,7 @@ import Announcement from "../models/announcement.model.js";
 import Pricing from "../models/pricing.model.js";
 import Template from "../models/template.model.js";
 import { generateTransactionPDF, generateAllTransactionsPDF } from "../utils/pdf.helper.js";
+import Earning from "../models/earning.model.js";
 
 const __dirname = path.resolve();
 
@@ -2478,6 +2479,7 @@ export const postAllTransactionList = async (req, res) => {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
             status,
+            payoutStatus,
             time,
         } = req.body;
 
@@ -2510,10 +2512,47 @@ export const postAllTransactionList = async (req, res) => {
             {
                 $match: match,
             },
+            {
+                $lookup: {
+                    from: "earnings",
+                    let: {
+                        transactionId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$transactionId", "$$transactionId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                status: 1,
+                                earningAmount: 1,
+                                serviceAmount: 1,
+                                adminCharge: 1,
+                                finalPayoutAmount: 1,
+                                processedAt: 1,
+                            },
+                        },
+                    ],
+                    as: "earningDetails",
+                },
+            },
+
+            // PAYOUT STATUS FILTER
+            ...(payoutStatus !== undefined && payoutStatus !== null && payoutStatus !== "" ? [
+                {
+                    $match: { "earningDetails.status": Number(payoutStatus), },
+                },
+            ] : []),
 
             {
                 $sort: {
                     createdAt: -1,
+                    _id: -1,
                 },
             },
 
@@ -2559,12 +2598,8 @@ export const postAllTransactionList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
-                                            latitude: 1,
-                                            longitude: 1,
-                                            address: 1,
                                             status: 1,
                                         },
                                     },
@@ -2587,7 +2622,6 @@ export const postAllTransactionList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -2634,6 +2668,18 @@ export const postAllTransactionList = async (req, res) => {
                                 localField: "bookingId",
                                 foreignField: "_id",
                                 as: "bookingDetails",
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            invoiceNo: 1,
+                                            date: 1,
+                                            slot: 1,
+                                            status: 1,
+                                            address: 1,
+                                            totalAmount: 1,
+                                        },
+                                    },
+                                ],
                             },
                         },
                         {
@@ -2644,10 +2690,15 @@ export const postAllTransactionList = async (req, res) => {
                         },
                         {
                             $project: {
+                                _id: 1,
+                                ownerId: 1,
+                                mechanicId: 1,
+                                serviceId: 1,
+                                bookingId: 1,
+                                carId: 1,
                                 invoiceId: 1,
                                 trxId: 1,
                                 totalAmount: 1,
-                                adminCharge: 1,
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
@@ -2657,13 +2708,9 @@ export const postAllTransactionList = async (req, res) => {
                                 ownerDetails: 1,
                                 mechanicDetails: 1,
                                 carDetails: 1,
-
-                                bookingDetails: {
-                                    _id: "$bookingDetails._id",
-                                    invoiceNo: "$bookingDetails.invoiceNo",
-                                    date: "$bookingDetails.date",
-                                    slot: "$bookingDetails.slot",
-                                    status: "$bookingDetails.status",
+                                bookingDetails: 1,
+                                earningDetails: {
+                                    $arrayElemAt: ["$earningDetails", 0],
                                 },
                             },
                         },
@@ -2680,9 +2727,9 @@ export const postAllTransactionList = async (req, res) => {
 
         const [result] = await Transaction.aggregate(pipeline).allowDiskUse(true);
 
-        const items = result.items;
+        const items = result?.items || [];
 
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
+        const totalRecords = result?.totalRecords[0]?.count || 0;
 
         let response = successResponse();
 
@@ -2843,11 +2890,29 @@ export const postTransactionDetails = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "earnings",
+                    localField: "_id",
+                    foreignField: "transactionId",
+                    as: "earningDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$earningDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
+                    ownerId: 1,
+                    mechanicId: 1,
+                    serviceId: 1,
+                    bookingId: 1,
+                    carId: 1,
                     invoiceId: 1,
                     trxId: 1,
                     totalAmount: 1,
-                    adminCharge: 1,
                     description: 1,
                     status: 1,
                     createdAt: 1,
@@ -2864,6 +2929,11 @@ export const postTransactionDetails = async (req, res) => {
                         date: "$bookingDetails.date",
                         slot: "$bookingDetails.slot",
                         status: "$bookingDetails.status",
+                    },
+
+                    earningDetails: {
+                        _id: "$earningDetails._id",
+                        status: "$earningDetails.status",
                     },
                 },
             },
@@ -2887,75 +2957,180 @@ export const getTransactionDownload = async (req, res) => {
         };
 
         const pipeline = [
-            { $match: { _id: new ObjectId(id) } },
+            {
+                $match: {
+                    _id: new ObjectId(id),
+                },
+            },
             {
                 $lookup: {
                     from: "services",
                     localField: "serviceId",
                     foreignField: "_id",
                     as: "serviceDetails",
-                    pipeline: [{ $project: { fullName: 1, description: 1, status: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "owners",
                     localField: "ownerId",
                     foreignField: "_id",
                     as: "ownerDetails",
-                    pipeline: [{ $project: { fullName: 1, email: 1, phoneNumber: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "mechanics",
                     localField: "mechanicId",
                     foreignField: "_id",
                     as: "mechanicDetails",
-                    pipeline: [{ $project: { fullName: 1, email: 1, phoneNumber: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$mechanicDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "cars",
                     localField: "carId",
                     foreignField: "_id",
                     as: "carDetails",
-                    pipeline: [{ $project: { fullName: 1, vehicleNumber: 1, model: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "bookings",
                     localField: "bookingId",
                     foreignField: "_id",
                     as: "bookingDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceNo: 1,
+                                date: 1,
+                                slot: 1,
+                                status: 1,
+                                address: 1,
+                                totalAmount: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$bookingDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "earnings",
+                    let: {
+                        transactionId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$transactionId", "$$transactionId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                status: 1,
+                                earningAmount: 1,
+                                serviceAmount: 1,
+                                adminCharge: 1,
+                                finalPayoutAmount: 1,
+                                processedAt: 1,
+                            },
+                        },
+                    ],
+                    as: "earningDetails",
+                },
+            },
             {
                 $project: {
+                    _id: 1,
+                    ownerId: 1,
+                    mechanicId: 1,
+                    serviceId: 1,
+                    bookingId: 1,
+                    carId: 1,
                     invoiceId: 1,
                     trxId: 1,
                     totalAmount: 1,
-                    adminCharge: 1,
-                    description: 1,
                     status: 1,
                     createdAt: 1,
+                    updatedAt: 1,
                     serviceDetails: 1,
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
-                    bookingDetails: {
-                        _id: "$bookingDetails._id",
-                        invoiceNo: "$bookingDetails.invoiceNo",
-                        date: "$bookingDetails.date",
-                        slot: "$bookingDetails.slot",
-                        status: "$bookingDetails.status",
+                    bookingDetails: 1,
+                    earningDetails: {
+                        $arrayElemAt: ["$earningDetails", 0],
                     },
                 },
             },
@@ -2985,67 +3160,223 @@ export const getAllTransactionsDownload = async (req, res) => {
                     localField: "serviceId",
                     foreignField: "_id",
                     as: "serviceDetails",
-                    pipeline: [{ $project: { fullName: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                description: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "owners",
                     localField: "ownerId",
                     foreignField: "_id",
                     as: "ownerDetails",
-                    pipeline: [{ $project: { fullName: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "mechanics",
                     localField: "mechanicId",
                     foreignField: "_id",
                     as: "mechanicDetails",
-                    pipeline: [{ $project: { fullName: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$mechanicDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "cars",
                     localField: "carId",
                     foreignField: "_id",
                     as: "carDetails",
-                    pipeline: [{ $project: { fullName: 1 } }],
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$carDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $lookup: {
                     from: "bookings",
                     localField: "bookingId",
                     foreignField: "_id",
                     as: "bookingDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                invoiceNo: 1,
+                                date: 1,
+                                slot: 1,
+                                status: 1,
+                                address: 1,
+                                totalAmount: 1,
+                            },
+                        },
+                    ],
                 },
             },
-            { $unwind: { path: "$bookingDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "earnings",
+                    let: {
+                        transactionId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$transactionId", "$$transactionId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                status: 1,
+                                earningAmount: 1,
+                                serviceAmount: 1,
+                                adminCharge: 1,
+                                finalPayoutAmount: 1,
+                                processedAt: 1,
+                            },
+                        },
+                    ],
+                    as: "earningDetails",
+                },
+            },
             {
                 $project: {
+                    _id: 1,
+                    ownerId: 1,
+                    mechanicId: 1,
+                    serviceId: 1,
+                    bookingId: 1,
+                    carId: 1,
+                    invoiceId: 1,
+                    trxId: 1,
                     totalAmount: 1,
-                    adminCharge: 1,
                     status: 1,
                     createdAt: 1,
+                    updatedAt: 1,
                     serviceDetails: 1,
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
-                    bookingDetails: {
-                        _id: "$bookingDetails._id",
+                    bookingDetails: 1,
+                    earningDetails: {
+                        $arrayElemAt: ["$earningDetails", 0],
                     },
                 },
             },
         ];
 
-        const transactions = await Transaction.aggregate(pipeline).allowDiskUse(true);
+        const [earningSummaryResult, transactionList] = await Promise.all([
+            Earning.aggregate([
+                {
+                    $match: {},
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCompletePayout: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$status", Constants.EARNING_STATUS.SUCCESS], },
+                                    { $ifNull: ["$finalPayoutAmount", 0] },
+                                    0,
+                                ],
+                            },
+                        },
+                        totalPendingPayouts: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$status", Constants.EARNING_STATUS.PENDING,], },
+                                    { $ifNull: ["$finalPayoutAmount", 0] },
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalCompletePayout: 1,
+                        totalPendingPayouts: 1,
+                    },
+                },
+            ]),
+
+            Transaction.aggregate(pipeline).allowDiskUse(true),
+        ]);
+
+        const earningSummary = earningSummaryResult[0] || { totalCompletePayout: 0, totalPendingPayouts: 0 };
+
+        const transactions = {
+            earningsSummary: {
+                totalCompletePayout: earningSummary.totalCompletePayout || 0,
+                totalPendingPayouts: earningSummary.totalPendingPayouts || 0,
+            },
+            transactionList,
+        };
 
         return generateAllTransactionsPDF(transactions, res);
     } catch (error) {
@@ -3342,20 +3673,40 @@ export const getTransactionDetailPage = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "earnings",
+                    localField: "_id",
+                    foreignField: "transactionId",
+                    as: "earningDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$earningDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
+                    ownerId: 1,
+                    mechanicId: 1,
+                    serviceId: 1,
+                    bookingId: 1,
+                    carId: 1,
                     invoiceId: 1,
                     trxId: 1,
                     totalAmount: 1,
-                    adminCharge: 1,
                     description: 1,
                     status: 1,
                     createdAt: 1,
                     updatedAt: 1,
+
                     serviceDetails: 1,
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
                     bookingDetails: 1,
+                    earningDetails: 1,
                 },
             },
         ];

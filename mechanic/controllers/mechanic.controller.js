@@ -40,6 +40,7 @@ import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 import { createOrder } from "./razorpay.controller.js";
+import Pricing from "../models/pricing.model.js";
 
 const __dirname = path.resolve();
 
@@ -875,10 +876,11 @@ export const postHomeDetails = async (req, res) => {
             }),
 
             // Today's earnings sum
-            Transaction.aggregate([
+            Earning.aggregate([
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
+                        status: { $in: [Constants.EARNING_STATUS.PENDING, Constants.EARNING_STATUS.SUCCESS] },
                         createdAt: { $gte: today, $lt: tomorrow },
                     },
                 },
@@ -909,18 +911,18 @@ export const postHomeDetails = async (req, res) => {
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                        status: Constants.EARNING_STATUS.PENDING
+                        status: Constants.EARNING_STATUS.PENDING,
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
             ]),
 
             // All time total earnings sum
-            Transaction.aggregate([
+            Earning.aggregate([
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                        status: Constants.TRANSACTION_STATUS.SUCCESS
+                        status: Constants.EARNING_STATUS.SUCCESS,
                     },
                 },
                 { $group: { _id: null, total: { $sum: "$totalAmount" } } },
@@ -1477,12 +1479,108 @@ export const postBookingDetails = async (req, res) => {
                     createdAt: -1,
                 },
             },
-
             {
                 $lookup: {
                     from: "services",
-                    localField: "serviceId",
-                    foreignField: "_id",
+                    let: {
+                        mechanicId: "$mechanicId",
+                        serviceId: "$serviceId",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                status: Constants.SERVICE_STATUS.ACTIVE,
+                                $expr: {
+                                    $eq: ["$_id", "$$serviceId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                categoryId: { $toString: "$_id" },
+                                categoryName: { $ifNull: ["$fullName", ""] },
+                                categoryImage: { $ifNull: ["$image", ""] },
+                                categoryDescription: { $ifNull: ["$description", ""] },
+                                subCategory: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: { $ifNull: ["$subCategory", []] },
+                                                as: "sub",
+                                                cond: {
+                                                    $gt: [
+                                                        {
+                                                            $size: {
+                                                                $filter: {
+                                                                    input: { $ifNull: ["$$sub.mechanicIds", []] },
+                                                                    as: "mechanic",
+                                                                    cond: {
+                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                        0,
+                                                    ],
+                                                },
+                                            },
+                                        },
+                                        as: "sub",
+                                        in: {
+                                            subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
+                                            price: {
+                                                $let: {
+                                                    vars: {
+                                                        mechanicData: {
+                                                            $arrayElemAt: [
+                                                                {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ["$$sub.mechanicIds", []],
+                                                                        },
+                                                                        as: "mechanic",
+                                                                        cond: {
+                                                                            $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                0,
+                                                            ],
+                                                        },
+                                                    },
+                                                    in: { $ifNull: ["$$mechanicData.price", 0] },
+                                                },
+                                            },
+                                            description: {
+                                                $let: {
+                                                    vars: {
+                                                        mechanicData: {
+                                                            $arrayElemAt: [
+                                                                {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ["$$sub.mechanicIds", []],
+                                                                        },
+                                                                        as: "mechanic",
+                                                                        cond: {
+                                                                            $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                0,
+                                                            ],
+                                                        },
+                                                    },
+                                                    in: { $ifNull: ["$$mechanicData.description", ""] },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
                     as: "serviceDetails",
                 },
             },
@@ -1530,7 +1628,6 @@ export const postBookingDetails = async (req, res) => {
                             $project: {
                                 invoiceId: 1,
                                 trxId: 1,
-                                adminCharge: 1,
                                 totalAmount: 1,
                                 totalQuotationAmount: 1,
                                 description: 1,
@@ -1642,6 +1739,8 @@ export const postBookingDetails = async (req, res) => {
                     taxAmount: 1,
                     totalAmount: 1,
                     quotation: 1,
+                    razorpayOrderId: 1,
+                    razorpayQuotationOrderId: 1,
                     quotationPaymentStatus: 1,
                     bookingPaymentStatus: 1,
                     cancelReason: 1,
@@ -1846,6 +1945,42 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 if (materialCost) {
                     updatePayload.materialCost = parseFloat(materialCost);
+                };
+
+                const transactionDetails = await Transaction.findOne({
+                    bookingId: new ObjectId(bookingDetails?._id),
+                });
+                log1(["postBookingUpdateStatus transactionDetails----->", transactionDetails]);
+
+                if (!transactionDetails) {
+                    return res.status(400).json(errorResponse("Invalid transition details."));
+                };
+
+                const pricingDetails = await Pricing.findOne({});
+                log1(["postBookingUpdateStatus pricingDetails----->", pricingDetails]);
+
+                const platformFee = pricingDetails?.platformCommission || 0;
+
+                const earningAmount = bookingDetails?.totalAmount - bookingDetails?.consultantFee;
+                const finalAmount = bookingDetails?.totalAmount - platformFee;
+
+                const createEarning = await Earning.create({
+                    mechanicId: new ObjectId(bookingDetails?.mechanicId),
+                    transactionId: new ObjectId(transactionDetails._id),
+                    bookingId: new ObjectId(bookingDetails?._id),
+                    earningAmount: earningAmount || 0,
+                    serviceAmount: bookingDetails?.totalAmount || 0,
+                    adminCharge: platformFee || 0,
+                    finalPayoutAmount: finalAmount || 0,
+                    bankAccountNumber: mechanicDetails?.bankAccountNumber,
+                    bankIfscCode: mechanicDetails?.bankIfscCode,
+                    bankAccountHolderName: mechanicDetails?.bankAccountHolderName,
+                    status: Constants.EARNING_STATUS.PENDING,
+                });
+                log1(["postBookingUpdateStatus createEarning----->", createEarning]);
+
+                if (!createEarning) {
+                    return res.status(400).json(errorResponse(messages.unexpectedDataError));
                 };
 
                 notificationTitle = "Service Completed";
@@ -2293,7 +2428,6 @@ export const postTransactionList = async (req, res) => {
                                 invoiceId: 1,
                                 trxId: 1,
                                 totalAmount: 1,
-                                adminCharge: 1,
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
@@ -2835,21 +2969,50 @@ export const postEarningOverview = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
 
-        // 1. Earnings Overview calculations
-        const [allTimeEarningsStats, pendingPayoutsStats] = await Promise.all([
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic ID."));
+        };
+
+        const [earningSummaryResult, recentTransactionList] = await Promise.all([
             Earning.aggregate([
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                        status: Constants.TRANSACTION_STATUS.SUCCESS
                     },
                 },
                 {
                     $group: {
                         _id: null,
-                        total: {
-                            $sum: "$totalAmount",
+                        totalEarnings: {
+                            $sum: {
+                                // $cond: [
+                                //     { $eq: ["$status", Constants.EARNING_STATUS.SUCCESS], },
+                                //     { $ifNull: ["$finalPayoutAmount", 0] },
+                                //     0,
+                                // ],
+                                $cond: [
+                                    { $in: ["$status", [Constants.EARNING_STATUS.PENDING, Constants.EARNING_STATUS.SUCCESS]] },
+                                    { $ifNull: ["$finalPayoutAmount", 0] },
+                                    0,
+                                ],
+                            },
                         },
+                        pendingPayouts: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$status", Constants.EARNING_STATUS.PENDING,], },
+                                    { $ifNull: ["$finalPayoutAmount", 0] },
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalEarnings: 1,
+                        pendingPayouts: 1,
                     },
                 },
             ]),
@@ -2858,40 +3021,106 @@ export const postEarningOverview = async (req, res) => {
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                        status: Constants.EARNING_STATUS.PENDING
                     },
                 },
                 {
-                    $group: {
-                        _id: null,
-                        total: {
-                            $sum: "$amount",
+                    $sort: {
+                        createdAt: -1,
+                    },
+                },
+                {
+                    $limit: 5,
+                },
+                {
+                    $lookup: {
+                        from: "transactions",
+                        localField: "transactionId",
+                        foreignField: "_id",
+                        as: "transactionDetails",
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$transactionDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "bookings",
+                        localField: "bookingId",
+                        foreignField: "_id",
+                        as: "bookingDetails",
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$bookingDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "services",
+                        let: {
+                            serviceId: {
+                                $ifNull: [
+                                    "$transactionDetails.serviceId",
+                                    "$bookingDetails.serviceId",
+                                ],
+                            },
                         },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$_id", "$$serviceId",],
+                                    },
+                                },
+                            },
+                            {
+                                $project: {
+                                    fullName: 1,
+                                    image: 1,
+                                },
+                            },
+                        ],
+                        as: "serviceDetails",
                     },
                 },
-            ])
-        ]);
-
-        const allTimeTotalEarnings = allTimeEarningsStats[0]?.total || 0;
-        const pendingPayouts = pendingPayoutsStats[0]?.total || 0;
-
-        // 3. Recent Day-wise Earnings (top 5)
-        const [recentTransactionList] = await Promise.all([
-            Earning.aggregate([
                 {
-                    $match: {
-                        mechanicId: new ObjectId(mechanicId),
+                    $unwind: {
+                        path: "$serviceDetails",
+                        preserveNullAndEmptyArrays: true,
                     },
                 },
-                { $sort: { createdAt: -1 } },
-                { $limit: 5 },
+                {
+                    $project: {
+                        _id: 1,
+                        transactionId: 1,
+                        bookingId: 1,
+                        invoiceId: { $ifNull: ["$transactionDetails.invoiceId", ""] },
+                        trxId: { $ifNull: ["$transactionDetails.trxId", ""] },
+                        serviceName: { $ifNull: ["$serviceDetails.fullName", ""] },
+                        serviceImage: { $ifNull: ["$serviceDetails.image", ""] },
+                        earningAmount: { $ifNull: ["$earningAmount", 0] },
+                        serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                        adminCharge: { $ifNull: ["$adminCharge", 0] },
+                        finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
+                        status: 1,
+                        processedAt: 1,
+                        createdAt: 1,
+                    },
+                },
             ]),
         ]);
+
+        const earningSummary = earningSummaryResult[0] || { totalEarnings: 0, pendingPayouts: 0 };
 
         const response = {
             earningsSummary: {
-                totalEarnings: allTimeTotalEarnings,
-                pendingPayouts: pendingPayouts,
+                totalEarnings: earningSummary.totalEarnings || 0,
+                pendingPayouts: earningSummary.pendingPayouts || 0,
             },
             recentTransactionList,
         };
@@ -2906,147 +3135,52 @@ export const postEarningOverview = async (req, res) => {
 export const postEarningList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
+
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            startDate,
-            endDate,
-            serviceId,
-            filterType,
+            search = "",
+            status,
         } = req.body;
+
+        log1(["postEarningList mechanicId ----->", mechanicId]);
+        log1(["postEarningList req.body ----->", req.body]);
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic ID."));
+        };
 
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
 
         const match = {
-            mechanicId: new ObjectId(mechanicId)
-        };
-
-        if (serviceId) {
-            if (!ObjectId.isValid(serviceId)) {
-                return res.status(400).json(errorResponse("Invalid service id."));
-            };
-            match.serviceId = new ObjectId(serviceId);
-        };
-
-        let start, end;
-        if (filterType) {
-            const lowerFilter = filterType.toLowerCase();
-            if (lowerFilter === "last_1_month" || lowerFilter === "last_1_months") {
-                start = moment().subtract(1, "months").startOf("day").toDate();
-                end = moment().endOf("day").toDate();
-            } else if (lowerFilter === "last_3_months") {
-                start = moment().subtract(3, "months").startOf("day").toDate();
-                end = moment().endOf("day").toDate();
-            } else if (lowerFilter === "last_6_months") {
-                start = moment().subtract(6, "months").startOf("day").toDate();
-                end = moment().endOf("day").toDate();
-            } else if (lowerFilter === "last_1_year") {
-                start = moment().subtract(1, "years").startOf("day").toDate();
-                end = moment().endOf("day").toDate();
-            } else if (lowerFilter === "custom" || lowerFilter === "choose_date") {
-                if (startDate && endDate) {
-                    start = moment(startDate).startOf("day").toDate();
-                    end = moment(endDate).endOf("day").toDate();
-                };
-            };
-        } else if (startDate && endDate) {
-            start = moment(startDate).startOf("day").toDate();
-            end = moment(endDate).endOf("day").toDate();
-        };
-
-        if (start && end) {
-            match.createdAt = { $gte: start, $lte: end };
-        };
-
-        const pipeline = [
-            {
-                $match: match,
-            },
-            {
-                $group: {
-                    _id: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-                    },
-                    totalEarning: { $sum: "$totalAmount" },
-                    totalJobs: { $sum: 1 },
-                },
-            },
-            {
-                $sort: { _id: -1 },
-            },
-            {
-                $facet: {
-                    items: [
-                        { $skip: skip },
-                        { $limit: limit },
-                    ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
-                },
-            },
-        ];
-
-        const [result] = await Transaction.aggregate(pipeline).allowDiskUse(true);
-
-        const rawItems = result.items || [];
-        const items = rawItems.map(item => ({
-            rawDate: item._id,
-            date: moment(item._id, "YYYY-MM-DD").format("MMMM D, YYYY"),
-            totalEarning: item.totalEarning,
-            totalJobs: item.totalJobs,
-        }));
-
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
-
-        const response = {
-            page,
-            limit,
-            totalRecords,
-            items,
-        };
-
-        return res.status(200).json(successResponse("Daily earning list fetched successfully.", response));
-    } catch (error) {
-        log1(["Error in postEarningList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postEarningDetails = async (req, res) => {
-    try {
-        const mechanicId = req.mechanicId;
-        const { transactionId } = req.body;
-
-        if (!transactionId || !ObjectId.isValid(transactionId)) {
-            return res.status(400).json(errorResponse("Invalid transaction id."));
-        };
-
-        const match = {
-            _id: new ObjectId(transactionId),
             mechanicId: new ObjectId(mechanicId),
         };
 
+        if (status !== undefined && status !== null && status !== "") {
+            match.status = Number(status);
+        };
+
+        const searchText = String(search || "").trim();
+
+        const searchRegex = searchText ? new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
+
         const pipeline = [
             {
                 $match: match,
             },
             {
-                $sort: { createdAt: -1, },
-            },
-            {
                 $lookup: {
-                    from: "services",
-                    localField: "serviceId",
+                    from: "transactions",
+                    localField: "transactionId",
                     foreignField: "_id",
-                    as: "serviceDetails"
+                    as: "transactionDetails",
                 },
             },
             {
                 $unwind: {
-                    path: "$serviceDetails",
+                    path: "$transactionDetails",
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -3055,7 +3189,7 @@ export const postEarningDetails = async (req, res) => {
                     from: "bookings",
                     localField: "bookingId",
                     foreignField: "_id",
-                    as: "bookingDetails"
+                    as: "bookingDetails",
                 },
             },
             {
@@ -3066,10 +3200,243 @@ export const postEarningDetails = async (req, res) => {
             },
             {
                 $lookup: {
+                    from: "services",
+                    let: {
+                        serviceId: { $ifNull: ["$transactionDetails.serviceId", "$bookingDetails.serviceId"] },
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$_id", "$$serviceId",],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                fullName: 1,
+                                image: 1,
+                            },
+                        },
+                    ],
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
                     from: "owners",
-                    localField: "ownerId",
+                    localField: "bookingDetails.ownerId",
                     foreignField: "_id",
-                    as: "ownerDetails"
+                    as: "ownerDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+
+            ...(searchRegex ? [{
+                $match: {
+                    $or: [
+                        { "serviceDetails.fullName": searchRegex, },
+                        { "ownerDetails.fullName": searchRegex, },
+                        { "ownerDetails.phoneNumber": searchRegex, },
+                        { "transactionDetails.invoiceId": searchRegex, },
+                        { "transactionDetails.trxId": searchRegex, },
+                        { "bookingDetails.invoiceNo": searchRegex, },
+                    ],
+                },
+            }] : []),
+
+            {
+                $facet: {
+                    items: [
+                        {
+                            $sort: {
+                                createdAt: -1,
+                                _id: -1,
+                            },
+                        },
+                        { $skip: skip, },
+                        { $limit: limit, },
+                        {
+                            $project: {
+                                _id: 1,
+                                transactionId: 1,
+                                bookingId: 1,
+                                invoiceId: { $ifNull: ["$transactionDetails.invoiceId", ""] },
+                                trxId: { $ifNull: ["$transactionDetails.trxId", ""] },
+                                earningAmount: { $ifNull: ["$earningAmount", 0] },
+                                serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                                adminCharge: { $ifNull: ["$adminCharge", 0] },
+                                finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
+                                status: 1,
+                                processedAt: 1,
+                                createdAt: 1,
+                                service: {
+                                    categoryId: "$serviceDetails._id",
+                                    categoryName: { $ifNull: ["$serviceDetails.fullName", ""] },
+                                    categoryImage: { $ifNull: ["$serviceDetails.image", ""] },
+                                },
+                                bookingDetails: {
+                                    bookingId: "$bookingDetails._id",
+                                    invoiceNo: { $ifNull: ["$bookingDetails.invoiceNo", ""] },
+                                    date: "$bookingDetails.date",
+                                    slot: { $ifNull: ["$bookingDetails.slot", ""] },
+                                    address: { $ifNull: ["$bookingDetails.address", ""] },
+                                    consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
+                                    totalServiceFee: { $ifNull: ["$bookingDetails.totalServiceFee", 0] },
+                                    discountAmount: { $ifNull: ["$bookingDetails.discountAmount", 0] },
+                                    taxAmount: { $ifNull: ["$bookingDetails.taxAmount", 0] },
+                                    subTotal: { $ifNull: ["$bookingDetails.subTotal", 0] },
+                                    totalAmount: { $ifNull: ["$bookingDetails.totalAmount", 0] },
+                                },
+                                customer: {
+                                    ownerId: "$ownerDetails._id",
+                                    fullName: { $ifNull: ["$ownerDetails.fullName", "",] },
+                                    phoneNumber: { $ifNull: ["$ownerDetails.phoneNumber", ""] },
+                                    profileImage: { $ifNull: ["$ownerDetails.profileImage", ""] },
+                                },
+                                pricingSummary: {
+                                    earnings: { $ifNull: ["$earningAmount", 0] },
+                                    serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                                    adminCharge: { $ifNull: ["$adminCharge", 0] },
+                                    finalPayout: { $ifNull: ["$finalPayoutAmount", 0] },
+                                    consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
+                                    tipAmount: { $ifNull: ["$transactionDetails.tipAmount", 0] },
+                                },
+                            },
+                        },
+                    ],
+
+                    totalRecords: [{ $count: "count" }],
+                },
+            },
+            {
+                $project: {
+                    items: 1,
+                    totalRecords: {
+                        $ifNull: [{ $arrayElemAt: ["$totalRecords.count", 0] }, 0],
+                    },
+                },
+            },
+        ];
+
+        const [result] = await Earning.aggregate(pipeline);
+
+        const totalRecords = result?.totalRecords || 0;
+        const totalPages = Math.ceil(totalRecords / limit);
+
+        const response = {
+            page,
+            limit,
+            totalRecords,
+            totalPages,
+            items: result?.items || [],
+        };
+
+        return res.status(200).json(successResponse("Earning list fetched successfully.", response));
+    } catch (error) {
+        log1(["Error in postEarningList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postEarningDetails = async (req, res) => {
+    try {
+        const mechanicId = req.mechanicId;
+        const { earningId } = req.body;
+
+        log1(["postEarningDetails mechanicId ----->", mechanicId,]);
+        log1(["postEarningDetails req.body ----->", req.body,]);
+
+        if (!earningId || !ObjectId.isValid(earningId)) {
+            return res.status(400).json(errorResponse("Invalid earning id."));
+        };
+
+        const match = {
+            _id: new ObjectId(earningId),
+            mechanicId: new ObjectId(mechanicId),
+        };
+
+        const pipeline = [
+            {
+                $match: match,
+            },
+            {
+                $lookup: {
+                    from: "transactions",
+                    localField: "transactionId",
+                    foreignField: "_id",
+                    as: "transactionDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$transactionDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    let: {
+                        serviceId: { $ifNull: ["$transactionDetails.serviceId", "$bookingDetails.serviceId"] },
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$_id", "$$serviceId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                description: 1,
+                                image: 1,
+                            },
+                        },
+                    ],
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "bookingDetails.ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
                 },
             },
             {
@@ -3081,41 +3448,38 @@ export const postEarningDetails = async (req, res) => {
             {
                 $project: {
                     _id: 1,
-                    invoiceId: 1,
-                    trxId: 1,
-                    totalAmount: 1,
-                    createdAt: 1,
+                    mechanicId: 1,
+                    transactionId: 1,
+                    bookingId: 1,
+                    earningAmount: 1,
+                    serviceAmount: 1,
+                    adminCharge: 1,
+                    finalPayoutAmount: 1,
                     status: 1,
-                    serviceName: "$serviceDetails.fullName",
-                    serviceImage: "$serviceDetails.image",
-                    bookingDetails: {
-                        _id: "$bookingDetails._id",
-                        invoiceNo: "$bookingDetails.invoiceNo",
-                        date: "$bookingDetails.date",
-                        slot: "$bookingDetails.slot",
-                        address: "$bookingDetails.address",
-                        consultantFee: "$bookingDetails.consultantFee",
-                        discountAmount: "$bookingDetails.discountAmount",
-                        taxAmount: "$bookingDetails.taxAmount",
-                        subTotal: "$bookingDetails.subTotal",
+                    consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
+                    bookingLocation: "$bookingDetails.address",
+                    service: {
+                        categoryId: "$serviceDetails._id",
+                        categoryName: "$serviceDetails.fullName",
+                        categoryImage: "$serviceDetails.image",
                     },
                     customer: {
+                        ownerId: "$ownerDetails._id",
                         fullName: "$ownerDetails.fullName",
-                        phoneNumber: "$ownerDetails.phoneNumber",
-                        profileImage: "$ownerDetails.profileImage",
                     },
-                    pricingSummary: {
-                        earnings: "$totalAmount",
-                        consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
-                        netAmount: { $add: ["$totalAmount", { $ifNull: ["$bookingDetails.consultantFee", 0] }] }
-                    }
+                    createdAt: 1,
+                    updatedAt: 1,
                 },
             },
         ];
 
-        const [items] = await Transaction.aggregate(pipeline);
+        const [earningDetails] = await Earning.aggregate(pipeline).allowDiskUse(false);
 
-        return res.status(200).json(successResponse("Earning details fetched successfully.", items || null));
+        if (!earningDetails) {
+            return res.status(404).json(errorResponse("Earning details not found."));
+        };
+
+        return res.status(200).json(successResponse("Earning details fetched successfully.", earningDetails));
     } catch (error) {
         log1(["Error in postEarningDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -3263,7 +3627,7 @@ export const postGenerateCallCaptcha = async (req, res) => {
         const mechanicId = req.mechanicId;
         const { ownerId } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.generate_call_captcha");
+        const validate = await custom_validation(req.body, "mechanic.generate_call_captcha");
         if (validate.flag != 1) {
             return res.status(400).json(validate);
         };
@@ -3354,7 +3718,7 @@ export const postVerifyCallCaptcha = async (req, res) => {
         const mechanicId = req.mechanicId;
         const { captchaId, captchaCode, ownerId } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.verify_call_captcha");
+        const validate = await custom_validation(req.body, "mechanic.verify_call_captcha");
         if (validate.flag != 1) {
             return res.status(400).json(validate);
         };
