@@ -1009,9 +1009,9 @@ export const postAllServicesList = async (req, res) => {
                 categoryId: parent._id,
                 categoryName: parent.fullName,
                 categoryImage: parent.image,
-                description: parent.description,
+                categoryDescription: parent.description,
                 isSelected,
-                subServices: children,
+                subCategory: children,
             };
         });
 
