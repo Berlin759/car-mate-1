@@ -1124,9 +1124,9 @@ export const postMyServiceList = async (req, res) => {
             itemPerPage = Constants.DEFAULT_LIMIT,
         } = req.body;
 
-        const page = Math.max(1, Number(currentPage));
-        const limit = Math.max(1, Number(itemPerPage));
-        const skip = (page - 1) * limit;
+        // const page = Math.max(1, Number(currentPage));
+        // const limit = Math.max(1, Number(itemPerPage));
+        // const skip = (page - 1) * limit;
 
         const mechanic = await Mechanic.findById(mechanicId)
             .select("serviceIds")
@@ -1171,13 +1171,13 @@ export const postMyServiceList = async (req, res) => {
 
         const items = Object.values(categoryGroupMap);
         const totalRecords = items.length;
-        const paginatedItems = items.slice(skip, skip + limit);
+        // const paginatedItems = items.slice(skip, skip + limit);
 
         let response = {
-            page,
-            limit,
+            // page,
+            // limit,
             totalRecords,
-            items: paginatedItems,
+            items: items,
         };
 
         return res.status(200).json(successResponse("Service List Get Successfully.", response));

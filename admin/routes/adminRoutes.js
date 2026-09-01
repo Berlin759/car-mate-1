@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import { handleRazorpayPayoutWebhook } from "../controllers/payoutWebhook.controller.js";
 import {
     getLoginPage,
     postLogin,
@@ -263,5 +264,8 @@ adminRouter.post("/seed-default-templates", authMiddleware, postSeedDefaultTempl
 // adminRouter.post("/update-language", authMiddleware, postUpdateLanguage);
 // adminRouter.post("/delete-language", authMiddleware, postDeleteLanguage);
 // adminRouter.post("/toggle-language-status", authMiddleware, postToggleLanguageStatus);
+
+// Razorpay Payout Webhook
+adminRouter.post("/webhook/razorpay-payout", handleRazorpayPayoutWebhook);
 
 export default adminRouter;
