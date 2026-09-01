@@ -47,6 +47,26 @@ const earningSchema = new Schema(
             type: String,
             default: "",
         },
+        razorpayPayoutId: {
+            type: String,
+            default: "",
+        },
+        razorpayFundAccountId: {
+            type: String,
+            default: "",
+        },
+        razorpayContactId: {
+            type: String,
+            default: "",
+        },
+        payoutReferenceId: {
+            type: String,
+            default: "",
+        },
+        payoutFailureReason: {
+            type: String,
+            default: "",
+        },
         status: {
             type: Number,
             enum: Object.values(Constants.EARNING_STATUS),

@@ -20,9 +20,9 @@ const getRazorpayAuthHeader = () => {
 
 export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
     const authHeader = getRazorpayAuthHeader();
-    const accountNum = process.env.RAZORPAYX_ACCOUNT_NUMBER;
+    const accountNumber = process.env.RAZORPAYX_ACCOUNT_NUMBER;
 
-    if (!accountNum) {
+    if (!accountNumber) {
         throw new Error(" Razorpay Account number is missing.");
     };
 
@@ -95,13 +95,20 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
         throw new Error(`Fund account creation failed: ${errData.description || error.message}`);
     };
 
-    log1(`Triggering Razorpay payout for fund account: ${fundAccountId}, amount: ${earning.finalPayoutAmount}`);
+    const payoutAmount = Math.round(Number(earning.finalPayoutAmount) * 100);
+    if (payoutAmount < 100) {
+        throw new Error("Payout amount must be at least ₹1.");
+    };
+
+    const idempotencyKey = `earning-${earning._id.toString()}`;
+
+    log1(`Triggering Razorpay payout for fund account: ${fundAccountId}, amount: ${payoutAmount}, earningId: ${earning._id.toString()}`);
     try {
         const payoutRes = await axios.post("https://api.razorpay.com/v1/payouts",
             {
-                account_number: accountNum,
+                account_number: accountNumber,
                 fund_account_id: fundAccountId,
-                amount: Math.round(earning.finalPayoutAmount * 100), // convert to paise
+                amount: payoutAmount,
                 currency: Constants.BASE_CURRENCY || "INR",
                 mode: "IMPS",
                 purpose: "payout",
@@ -113,15 +120,22 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
                 headers: {
                     Authorization: authHeader,
                     "Content-Type": "application/json",
+                    "X-Payout-Idempotency": idempotencyKey,
                 },
             },
         );
 
+        log1(["Razorpay payout created successfully", payoutRes.data]);
+
         return payoutRes.data;
     } catch (error) {
         const errData = error.response?.data?.error || error;
-        log1(["Failed to trigger Razorpay payout:", errData]);
-        throw new Error(`Payout API call failed: ${errData.description || error.message}`);
+        log1(["Failed to trigger Razorpay payout:", {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message,
+        }]);
+        throw new Error(`Payout API call failed: ${errData.description || error.response?.data?.message || error.message || "Razorpay payout failed."}`);
     };
 };
 
@@ -181,33 +195,52 @@ export const processWeeklyPayouts = async () => {
                 const payoutData = await triggerRazorpayPayout(earning, mechanic, bankDetails);
                 log1(`Razorpay payout response status: ${payoutData.status}`);
 
-                if (payoutData.status === "failed" || payoutData.status === "rejected") {
-                    earning.status = Constants.EARNING_STATUS.FAILED;
-                    earning.processedAt = new Date();
-                    await earning.save();
+                earning.razorpayPayoutId = payoutData.id || "";
+                earning.payoutReferenceId = earning._id.toString();
+                earning.razorpayContactId = mechanic.razorpayContactId || "";
+                earning.razorpayFundAccountId = mechanic.razorpayFundAccountId || "";
+
+                const deviceToken = mechanic.deviceToken || null;
+                const amountStr = earning.finalPayoutAmount.toFixed(2);
+
+                let notificationTitle = "";
+                let notificationDescription = "";
+
+                if (payoutData.status === "failed" || payoutData.status === "rejected" || payoutData.status === "reversed") {
                     log1(`Earning record ${earning._id} marked as Failed.`);
-                } else {
-                    earning.status = Constants.EARNING_STATUS.SUCCESS;
-                    earning.processedAt = new Date();
-                    await earning.save();
+                    earning.status = Constants.EARNING_STATUS.FAILED;
+                    earning.payoutFailureReason = payoutData?.status_details?.reason || payoutData?.status_details?.description || "";
+
+                    notificationTitle = "Payment transferred Failed";
+                    notificationDescription = `An amount of ₹${amountStr} has been failed transferred to your account for CarMate services.`;
+                } else if (payoutData.status === "processed") {
                     log1(`Earning record ${earning._id} marked as Success.`);
+                    earning.status = Constants.EARNING_STATUS.SUCCESS;
 
-                    const deviceToken = mechanic.deviceToken || null;
-                    const amountStr = earning.finalPayoutAmount.toFixed(2);
-                    const title = "Payment Credited Successfully";
-                    const description = `An amount of ₹${amountStr} has been successfully transferred to your account for CarMate services.`;
+                    notificationTitle = "Payment Credited Successfully";
+                    notificationDescription = `An amount of ₹${amountStr} has been successfully transferred to your account for CarMate services.`;
+                } else {
+                    log1(`Earning record ${earning._id} marked as Processing.`);
+                    earning.status = Constants.EARNING_STATUS.PROCESSING;
 
-                    const isPushEnabled = mechanic.paymentNotification !== Constants.NOTIFICATION_PREFERENCES_STATUS.FALSE;
-                    log1(`Sending payout success notification to mechanic device: ${deviceToken}`);
-                    await sendPushNotification(isPushEnabled ? deviceToken : null, {
-                        mechanicId: mechanic._id,
-                        transactionId: earning.transactionId,
-                        bookingId: earning.bookingId,
-                        type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-                        title,
-                        description,
-                    });
+                    notificationTitle = "Payment in Processing";
+                    notificationDescription = `An amount of ₹${amountStr} has been processing for transferred to your account for CarMate services.`;
                 };
+
+                earning.processedAt = new Date();
+                await earning.save();
+
+                const isPushEnabled = mechanic.paymentNotification !== Constants.NOTIFICATION_PREFERENCES_STATUS.FALSE;
+                log1(`Sending payout notification to mechanic device: ${deviceToken}`);
+
+                await sendPushNotification(isPushEnabled ? deviceToken : null, {
+                    mechanicId: mechanic._id,
+                    transactionId: earning.transactionId,
+                    bookingId: earning.bookingId,
+                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                    title: notificationTitle,
+                    description: notificationDescription,
+                });
             } catch (payoutError) {
                 log1(`Error processing payout for earning ${earning._id}: ${payoutError.message}`);
                 earning.status = Constants.EARNING_STATUS.FAILED;
@@ -225,14 +258,14 @@ export const processWeeklyPayouts = async () => {
  */
 export const initCronJobs = () => {
     // Schedule cron every Monday at 12:00:00 AM (0 0 * * 1)
-    cron.schedule("0 0 * * 1", async () => {
-        log1("Cron trigger fired: Weekly Earning Payout");
-        await processWeeklyPayouts();
-    });
-
-    // Schedule cron every 5 Minute
-    // cron.schedule("*/5 * * * *", async () => {
+    // cron.schedule("0 0 * * 1", async () => {
     //     log1("Cron trigger fired: Weekly Earning Payout");
     //     await processWeeklyPayouts();
     // });
+
+    // Schedule cron every 5 Minute
+    cron.schedule("*/5 * * * *", async () => {
+        log1("Cron trigger fired: Weekly Earning Payout");
+        await processWeeklyPayouts();
+    });
 };

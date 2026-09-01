@@ -75,6 +75,7 @@ const Constants = {
         PENDING: 1,
         SUCCESS: 2,
         FAILED: 3,
+        PROCESSING: 4,
     },
     IS_SUSPENDED_STATUS: {
         UNSUSPENDED: 0,

@@ -181,6 +181,7 @@ const Constants = {
         PENDING: 1,
         SUCCESS: 2,
         FAILED: 3,
+        PROCESSING: 4,
     },
     USER_ROLE: {
         OWNER: "owner",

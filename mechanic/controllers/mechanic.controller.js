@@ -3364,6 +3364,41 @@ export const postEarningOverview = async (req, res) => {
                 },
                 {
                     $lookup: {
+                        from: "owners",
+                        let: {
+                            ownerId: {
+                                $ifNull: [
+                                    "$transactionDetails.ownerId",
+                                    "$bookingDetails.ownerId",
+                                ],
+                            },
+                        },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$_id", "$$ownerId",],
+                                    },
+                                },
+                            },
+                            {
+                                $project: {
+                                    fullName: 1,
+                                    profileImage: 1,
+                                },
+                            },
+                        ],
+                        as: "ownerDetails",
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$ownerDetails",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
                         from: "services",
                         let: {
                             serviceId: {
@@ -3404,6 +3439,7 @@ export const postEarningOverview = async (req, res) => {
                         bookingId: 1,
                         invoiceId: { $ifNull: ["$transactionDetails.invoiceId", ""] },
                         trxId: { $ifNull: ["$transactionDetails.trxId", ""] },
+                        ownerName: { $ifNull: ["$ownerDetails.fullName", ""] },
                         serviceName: { $ifNull: ["$serviceDetails.fullName", ""] },
                         serviceImage: { $ifNull: ["$serviceDetails.image", ""] },
                         earningAmount: { $ifNull: ["$earningAmount", 0] },
