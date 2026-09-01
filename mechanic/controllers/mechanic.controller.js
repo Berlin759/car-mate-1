@@ -999,7 +999,7 @@ export const postAllServicesList = async (req, res) => {
                 );
                 const isSelected = !!mechanicEntry;
                 return {
-                    fullName: sub.fullname,
+                    subCategoryName: sub.fullname,
                     isSelected,
                 };
             });
