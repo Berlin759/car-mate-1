@@ -1000,6 +1000,8 @@ export const postAllServicesList = async (req, res) => {
                 const isSelected = !!mechanicEntry;
                 return {
                     subCategoryName: sub.fullname,
+                    price: mechanicEntry ? mechanicEntry.price : 0,
+                    description: mechanicEntry ? mechanicEntry.description : "",
                     isSelected,
                 };
             });
