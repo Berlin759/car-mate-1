@@ -56,7 +56,7 @@ io.on("connection", async (socket) => {
     socket.authToken = authToken;
 
     if (ownerId && ObjectId.isValid(ownerId)) {
-        io.emit(Constants.SOCKET_EVENTS.owner_STATUS_CHANGE, { ownerId: socket.ownerId, status: "online" });
+        io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: socket.ownerId, status: "online" });
         await Owner.findByIdAndUpdate({ _id: new ObjectId(socket.ownerId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
     } else {
         const guestId = socket?.handshake?.auth?.guestId;
@@ -112,7 +112,7 @@ io.on("connection", async (socket) => {
         if (socket.ownerId && ObjectId.isValid(socket.ownerId)) {
             let ownerDetails = await Owner.findById(socket.ownerId).select("loginToken");
             if (ownerDetails && ownerDetails.loginToken === socket.authToken) {
-                io.emit(Constants.SOCKET_EVENTS.owner_STATUS_CHANGE, { ownerId: socket.ownerId, status: "offline" });
+                io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: socket.ownerId, status: "offline" });
                 await Owner.findByIdAndUpdate({ _id: new ObjectId(socket.ownerId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
             };
         };

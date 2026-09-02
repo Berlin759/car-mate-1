@@ -56,7 +56,7 @@ io.on("connection", async (socket) => {
     socket.authToken = authToken;
 
     if (mechanicId && ObjectId.isValid(mechanicId)) {
-        io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "online" });
+        io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "online" });
         await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
     };
 
@@ -109,7 +109,7 @@ io.on("connection", async (socket) => {
         if (socket.mechanicId && ObjectId.isValid(socket.mechanicId)) {
             let mechanicDetails = await Mechanic.findById(socket.mechanicId).select("loginToken");
             if (mechanicDetails && mechanicDetails.loginToken === socket.authToken) {
-                io.emit(Constants.SOCKET_EVENTS.mechanic_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "offline" });
+                io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "offline" });
                 await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
             };
         };
