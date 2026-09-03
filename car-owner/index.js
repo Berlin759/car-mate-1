@@ -67,8 +67,8 @@ io.on("connection", async (socket) => {
         socket.join(chatId);
     });
 
-    socket.on(Constants.SOCKET_EVENTS.MESSAGE_EVENT, ({ chatId, message }) => {
-        io.to(chatId).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId, message });
+    socket.on(Constants.SOCKET_EVENTS.OWNER_MESSAGE_EVENT, ({ chatId, message }) => {
+        io.to(chatId).emit(Constants.SOCKET_EVENTS.OWNER_MESSAGE_EVENT, { chatId, message });
     });
 
     socket.on(Constants.SOCKET_EVENTS.IN_OUT_DETAILS_PAGE, async ({ chatId, ownerId, isOnDetailsPage }) => {

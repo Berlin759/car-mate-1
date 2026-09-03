@@ -1,4 +1,16 @@
 import PDFDocument from "pdfkit";
+import fs from "fs";
+
+let FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+let FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+
+if (!fs.existsSync(FONT_REGULAR)) {
+    FONT_REGULAR = "Helvetica";
+};
+
+if (!fs.existsSync(FONT_BOLD)) {
+    FONT_BOLD = "Helvetica-Bold";
+};
 
 const COLORS = {
     primary: "#1a73e8",
@@ -36,9 +48,9 @@ function formatDate(date) {
     return `${year}-${month}-${day}`;
 };
 
-function drawField(doc, label, value, x, y) {
-    doc.fontSize(8).fillColor(COLORS.gray).font("Helvetica").text(label, x, y);
-    doc.fontSize(9).fillColor(COLORS.dark).font("Helvetica-Bold").text(String(value || "-"), x, y + 11);
+function drawField(doc, label, value, x, y, valueColor = COLORS.dark) {
+    doc.fontSize(8).fillColor(COLORS.gray).font(FONT_REGULAR).text(label, x, y);
+    doc.fontSize(9).fillColor(valueColor).font(FONT_BOLD).text(String(value || "-"), x, y + 11);
 };
 
 export function generateTransactionPDF(transaction, res) {
@@ -60,15 +72,14 @@ export function generateTransactionPDF(transaction, res) {
 
     // Header background
     doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
-    doc.fontSize(18).fillColor(COLORS.white).font("Helvetica-Bold").text("Transaction Receipt", ML, 18, { width: CW, align: "center" });
-    doc.fontSize(10).fillColor(COLORS.white).font("Helvetica").text(`Status: ${status.text}`, ML, 46, { width: CW, align: "center" });
-    doc.fontSize(10).fillColor(COLORS.white).font("Helvetica").text(`Payout Status: ${payoutStatus.text}`, ML, 46, { width: CW, align: "center" });
+    doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("Transaction Receipt", ML, 18, { width: CW, align: "center" });
+    doc.fontSize(9).fillColor(COLORS.white).font(FONT_REGULAR).text(`Generated on ${formatDate(new Date())}`, ML, 38, { width: CW, align: "center" });
 
     let y = 85;
 
     // Helper: draw a section with title and content callback
     function section(title, drawFn) {
-        doc.fontSize(10).fillColor(COLORS.primary).font("Helvetica-Bold").text(title, ML, y);
+        doc.fontSize(10).fillColor(COLORS.primary).font(FONT_BOLD).text(title, ML, y);
         y += 14;
         doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
         y += 8;
@@ -78,72 +89,70 @@ export function generateTransactionPDF(transaction, res) {
 
     // Transaction Info
     section("Transaction Information", () => {
-        drawField(doc, "Transaction ID:", transaction?._id, ML, y);
-        drawField(doc, "Invoice ID:", transaction?.invoiceId, 320, y);
-        y += 28;
-
         drawField(doc, "TRX ID:", transaction?.trxId, ML, y);
-        drawField(doc, "Created Date:", formatDate(transaction?.createdAt), 320, y);
-        y += 28;
+        drawField(doc, "Invoice ID:", transaction?.invoiceId, 320, y);
+        y += 38;
 
-        drawField(doc, "Service Amount:", `$${transaction?.earningDetails?.serviceAmount || 0}`, ML, y);
-        drawField(doc, "Admin Charge:", `$${transaction?.earningDetails?.adminCharge || 0}`, ML, y);
-        drawField(doc, "Total Amount:", `$${transaction?.earningDetails?.finalPayoutAmount || 0}`, 320, y);
-        y += 28;
+        drawField(doc, "Service Amount:", `₹${transaction?.earningDetails?.serviceAmount || 0}`, ML, y);
+        drawField(doc, "Admin Charge:", `₹${transaction?.earningDetails?.adminCharge || 0}`, 320, y);
+        y += 38;
+
+        drawField(doc, "Total Payout Amount:", `₹${transaction?.earningDetails?.finalPayoutAmount || 0}`, ML, y);
+        drawField(doc, "Payout Status:", payoutStatus.text, 320, y, payoutStatus.color);
+        y += 38;
+
+        drawField(doc, "TRX Created Date:", formatDate(transaction?.createdAt), ML, y);
+        drawField(doc, "Payout Transfer Date:", formatDate(transaction?.earningDetails?.processedAt), 320, y);
+        y += 38;
     });
 
     // Booking Info
     section("Booking Information", () => {
         drawField(doc, "Booking ID:", transaction?.bookingDetails?._id, ML, y);
         drawField(doc, "Invoice No:", transaction?.bookingDetails?.invoiceNo, 320, y);
-        y += 28;
+        y += 38;
 
         drawField(doc, "Booking Date:", formatDate(transaction?.bookingDetails?.date), ML, y);
         drawField(doc, "Booking Slot:", transaction?.bookingDetails?.slot || "-", 320, y);
-        y += 28;
+        y += 38;
     });
 
     // Car Owner
     section("Car Owner Details", () => {
         drawField(doc, "Owner Name:", transaction?.ownerDetails?.fullName, ML, y);
-        drawField(doc, "Email:", transaction?.ownerDetails?.email, 320, y);
-        y += 28;
-
-        drawField(doc, "Phone:", transaction?.ownerDetails?.phoneNumber, ML, y);
-        y += 28;
+        drawField(doc, "Phone:", transaction?.ownerDetails?.phoneNumber, 320, y);
+        y += 38;
     });
 
     // Mechanic
     section("Mechanic Details", () => {
         drawField(doc, "Mechanic Name:", transaction?.mechanicDetails?.fullName, ML, y);
-        drawField(doc, "Email:", transaction?.mechanicDetails?.email, 320, y);
-        y += 28;
-
-        drawField(doc, "Phone:", transaction?.mechanicDetails?.phoneNumber, ML, y);
-        y += 28;
+        drawField(doc, "Phone:", transaction?.mechanicDetails?.phoneNumber, 320, y);
+        y += 38;
     });
 
     // Service & Vehicle
     section("Service & Vehicle Details", () => {
         drawField(doc, "Service Name:", transaction?.serviceDetails?.fullName, ML, y);
         drawField(doc, "Car Name:", transaction?.carDetails?.fullName, 320, y);
-        y += 28;
+        y += 38;
 
         drawField(doc, "Vehicle Number:", transaction?.carDetails?.vehicleNumber, ML, y);
-        y += 28;
+        y += 38;
     });
 
     // Amount Summary Box
     y += 4;
-    doc.roundedRect(ML, y, CW, 55, 4).fill("#f0f4ff");
-    doc.fontSize(11).fillColor(COLORS.primary).font("Helvetica-Bold").text("Amount Summary", ML + 15, y + 10);
-    doc.fontSize(10).fillColor(COLORS.dark).font("Helvetica").text(`Total: $${transaction?.totalAmount || 0}`, ML + 15, y + 28);
-    doc.text(`Admin Charge: $${transaction?.adminCharge || 0}`, ML + 180, y + 28);
-    doc.fontSize(11).fillColor(COLORS.primary).font("Helvetica-Bold").text(`Net: $${(transaction?.totalAmount || 0) - (transaction?.adminCharge || 0)}`, ML + 360, y + 28);
+    doc.roundedRect(ML, y, CW, 85, 4).fill("#f0f4ff");
+    doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
+    y += 20;
+    doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${transaction?.earningDetails?.serviceAmount || 0}`, ML + 15, y + 28);
+    doc.text(`Admin Charge: ₹${transaction?.earningDetails?.adminCharge || 0}`, ML + 180, y + 28);
+    doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(transaction?.earningDetails?.finalPayoutAmount || 0)}`, ML + 360, y + 28);
 
     // Footer line
     doc.moveTo(ML, doc.page.height - 35).lineTo(doc.page.width - MR, doc.page.height - 35).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
-    doc.fontSize(7).fillColor(COLORS.gray).font("Helvetica").text(
+    doc.fontSize(7).fillColor(COLORS.gray).font(FONT_REGULAR).text(
         `Generated on ${formatDate(new Date())} | Car-Mate Admin`,
         ML,
         doc.page.height - 28,
@@ -158,7 +167,7 @@ function drawCell(doc, text, x, y, w, opts = {}) {
     const color = opts.color || COLORS.dark;
 
     doc.save();
-    doc.fontSize(fontSize).fillColor(color).font(opts.bold ? "Helvetica-Bold" : "Helvetica");
+    doc.fontSize(fontSize).fillColor(color).font(opts.bold ? FONT_BOLD : FONT_REGULAR);
     doc.text(String(text || "-"), x + 2, y + 4, { width: w - 4, height: 12, ellipsis: true, lineBreak: false });
     doc.restore();
 };
@@ -177,15 +186,15 @@ export function generateAllTransactionsPDF(transactionData, res) {
 
     doc.pipe(res);
 
-    const ML = 30;
-    const MR = 30;
+    const ML = 10;
+    const MR = 10;
     const PW = doc.page.width;
     const USABLE_W = PW - ML - MR;
 
     // Header
     doc.rect(0, 0, PW, 60).fill(COLORS.primary);
-    doc.fontSize(18).fillColor(COLORS.white).font("Helvetica-Bold").text("All Transactions Report", ML, 15, { width: USABLE_W, align: "center" });
-    doc.fontSize(9).fillColor(COLORS.white).font("Helvetica").text(`Generated on ${formatDate(new Date())}`, ML, 38, { width: USABLE_W, align: "center" });
+    doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("All Transactions Report", ML, 15, { width: USABLE_W, align: "center" });
+    doc.fontSize(9).fillColor(COLORS.white).font(FONT_REGULAR).text(`Generated on ${formatDate(new Date())}`, ML, 38, { width: USABLE_W, align: "center" });
 
     let y = 72;
 
@@ -198,15 +207,19 @@ export function generateAllTransactionsPDF(transactionData, res) {
     const completePayoutCount = earningSummary.totalCompletePayout || 0;
     const pendingPayoutCount = earningSummary.totalPendingPayouts || 0;
 
-    doc.fontSize(9).fillColor(COLORS.dark).font("Helvetica");
-    doc.text(`Total: ${transactions.length}`, ML, y, { width: 150, lineBreak: false });
-    doc.text(`Revenue: $${totalAmount.toFixed(2)}`, ML + 150, y, { width: 150, lineBreak: false });
-    doc.text(`Completed: ${successCount}  |  Pending: ${pendingCount}  |  Failed: ${failedCount}  |  Refunded: ${refundedCount}`, ML + 300, y, { width: USABLE_W - 300, lineBreak: false });
-    doc.text(`Payout Completed: ${completePayoutCount}  |  Pending Payout: ${pendingPayoutCount}`, ML + 300, y, { width: USABLE_W - 300, lineBreak: false });
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`1. Total Transaction: ${transactions.length}`, ML, y, { width: USABLE_W, lineBreak: false });
     y += 18;
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`2. Revenue Amount: ₹${totalAmount.toFixed(2)}`, ML, y, { width: USABLE_W, lineBreak: false });
+    y += 18;
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`3. Transaction: Completed: ${successCount}  |  Pending: ${pendingCount}  |  Failed: ${failedCount}  |  Refunded: ${refundedCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
+    y += 18;
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`4. Total Complete Payout: ₹${completePayoutCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
+    y += 18;
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`5. Total Pending Payout: ₹${pendingPayoutCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
+    y += 25;
 
     // Column definitions — must sum to USABLE_W
-    const headers = ["#", "Payment ID", "Booking ID", "Owner", "Mechanic", "Service", "Car", "Amount", "Admin Chg", "Status", "Payout Status", "Date"];
+    const headers = ["#", "Payment ID", "Booking ID", "Owner", "Mechanic", "Service", "Car", "Service Amount", "Admin Charge", "Payout Amount", "Payout Status", "Date"];
     const colWidths = [25, 85, 85, 80, 80, 80, 75, 60, 60, 65, 65, 75];
     const colX = [];
     let xAcc = ML;
@@ -225,7 +238,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
 
         for (let i = 0; i < headers.length; i++) {
             doc.save();
-            doc.fontSize(7).fillColor(COLORS.white).font("Helvetica-Bold");
+            doc.fontSize(7).fillColor(COLORS.white).font(FONT_BOLD);
             doc.text(headers[i], hx + 2, py + 5, { width: colWidths[i] - 4, height: 10, lineBreak: false });
             doc.restore();
 
@@ -241,8 +254,8 @@ export function generateAllTransactionsPDF(transactionData, res) {
         if (y + ROW_H > doc.page.height - 30) {
             doc.addPage();
             doc.rect(0, 0, PW, 60).fill(COLORS.primary);
-            doc.fontSize(18).fillColor(COLORS.white).font("Helvetica-Bold").text("All Transactions Report (continued)", ML, 15, { width: USABLE_W, align: "center" });
-            doc.fontSize(9).fillColor(COLORS.white).font("Helvetica").text(`Page ${doc.bufferedPageRange().count + 1}`, ML, 38, { width: USABLE_W, align: "center" });
+            doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("All Transactions Report (continued)", ML, 15, { width: USABLE_W, align: "center" });
+            doc.fontSize(9).fillColor(COLORS.white).font(FONT_REGULAR).text(`Page ${doc.bufferedPageRange().count + 1}`, ML, 38, { width: USABLE_W, align: "center" });
             y = 72;
 
             drawPageHeader(y);
@@ -261,22 +274,22 @@ export function generateAllTransactionsPDF(transactionData, res) {
 
         const rowData = [
             String(index + 1),
-            String(transaction?._id || "-").substring(0, 12),
+            String(transaction?.trxId || "-").substring(0, 12),
             String(transaction?.bookingDetails?._id || "-").substring(0, 12),
             String(transaction?.ownerDetails?.fullName || "-").substring(0, 12),
             String(transaction?.mechanicDetails?.fullName || "-").substring(0, 12),
             String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
             String(transaction?.carDetails?.fullName || "-").substring(0, 12),
-            `$${transaction?.totalAmount || 0}`,
-            `$${transaction?.earningDetails?.adminCharge || 0}`,
-            status.text,
+            `₹${transaction?.earningDetails?.serviceAmount || 0}`,
+            `₹${transaction?.earningDetails?.adminCharge || 0}`,
+            `₹${transaction?.earningDetails?.finalPayoutAmount || 0}`,
             payoutStatus.text,
             formatDate(transaction?.createdAt),
         ];
 
         for (let ci = 0; ci < rowData.length; ci++) {
-            if (ci === 9) {
-                drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci], { color: status.color, bold: true });
+            if (ci === 11) {
+                drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci], { color: payoutStatus.color, bold: true });
             } else {
                 drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci]);
             };
@@ -289,10 +302,10 @@ export function generateAllTransactionsPDF(transactionData, res) {
     doc.save().moveTo(ML, y).lineTo(ML + USABLE_W, y).strokeColor(COLORS.lightGray).lineWidth(0.3).stroke().restore();
 
     // Footer
-    doc.fontSize(7).fillColor(COLORS.gray).font("Helvetica").text(
+    doc.fontSize(10).fillColor(COLORS.gray).font(FONT_BOLD).text(
         `Car-Mate Admin | Total: ${transactions.length} transactions`,
         ML,
-        doc.page.height - 20,
+        doc.page.height - 30,
         { width: USABLE_W, align: "center" }
     );
 

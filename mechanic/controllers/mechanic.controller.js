@@ -41,6 +41,7 @@ import { createOrder } from "./razorpay.controller.js";
 import Pricing from "../models/pricing.model.js";
 
 const __dirname = path.resolve();
+const currentTimezone = Constants.CURRENT_TIMEZONE || "Asia/Kolkata";
 
 const { ObjectId } = mongoose.Types;
 const mechanicLocks = new Map();
@@ -613,12 +614,15 @@ export const postLogout = async (req, res) => {
         let updateObj = {
             deviceToken: "",
             loginToken: "",
+            isOnline: Constants.ONLINE_STATUS.FALSE,
         };
 
-        let updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updateObj, { new: true });
+        const updateMechanic = await Mechanic.findByIdAndUpdate(mechanicId, updateObj, { new: true });
         if (!updateMechanic) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
+
+        io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId: updateMechanic._id, status: "offline" });
 
         return res.status(200).json(successResponse("Logout successfully."));
     } catch (error) {
@@ -694,10 +698,8 @@ export const postHomeDetails = async (req, res) => {
             };
         };
 
-        const timezone = Constants.CURRENT_TIMEZONE || "Asia/Kolkata";
-
-        const today = momentTz().tz(timezone).startOf("day").toDate();
-        const tomorrow = momentTz().tz(timezone).add(1, "day").startOf("day").toDate();
+        const today = momentTz().tz(currentTimezone).startOf("day").toDate();
+        const tomorrow = momentTz().tz(currentTimezone).add(1, "day").startOf("day").toDate();
 
         // Pipelines for bookings
         const newJobRequestsPipeline = [
@@ -705,6 +707,7 @@ export const postHomeDetails = async (req, res) => {
                 $match: {
                     mechanicId: new ObjectId(mechanicId),
                     status: Constants.BOOKING_STATUS.PENDING,
+                    bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
                 },
             },
             {
@@ -863,7 +866,7 @@ export const postHomeDetails = async (req, res) => {
             // Today's completed jobs
             Booking.countDocuments({
                 mechanicId: new ObjectId(mechanicId),
-                date: { $gte: today, $lt: tomorrow },
+                updatedAt: { $gte: today, $lt: tomorrow },
                 status: {
                     $in: [
                         Constants.BOOKING_STATUS.SERVICE_COMPLETED,
@@ -916,7 +919,7 @@ export const postHomeDetails = async (req, res) => {
                         status: Constants.EARNING_STATUS.PENDING,
                     }
                 },
-                { $group: { _id: null, total: { $sum: "$amount" } } }
+                { $group: { _id: null, total: { $sum: "$finalPayoutAmount" } } }
             ]),
 
             // All time total earnings sum
@@ -924,10 +927,10 @@ export const postHomeDetails = async (req, res) => {
                 {
                     $match: {
                         mechanicId: new ObjectId(mechanicId),
-                        status: Constants.EARNING_STATUS.SUCCESS,
+                        status: { $in: [Constants.EARNING_STATUS.PENDING, Constants.EARNING_STATUS.SUCCESS] },
                     },
                 },
-                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+                { $group: { _id: null, total: { $sum: "$finalPayoutAmount" } } },
             ]),
 
             // KYC record for profile completion
@@ -2292,6 +2295,25 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("Can only start service after accepting booking."));
                 };
 
+                const slotStartTimes = {
+                    Morning: "09:00 AM",
+                    Afternoon: "01:00 PM",
+                    Evening: "05:00 PM"
+                };
+
+                const slotStartTime = slotStartTimes[bookingDetails.slot];
+                if (!slotStartTime) {
+                    return res.status(400).json(errorResponse("Invalid booking slot."));
+                };
+
+                const nowIST = momentTz().tz(currentTimezone);
+                const bookingDateIST = momentTz(bookingDetails.date).tz(currentTimezone).format("YYYY-MM-DD");
+                const bookingStartIST = moment.tz(`${bookingDateIST} ${slotStartTime}`, "YYYY-MM-DD hh:mm A", currentTimezone);
+
+                if (nowIST.isBefore(bookingStartIST)) {
+                    return res.status(400).json(errorResponse("Service cannot be started before the scheduled date and time. Please try again at the scheduled time."));
+                };
+
                 updatePayload.startTime = new Date();
                 if (beforePhotos && Array.isArray(beforePhotos)) {
                     updatePayload.beforePhotos = beforePhotos;
@@ -2852,7 +2874,7 @@ export const postTransactionList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const { itemPerPage, currentPage } = req.body;
+        const { itemPerPage, currentPage, search } = req.body;
 
         log1(["postChatList mechanicId----->", mechanicId]);
         log1(["postChatList req.body----->", req.body]);
@@ -2864,20 +2886,104 @@ export const postChatList = async (req, res) => {
             mechanicId: new ObjectId(mechanicId),
         };
 
-        const count = await Chat.countDocuments(matchQuery);
-        const chats = await Chat.find(matchQuery)
-            .sort({ lastMessageAt: -1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate("ownerId")
-            .populate("bookingId");
+        const pipeline = [
+            {
+                $match: matchQuery
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails"
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true
+                },
+            },
+        ];
+
+        if (search && search.trim()) {
+            const searchText = search.trim();
+
+            const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+            const searchRegex = new RegExp(escapedSearch, "i");
+
+            pipeline.push({
+                $match: {
+                    $or: [
+                        {
+                            "ownerDetails.fullName": searchRegex,
+                        },
+                        {
+                            $and: [
+                                {
+                                    guestId: { $ne: null },
+                                },
+                                {
+                                    $expr: {
+                                        $regexMatch: {
+                                            input: "Guest User",
+                                            regex: escapedSearch,
+                                            options: "i",
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            });
+        };
+
+        const countPipeline = [...pipeline];
+
+        countPipeline.push({
+            $count: "total"
+        });
+
+        const countResult = await Chat.aggregate(countPipeline);
+        const count = countResult.length > 0 ? countResult[0].total : 0;
+
+        pipeline.push(
+            {
+                $sort: {
+                    lastMessageAt: -1,
+                    createdAt: -1,
+                },
+            },
+            { $skip: skip },
+            { $limit: limit }
+        );
+
+        const chats = await Chat.aggregate(pipeline);
 
         let chatList = [];
+
         if (chats.length > 0) {
             chatList = await Promise.all(chats.map(async (chat) => {
                 const findReadMessages = chat?.readMessages?.find((read) => read.byId === mechanicId.toString());
 
                 let unreadMsgCount = 0;
+
                 if (findReadMessages) {
                     unreadMsgCount = await ChatMessage.countDocuments({
                         chatId: chat._id,
@@ -2890,12 +2996,16 @@ export const postChatList = async (req, res) => {
                 };
 
                 const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+
                 let lastMessageObj = null;
+
                 if (lastMessageDoc) {
                     lastMessageObj = lastMessageDoc.toObject();
 
+                    lastMessageObj.isMessageSeen = null;
+
                     if (lastMessageObj.byId === mechanicId.toString()) {
-                        const receiverId = chat.ownerId ? chat.ownerId._id.toString() : chat.guestId;
+                        const receiverId = chat.ownerDetails ? chat.ownerDetails._id.toString() : chat.guestId;
                         const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
                         if (findReceiverReadMessages) {
                             lastMessageObj.isMessageSeen = findReceiverReadMessages.lastReadAt >= lastMessageObj.createdAt;
@@ -2906,46 +3016,47 @@ export const postChatList = async (req, res) => {
                 };
 
                 let chatOwner = null;
-                if (chat.ownerId) {
+
+                if (chat.ownerDetails) {
                     chatOwner = {
-                        _id: chat.ownerId._id,
-                        fullName: chat.ownerId.fullName,
-                        profileImage: chat.ownerId.profileImage,
-                        isOnline: chat.ownerId.isOnline
+                        _id: chat.ownerDetails._id,
+                        fullName: chat.ownerDetails.fullName,
+                        profileImage: chat.ownerDetails.profileImage,
+                        isOnline: chat.ownerDetails.isOnline,
                     };
                 } else {
                     chatOwner = {
                         _id: chat.guestId,
                         fullName: "Guest User",
                         profileImage: "",
-                        isOnline: Constants.ONLINE_STATUS.FALSE
+                        isOnline: Constants.ONLINE_STATUS.FALSE,
                     };
                 };
 
                 return {
                     _id: chat._id,
-                    ownerId: chat.ownerId?._id || null,
+                    ownerId: chat.ownerDetails?._id || null,
                     guestId: chat.guestId,
-                    ownerIds: chat.ownerId ? [chat.ownerId._id] : [],
+                    ownerIds: chat.ownerDetails ? [chat.ownerDetails._id] : [],
                     mechanicIds: [chat.mechanicId],
                     chatOwner,
-                    bookingsDetails: chat.bookingId ? {
-                        _id: chat.bookingId._id,
-                        status: chat.bookingId.status
+                    bookingsDetails: chat.bookingDetails ? {
+                        _id: chat.bookingDetails._id,
+                        status: chat.bookingDetails.status,
                     } : null,
                     unreadMsgCount,
                     lastMessage: lastMessageObj,
                     createdAt: chat.createdAt,
-                    updatedAt: chat.updatedAt
+                    updatedAt: chat.updatedAt,
                 };
             }));
         };
 
         const response = {
-            chatMessagesList: chatList,
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: count,
+            chatMessagesList: chatList,
         };
 
         return res.status(200).json(successResponse("Chat list get successfully.", response));
@@ -2988,9 +3099,9 @@ export const postChatMessagesDetails = async (req, res) => {
         let readMessages = chat.readMessages || [];
         const currentTime = moment().utc().toDate();
 
-        const findIndex = readMessages.findIndex((read) => read.byId === mechanicId.toString());
-        if (findIndex !== -1) {
-            readMessages[findIndex].lastReadAt = currentTime;
+        const mechanicReadIndex = readMessages.findIndex((read) => read.byId === mechanicId.toString());
+        if (mechanicReadIndex !== -1) {
+            readMessages[mechanicReadIndex].lastReadAt = currentTime;
         } else {
             readMessages.push({
                 byId: mechanicId.toString(),
@@ -3000,14 +3111,37 @@ export const postChatMessagesDetails = async (req, res) => {
 
         await Chat.findByIdAndUpdate(chat._id, { readMessages });
 
+        const ownerId = chat.ownerId ? chat.ownerId.toString() : chat.guestId;
+
+        const updatedMessagesList = messagesList.map((message) => {
+            const messageObj = message.toObject();
+            let receiverId;
+
+            if (messageObj.byId === mechanicId.toString()) {
+                receiverId = ownerId;
+            } else {
+                receiverId = mechanicId.toString();
+            };
+
+            const receiverReadData = readMessages.find((read) => read.byId === receiverId);
+
+            if (!receiverReadData?.lastReadAt) {
+                messageObj.isMessageSeen = false;
+            } else {
+                messageObj.isMessageSeen = new Date(receiverReadData.lastReadAt) >= new Date(messageObj.createdAt);
+            };
+
+            return messageObj;
+        });
+
         const response = {
-            chatMessagesList: messagesList.reverse(),
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: count,
+            chatMessagesList: updatedMessagesList.reverse(),
         };
 
-        return res.status(200).json(successResponse("Chat List Get Successfully.", response));
+        return res.status(200).json(successResponse("Chat Details Get Successfully.", response));
     } catch (error) {
         log1(["Error in postChatMessagesDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -3201,7 +3335,7 @@ export const postSendMessage = async (req, res) => {
                 };
             };
 
-            await Chat.findByIdAndUpdate(chat._id, {
+            chat = await Chat.findByIdAndUpdate(chat._id, {
                 lastMessage: messageText,
                 lastMessageType: messageType,
                 lastMessageAt: currentTime,
@@ -3219,7 +3353,11 @@ export const postSendMessage = async (req, res) => {
             createdAt: currentTime,
         });
 
-        const targetReceiverId = chat.ownerId ? chat.ownerId.toString() : chat.guestId;
+        const targetReceiverId = chat.ownerId ? chat.ownerId.toString() : chat.guestId
+        const receiverReadData = chat.readMessages.find((read) => read.byId === targetReceiverId);
+        const chatMessageObj = chatMessage.toObject();
+        chatMessageObj.isMessageSeen = receiverReadData?.lastReadAt ? new Date(receiverReadData.lastReadAt) >= new Date(chatMessage.createdAt) : false;
+
         if (!chat.ownerDetailsPageIds.includes(targetReceiverId)) {
             if (
                 receiverOwner &&
@@ -3241,19 +3379,19 @@ export const postSendMessage = async (req, res) => {
             };
         };
 
-        const emitPayload = chatMessage.toObject();
-        emitPayload.sender = { fullName: mechanicData.fullName };
-        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: emitPayload });
-
         const response = {
             chatId: chat._id,
             document: document,
+            byId: mechanicId.toString(),
             messages: {
                 createdAt: chatMessage.createdAt,
                 message: chatMessage.message,
                 type: chatMessage.type,
+                isMessageSeen: chatMessageObj.isMessageSeen || null,
             },
         };
+
+        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.OWNER_MESSAGE_EVENT, response);
 
         return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {

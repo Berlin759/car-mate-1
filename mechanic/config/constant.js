@@ -18,7 +18,8 @@ const Constants = {
 
     SOCKET_EVENTS: {
         JOIN_CHAT_ROOM: "join_room",
-        MESSAGE_EVENT: "new_message",
+        OWNER_MESSAGE_EVENT: "owner_new_message",
+        MECHANIC_MESSAGE_EVENT: "mechanic_new_message",
         OWNER_STATUS_CHANGE: "owner_status_change",
         MECHANIC_STATUS_CHANGE: "mechanic_status_change",
         IS_READ_MESSAGE: "is_read_message",

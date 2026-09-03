@@ -2995,6 +2995,7 @@ export const getTransactionDownload = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
+                                phoneNumber: 1,
                                 profileImage: 1,
                             },
                         },
@@ -3017,6 +3018,7 @@ export const getTransactionDownload = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
+                                phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
                                 longitude: 1,

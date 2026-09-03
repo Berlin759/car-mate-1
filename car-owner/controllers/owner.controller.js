@@ -593,12 +593,15 @@ export const postLogout = async (req, res) => {
         let updateObj = {
             deviceToken: "",
             loginToken: "",
+            isOnline: Constants.ONLINE_STATUS.FALSE,
         };
 
-        let updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });
+        const updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });
         if (!updateOwner) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
+
+        io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: updateOwner._id, status: "offline" });
 
         return res.status(200).json(successResponse("Logout successfully."));
     } catch (error) {
@@ -6016,7 +6019,7 @@ export const postAddRating = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid Booking."));
         };
 
-        if (!bookingDetails.status.includes(Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED)) {
+        if (![Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED].includes(bookingDetails.status)) {
             return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
         };
 
@@ -6247,6 +6250,7 @@ export const postChatList = async (req, res) => {
                 if (lastMessageDoc) {
                     lastMessageObj = lastMessageDoc.toObject();
 
+                    lastMessageObj.isMessageSeen = null;
                     if (lastMessageObj.byId === myId) {
                         const receiverId = chat.mechanicId?._id?.toString();
                         const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
@@ -6283,10 +6287,10 @@ export const postChatList = async (req, res) => {
         };
 
         const response = {
-            chatMessagesList: chatList,
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: count,
+            chatMessagesList: chatList,
         };
 
         return res.status(200).json(successResponse("Chat list get successfully.", response));
@@ -6337,9 +6341,9 @@ export const postChatMessagesDetails = async (req, res) => {
         let readMessages = chat.readMessages || [];
         const currentTime = moment().utc().toDate();
 
-        const findIndex = readMessages.findIndex((read) => read.byId === myId);
-        if (findIndex !== -1) {
-            readMessages[findIndex].lastReadAt = currentTime;
+        const ownerReadIndex = readMessages.findIndex((read) => read.byId === myId);
+        if (ownerReadIndex !== -1) {
+            readMessages[ownerReadIndex].lastReadAt = currentTime;
         } else {
             readMessages.push({
                 byId: myId,
@@ -6349,14 +6353,37 @@ export const postChatMessagesDetails = async (req, res) => {
 
         await Chat.findByIdAndUpdate(chat._id, { readMessages });
 
+        const mechanicId = chat.mechanicId.toString();
+
+        const updatedMessagesList = messagesList.map((message) => {
+            const messageObj = message.toObject();
+            let receiverId;
+
+            if (messageObj.byId === myId.toString()) {
+                receiverId = mechanicId;
+            } else {
+                receiverId = myId.toString();
+            };
+
+            const receiverReadData = readMessages.find((read) => read.byId === receiverId);
+
+            if (!receiverReadData?.lastReadAt) {
+                messageObj.isMessageSeen = false;
+            } else {
+                messageObj.isMessageSeen = new Date(receiverReadData.lastReadAt) >= new Date(messageObj.createdAt);
+            };
+
+            return messageObj;
+        });
+
         const response = {
-            chatMessagesList: messagesList.reverse(),
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: count,
+            chatMessagesList: updatedMessagesList.reverse(),
         };
 
-        return res.status(200).json(successResponse("Chat List Get Successfully.", response));
+        return res.status(200).json(successResponse("Chat Details Get Successfully.", response));
     } catch (error) {
         log1(["Error in postChatMessagesDetails ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -6559,7 +6586,7 @@ export const postSendMessage = async (req, res) => {
                 };
             };
 
-            await Chat.findByIdAndUpdate(chat._id, {
+            chat = await Chat.findByIdAndUpdate(chat._id, {
                 lastMessage: messageText,
                 lastMessageType: messageType,
                 lastMessageAt: currentTime,
@@ -6577,7 +6604,12 @@ export const postSendMessage = async (req, res) => {
             createdAt: currentTime,
         });
 
-        if (!chat.mechanicDetailsPageIds.includes(receiverMechanic._id.toString())) {
+        const targetReceiverId = receiverMechanic._id.toString();
+        const receiverReadData = chat.readMessages.find((read) => read.byId === targetReceiverId);
+        const chatMessageObj = chatMessage.toObject();
+        chatMessageObj.isMessageSeen = receiverReadData?.lastReadAt ? new Date(receiverReadData.lastReadAt) >= new Date(chatMessage.createdAt) : false;
+
+        if (!chat.mechanicDetailsPageIds.includes(targetReceiverId)) {
             if (
                 receiverMechanic.pushNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
                 receiverMechanic.deviceToken &&
@@ -6597,19 +6629,19 @@ export const postSendMessage = async (req, res) => {
             };
         };
 
-        const emitPayload = chatMessage.toObject();
-        emitPayload.sender = { fullName: ownerName };
-        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MESSAGE_EVENT, { chatId: chat._id, message: emitPayload });
-
         const response = {
             chatId: chat._id,
             document: document,
+            byId: myId,
             messages: {
                 createdAt: chatMessage.createdAt,
                 message: chatMessage.message,
                 type: chatMessage.type,
+                isMessageSeen: chatMessageObj.isMessageSeen || null,
             },
         };
+
+        io.to(chat._id.toString()).emit(Constants.SOCKET_EVENTS.MECHANIC_MESSAGE_EVENT, response);
 
         return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {

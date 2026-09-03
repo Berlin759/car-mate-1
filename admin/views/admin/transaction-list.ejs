@@ -41,7 +41,7 @@
                         <td><%= transaction?.ownerDetails?.fullName || "-" %></td>
                         <td><%= transaction?.mechanicDetails?.fullName || "-" %></td>
                         <td><%= transaction?.serviceDetails?.fullName || "-" %></td>
-                        <td>$<%= transaction?.totalAmount || 0 %></td>
+                        <td>$<%= parseFloat(transaction?.totalAmount.toFixed(2)) || 0 %></td>
                         <td>
                             <% if(transaction?.status === 2) { %>
                                 <span class="bet-status alert-accept">Completed</span>
