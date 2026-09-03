@@ -2957,7 +2957,7 @@ export const postChatList = async (req, res) => {
         const countPipeline = [...pipeline];
 
         countPipeline.push({
-            $count: "total"
+            $count: "total",
         });
 
         const countResult = await Chat.aggregate(countPipeline);

@@ -6202,7 +6202,7 @@ export const postRatingList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const { currentPage, itemPerPage, guestId } = req.body;
+        const { currentPage, itemPerPage, guestId, search } = req.body;
 
         log1(["postChatList ownerId----->", ownerId]);
         log1(["postChatList req.body----->", req.body]);
@@ -6219,21 +6219,85 @@ export const postChatList = async (req, res) => {
             return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        const count = await Chat.countDocuments(matchQuery);
-        const chats = await Chat.find(matchQuery)
-            .sort({ lastMessageAt: -1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate("mechanicId")
-            .populate("bookingId");
+        const pipeline = [
+            {
+                $match: matchQuery,
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    localField: "bookingId",
+                    foreignField: "_id",
+                    as: "bookingDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$bookingDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+        ];
+
+        if (search && search.trim()) {
+            const searchText = search.trim();
+
+            const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+            const searchRegex = new RegExp(escapedSearch, "i");
+
+            pipeline.push({
+                $match: {
+                    "mechanicDetails.fullName": searchRegex,
+                },
+            });
+        };
+
+        const countPipeline = [...pipeline];
+
+        countPipeline.push({
+            $count: "total",
+        });
+
+        const countResult = await Chat.aggregate(countPipeline);
+        const count = countResult.length > 0 ? countResult[0].total : 0;
+
+        pipeline.push(
+            {
+                $sort: {
+                    lastMessageAt: -1,
+                    createdAt: -1,
+                },
+            },
+            { $skip: skip },
+            { $limit: limit },
+        );
+
+        const chats = await Chat.aggregate(pipeline);
 
         let chatList = [];
+
         if (chats.length > 0) {
             chatList = await Promise.all(chats.map(async (chat) => {
                 const myId = ownerId ? ownerId.toString() : guestId;
                 const findReadMessages = chat?.readMessages?.find((read) => read.byId === myId);
 
                 let unreadMsgCount = 0;
+
                 if (findReadMessages) {
                     unreadMsgCount = await ChatMessage.countDocuments({
                         chatId: chat._id,
@@ -6246,11 +6310,14 @@ export const postChatList = async (req, res) => {
                 };
 
                 const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+
                 let lastMessageObj = null;
+
                 if (lastMessageDoc) {
                     lastMessageObj = lastMessageDoc.toObject();
 
                     lastMessageObj.isMessageSeen = null;
+
                     if (lastMessageObj.byId === myId) {
                         const receiverId = chat.mechanicId?._id?.toString();
                         const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
@@ -6267,16 +6334,16 @@ export const postChatList = async (req, res) => {
                     ownerId: chat.ownerId,
                     guestId: chat.guestId,
                     ownerIds: chat.ownerId ? [chat.ownerId] : [],
-                    mechanicIds: chat.mechanicId ? [chat.mechanicId._id] : [],
-                    chatMechanic: chat.mechanicId ? {
-                        _id: chat.mechanicId._id,
-                        fullName: chat.mechanicId.fullName,
-                        profileImage: chat.mechanicId.profileImage,
-                        isOnline: chat.mechanicId.isOnline
+                    mechanicIds: chat.mechanicDetails ? [chat.mechanicDetails._id] : [],
+                    chatMechanic: chat.mechanicDetails ? {
+                        _id: chat.mechanicDetails._id,
+                        fullName: chat.mechanicDetails.fullName,
+                        profileImage: chat.mechanicDetails.profileImage,
+                        isOnline: chat.mechanicDetails.isOnline
                     } : null,
-                    bookingsDetails: chat.bookingId ? {
-                        _id: chat.bookingId._id,
-                        status: chat.bookingId.status
+                    bookingsDetails: chat.bookingDetails ? {
+                        _id: chat.bookingDetails._id,
+                        status: chat.bookingDetails.status
                     } : null,
                     unreadMsgCount,
                     lastMessage: lastMessageObj,
