@@ -3740,10 +3740,23 @@ export const postBookingList = async (req, res) => {
                         {
                             $lookup: {
                                 from: "transactions",
-                                localField: "_id",
-                                foreignField: "bookingId",
-                                as: "transactionDetails",
+                                let: {
+                                    bookingId: "$_id"
+                                },
                                 pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $eq: ["$bookingId", "$$bookingId"]
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $sort: {
+                                            createdAt: -1,
+                                        },
+                                    },
+                                    { $limit: 1 },
                                     {
                                         $project: {
                                             _id: 1,
@@ -3754,11 +3767,12 @@ export const postBookingList = async (req, res) => {
                                             description: 1,
                                             status: 1,
                                             createdAt: 1,
-                                            updatedAt: 1,
-                                        },
-                                    },
+                                            updatedAt: 1
+                                        }
+                                    }
                                 ],
-                            },
+                                as: "transactionDetails"
+                            }
                         },
                         {
                             $unwind: {
@@ -3792,32 +3806,26 @@ export const postBookingList = async (req, res) => {
                                         $match: {
                                             $expr: {
                                                 $and: [
-                                                    {
-                                                        $eq: [
-                                                            "$bookingId",
-                                                            "$$bookingId",
-                                                        ],
-                                                    },
-                                                    {
-                                                        $eq: [
-                                                            "$ownerId",
-                                                            "$$ownerId",
-                                                        ],
-                                                    },
+                                                    { $eq: ["$bookingId", "$$bookingId"] },
+                                                    { $eq: ["$ownerId", "$$ownerId"] },
                                                 ],
                                             },
                                         },
                                     },
                                     {
-                                        $limit: 1,
+                                        $sort: {
+                                            createdAt: -1
+                                        }
                                     },
-                                    {
-                                        $project: {
-                                            _id: 1,
-                                        },
-                                    },
+                                    { $limit: 1 },
                                 ],
                                 as: "ratingDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$ratingDetails",
+                                preserveNullAndEmptyArrays: true,
                             },
                         },
                         {
@@ -3899,11 +3907,11 @@ export const postBookingList = async (req, res) => {
                                 transactionDetails: 1,
                                 chatId: "$chatDetails._id",
                                 isRatingAdded: {
-                                    $gt: [{ $size: "$ratingDetails", }, 0,],
+                                    $ne: [{ $ifNull: ["$ratingDetails._id", null] }, null],
                                 },
                                 feedback: {
-                                    rating: "$ratingDetails.rating",
-                                    description: "$ratingDetails.description",
+                                    rating: { $ifNull: ["$ratingDetails.rating", 0] },
+                                    description: { $ifNull: ["$ratingDetails.description", ""] },
                                 },
                                 carDetails: {
                                     _id: "$carDetails._id",
@@ -4292,12 +4300,26 @@ export const postBookingDetails = async (req, res) => {
             {
                 $lookup: {
                     from: "transactions",
-                    localField: "_id",
-                    foreignField: "bookingId",
-                    as: "transactionDetails",
+                    let: {
+                        bookingId: "$_id"
+                    },
                     pipeline: [
                         {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$bookingId", "$$bookingId"]
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
+                        { $limit: 1 },
+                        {
                             $project: {
+                                _id: 1,
                                 invoiceId: 1,
                                 trxId: 1,
                                 totalAmount: 1,
@@ -4305,11 +4327,12 @@ export const postBookingDetails = async (req, res) => {
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
-                                updatedAt: 1,
-                            },
-                        },
+                                updatedAt: 1
+                            }
+                        }
                     ],
-                },
+                    as: "transactionDetails"
+                }
             },
             {
                 $unwind: {
@@ -4334,8 +4357,28 @@ export const postBookingDetails = async (req, res) => {
             {
                 $lookup: {
                     from: "ratings",
-                    localField: "_id",
-                    foreignField: "bookingId",
+                    let: {
+                        bookingId: "$_id",
+                        ownerId: new ObjectId(ownerId),
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$bookingId", "$$bookingId"] },
+                                        { $eq: ["$ownerId", "$$ownerId"] },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1
+                            }
+                        },
+                        { $limit: 1 },
+                    ],
                     as: "ratingDetails",
                 },
             },
@@ -5969,9 +6012,24 @@ export const postAddRating = async (req, res) => {
         ]);
         log1(["postAddRating bookingDetails----->", bookingDetails]);
 
-        if (bookingDetails.status !== Constants.BOOKING_STATUS.SERVICE_COMPLETED &&
-            bookingDetails.status !== Constants.BOOKING_STATUS.CLOSED) {
+        if (!bookingDetails) {
+            return res.status(400).json(errorResponse("Invalid Booking."));
+        };
+
+        if (!bookingDetails.status.includes(Constants.BOOKING_STATUS.SERVICE_COMPLETED, Constants.BOOKING_STATUS.CLOSED)) {
             return res.status(400).json(errorResponse("Rating can only be added after service is completed."));
+        };
+
+        const ratingExits = await Rating.findOne({
+            ownerId: ownerId,
+            mechanicId: bookingDetails.mechanicId,
+            bookingId: bookingDetails._id,
+            serviceId: bookingDetails.serviceId,
+        });
+        log1(["postAddRating ratingExits----->", ratingExits]);
+
+        if (ratingExits) {
+            return res.status(400).json(errorResponse("You have alredy added rating for this booking."));
         };
 
         let ratingPayload = {

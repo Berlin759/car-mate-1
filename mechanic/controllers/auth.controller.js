@@ -5,6 +5,9 @@ import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
 import { custom_validation } from "../lib/validation.js";
+import { sendPushNotification } from "./pushNotification.js";
+import { io } from "../index.js";
+import { sendOtp } from "../lib/twilioHelper.js";
 import {
     errorResponse,
     generateLoginToken,
@@ -15,10 +18,8 @@ import {
     successResponse,
     validatePhoneNumber,
 } from "../lib/general.js";
-import { sendOtp } from "../lib/twilioHelper.js";
 import Mechanic from "../models/mechanic.model.js";
 import OTP from "../models/otp.model.js";
-import { sendPushNotification } from "./pushNotification.js";
 
 const { ObjectId } = mongoose.Types;
 const __dirname = path.resolve();
@@ -173,6 +174,15 @@ export const postVerifyOtp = async (req, res) => {
         log1(["postVerifyOtp mechanicData ----->", mechanicData]);
 
         await OTP.deleteMany({ phoneNumber: verifyOtpNumber.phoneNumber });
+
+        if (io) {
+            io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, {
+                mechanicId: mechanicData._id,
+                status: "online",
+            });
+
+            await Mechanic.findByIdAndUpdate({ _id: new ObjectId(mechanicData._id) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
+        };
 
         let response = {
             _id: mechanicData._id,

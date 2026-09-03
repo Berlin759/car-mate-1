@@ -1,9 +1,7 @@
 import ejs from "ejs";
 import path from "path";
-import fs from "fs";
 import moment from "moment";
-import Razorpay from 'razorpay';
-import crypto from 'crypto';
+import momentTz from "moment-timezone";
 import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
@@ -696,11 +694,10 @@ export const postHomeDetails = async (req, res) => {
             };
         };
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const timezone = Constants.CURRENT_TIMEZONE || "Asia/Kolkata";
 
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const today = momentTz().tz(timezone).startOf("day").toDate();
+        const tomorrow = momentTz().tz(timezone).add(1, "day").startOf("day").toDate();
 
         // Pipelines for bookings
         const newJobRequestsPipeline = [
@@ -860,7 +857,7 @@ export const postHomeDetails = async (req, res) => {
             Booking.countDocuments({
                 mechanicId: new ObjectId(mechanicId),
                 date: { $gte: today, $lt: tomorrow },
-                status: { $nin: [Constants.BOOKING_STATUS.CANCELLED, 11] }, // 11 represents REJECTED status
+                status: { $nin: [Constants.BOOKING_STATUS.REJECTED, Constants.BOOKING_STATUS.CANCELLED] },
             }),
 
             // Today's completed jobs
@@ -884,7 +881,7 @@ export const postHomeDetails = async (req, res) => {
                         createdAt: { $gte: today, $lt: tomorrow },
                     },
                 },
-                { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+                { $group: { _id: null, total: { $sum: "$finalPayoutAmount" } } },
             ]),
 
             // Mechanic profile details
@@ -896,7 +893,12 @@ export const postHomeDetails = async (req, res) => {
 
             // Average rating
             Rating.aggregate([
-                { $match: { mechanicId: new ObjectId(mechanicId) } },
+                {
+                    $match: {
+                        mechanicId: new ObjectId(mechanicId),
+                        createdAt: { $gte: today, $lt: tomorrow },
+                    },
+                },
                 { $group: { _id: null, avgRating: { $avg: "$rating" } } }
             ]),
 
@@ -1220,6 +1222,7 @@ export const postBookingList = async (req, res) => {
 
         const mechanicMatch = {
             mechanicId: new ObjectId(mechanicId),
+            bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
         };
 
         const match = {
@@ -1403,10 +1406,23 @@ export const postBookingList = async (req, res) => {
                         {
                             $lookup: {
                                 from: "transactions",
-                                localField: "_id",
-                                foreignField: "bookingId",
-                                as: "transactionDetails",
+                                let: {
+                                    bookingId: "$_id"
+                                },
                                 pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $eq: ["$bookingId", "$$bookingId"]
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $sort: {
+                                            createdAt: -1,
+                                        },
+                                    },
+                                    { $limit: 1 },
                                     {
                                         $project: {
                                             _id: 1,
@@ -1417,11 +1433,12 @@ export const postBookingList = async (req, res) => {
                                             description: 1,
                                             status: 1,
                                             createdAt: 1,
-                                            updatedAt: 1,
-                                        },
-                                    },
+                                            updatedAt: 1
+                                        }
+                                    }
                                 ],
-                            },
+                                as: "transactionDetails"
+                            }
                         },
                         {
                             $unwind: {
@@ -1446,10 +1463,30 @@ export const postBookingList = async (req, res) => {
                         {
                             $lookup: {
                                 from: "ratings",
-                                localField: "_id",
-                                foreignField: "bookingId",
-                                as: "ratingDetails",
-                            },
+                                let: {
+                                    bookingId: "$_id",
+                                    mechanicId: new ObjectId(mechanicId),
+                                },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $and: [
+                                                    { $eq: ["$bookingId", "$$bookingId"] },
+                                                    { $eq: ["$mechanicId", "$$mechanicId"] },
+                                                ],
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $sort: {
+                                            createdAt: -1
+                                        }
+                                    },
+                                    { $limit: 1 }
+                                ],
+                                as: "ratingDetails"
+                            }
                         },
                         {
                             $unwind: {
@@ -1923,10 +1960,23 @@ export const postBookingDetails = async (req, res) => {
             {
                 $lookup: {
                     from: "transactions",
-                    localField: "_id",
-                    foreignField: "bookingId",
-                    as: "transactionDetails",
+                    let: {
+                        bookingId: "$_id"
+                    },
                     pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$bookingId", "$$bookingId"]
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1,
+                            },
+                        },
+                        { $limit: 1 },
                         {
                             $project: {
                                 _id: 1,
@@ -1937,11 +1987,12 @@ export const postBookingDetails = async (req, res) => {
                                 description: 1,
                                 status: 1,
                                 createdAt: 1,
-                                updatedAt: 1,
-                            },
-                        },
+                                updatedAt: 1
+                            }
+                        }
                     ],
-                },
+                    as: "transactionDetails"
+                }
             },
             {
                 $unwind: {
@@ -1966,10 +2017,30 @@ export const postBookingDetails = async (req, res) => {
             {
                 $lookup: {
                     from: "ratings",
-                    localField: "_id",
-                    foreignField: "bookingId",
-                    as: "ratingDetails",
-                },
+                    let: {
+                        bookingId: "$_id",
+                        mechanicId: new ObjectId(mechanicId),
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$bookingId", "$$bookingId"] },
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $sort: {
+                                createdAt: -1
+                            }
+                        },
+                        { $limit: 1 }
+                    ],
+                    as: "ratingDetails"
+                }
             },
             {
                 $unwind: {

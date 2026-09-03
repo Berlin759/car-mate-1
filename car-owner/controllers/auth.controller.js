@@ -1,10 +1,12 @@
-import ejs from "ejs";
 import path from "path";
 import moment from "moment";
 import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
 import { custom_validation } from "../lib/validation.js";
+import { sendPushNotification } from "./pushNotification.js";
+import { io } from "../index.js";
+import { sendOtp } from "../lib/twilioHelper.js";
 import {
     errorResponse,
     generateLoginToken,
@@ -15,10 +17,8 @@ import {
     successResponse,
     validatePhoneNumber,
 } from "../lib/general.js";
-import { sendOtp } from "../lib/twilioHelper.js";
 import Owner from "../models/owner.model.js";
 import OTP from "../models/otp.model.js";
-import { sendPushNotification } from "./pushNotification.js";
 import Chat from "../models/chat.model.js";
 import ChatMessage from "../models/chatMessage.model.js";
 
@@ -231,6 +231,15 @@ export const postVerifyOtp = async (req, res) => {
                     ),
                 ]);
             };
+        };
+
+        if (io) {
+            io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, {
+                ownerId: ownerData._id,
+                status: "online",
+            });
+
+            await Owner.findByIdAndUpdate({ _id: new ObjectId(ownerData._id) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
         };
 
         let response = {

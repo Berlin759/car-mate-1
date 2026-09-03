@@ -4,7 +4,8 @@ dotenv.config();
 const Constants = {
     PLATFORM_NAME: "car_mate_mechanic_app",
     DEFAULT_COUNTRY_CODE: "IN",
-    BASE_CURRENCY: 'INR',
+    BASE_CURRENCY: "INR",
+    CURRENT_TIMEZONE: "Asia/Kolkata",
     OTP_LENGTH: 6,
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 10,
@@ -18,8 +19,6 @@ const Constants = {
     SOCKET_EVENTS: {
         JOIN_CHAT_ROOM: "join_room",
         MESSAGE_EVENT: "new_message",
-        USER_ONLINE: "user_online",
-        USER_STATUS_CHANGE: "user_status_change",
         OWNER_STATUS_CHANGE: "owner_status_change",
         MECHANIC_STATUS_CHANGE: "mechanic_status_change",
         IS_READ_MESSAGE: "is_read_message",
@@ -143,13 +142,13 @@ const Constants = {
         PENDING: 1,
         INPROGRESS: 2,
         COMPLETED: 3,
-        REJECTED: 4
+        FAILED: 4,
     },
     QUOTATION_PAYMENT_STATUS: {
         PENDING: 1,
         INPROGRESS: 2,
         COMPLETED: 3,
-        REJECTED: 4
+        FAILED: 4,
     },
     PREFERENCES_STATUS: {
         FALSE: 1,
