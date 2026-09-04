@@ -26,7 +26,7 @@ function formatDate(date) {
     return `${day}-${month}-${year}`;
 };
 
-export const generateInvoicePDF = async (booking, subTotal) => {
+export const generateInvoicePDF = async (booking) => {
     return new Promise((resolve, reject) => {
         try {
             let FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
@@ -59,13 +59,13 @@ export const generateInvoicePDF = async (booking, subTotal) => {
             const stream = fs.createWriteStream(filePath);
             doc.pipe(stream);
 
-            const ML = 50;
-            const MR = 50;
+            const ML = 20;
+            const MR = 20;
             const CW = doc.page.width - ML - MR;
 
             doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
             doc.font(FONT_BOLD).fontSize(22).fillColor(COLORS.white).text("CAR-MATE", ML, 18, { width: CW, align: "left" });
-            doc.font(FONT_BOLD).fontSize(20).fillColor(COLORS.white).text("INVOICE", ML, 46, { width: CW, align: "right" });
+            doc.font(FONT_BOLD).fontSize(20).fillColor(COLORS.white).text("INVOICE", ML, 18, { width: CW, align: "right" });
 
             // INVOICE BASIC INFORMATION
             let y = 85;
@@ -74,8 +74,8 @@ export const generateInvoicePDF = async (booking, subTotal) => {
             doc.text(`Invoice No: ${booking.invoiceNo || "N/A"}`, ML, y);
             doc.text(`Date: ${formatDate(booking.date)}, Slot: (${booking.slot || ""})`, ML, y + 15);
 
-            doc.text(`Mechanic: ${booking.mechanicId?.fullName || "N/A"}`, 350, y);
-            doc.text(`Contact: ${booking.mechanicId?.phoneNumber || "N/A"}`, 350, y + 15);
+            doc.text(`Mechanic: ${booking.mechanicDetails?.fullName || "N/A"}`, 350, y);
+            doc.text(`Contact: ${booking.mechanicDetails?.phoneNumber || "N/A"}`, 350, y + 15);
 
             y += 45;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
@@ -83,9 +83,19 @@ export const generateInvoicePDF = async (booking, subTotal) => {
 
             doc.font(FONT_BOLD).fontSize(10).fillColor(COLORS.dark).text("Billed To:", ML, y);
             doc.font(FONT_REGULAR).fontSize(10);
-            doc.text(`${booking.ownerId?.fullName || "N/A"}`, ML, y + 14);
-            doc.text(`Phone: ${booking.ownerId?.phoneNumber || "N/A"}`, ML, y + 28);
+            doc.text(`Customer Name: ${booking.ownerDetails?.fullName || "N/A"}`, ML, y + 14);
+            doc.text(`Phone: ${booking.ownerDetails?.phoneNumber || "N/A"}`, ML, y + 28);
             doc.text(`Address: ${booking.address || "N/A"}`, ML, y + 42);
+
+            y += 65;
+            doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
+            y += 15;
+
+            doc.font(FONT_BOLD).fontSize(10).fillColor(COLORS.dark).text("Service & Vehicle Details:", ML, y);
+            doc.font(FONT_REGULAR).fontSize(10);
+            doc.text(`Service Name: ${booking?.serviceDetails?.categoryName || "N/A"}`, ML, y + 14);
+            doc.text(`Car Name: ${booking?.carDetails?.fullName || "N/A"}`, ML, y + 28);
+            doc.text(`Vehicle Number: ${booking?.carDetails?.vehicleNumber || "N/A"}`, ML, y + 42);
 
             y += 65;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
@@ -110,51 +120,52 @@ export const generateInvoicePDF = async (booking, subTotal) => {
                 y += 22;
             };
 
-            drawRow(`${booking.serviceId?.fullName || "Service"}`, booking.servicePrice || 0);
-
-            if (booking.consultantFee !== undefined && booking.consultantFee !== null && parseFloat(booking.consultantFee) > 0) {
-                drawRow("Consultant Fee", booking.consultantFee);
-            };
-
-            (booking.quotation || []).forEach((item) => {
-                drawRow(`Quotation: ${item.serviceName || "Service"}`, item.price || 0);
-            });
-
-            if (booking.discountAmount !== undefined && booking.discountAmount !== null && parseFloat(booking.discountAmount) > 0) {
-                drawRow("Discount", booking.discountAmount, true);
-            };
+            drawRow("Earning Amount", parseFloat(booking?.earningDetails?.earningAmount || 0).toFixed(2));
+            drawRow("Consultant Fee", parseFloat(booking?.consultantFee || 0).toFixed(2));
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
             y += 15;
 
-            const drawSummaryRow = (label, amount, isBold = false) => {
+            const drawSummaryRow = (label, amount, isBold = false, minusVal = false) => {
                 doc.font(isBold ? FONT_BOLD : FONT_REGULAR).fontSize(10).fillColor(COLORS.dark);
-                doc.text(label, ML + CW - 180, y, { width: 120, lineBreak: false });
+                doc.text(label, ML + CW - 200, y, { width: 120, lineBreak: false });
 
                 const formattedAmount = parseFloat(amount || 0).toFixed(2);
 
-                doc.text(`₹${formattedAmount}`, ML + CW - 55, y, { width: 47, align: "right", lineBreak: false });
+                doc.text(`${minusVal ? '-' : ''} ₹${formattedAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
                 y += 18;
             };
 
-            drawSummaryRow("Subtotal:", subTotal);
-            drawSummaryRow("GST (18%):", booking.taxAmount || 0);
+            const serviceAmount = parseFloat(booking?.earningDetails?.serviceAmount || 0).toFixed(2);
+            const adminCharge = parseFloat(booking?.earningDetails?.adminCharge || 0).toFixed(2);
+            const finalPayoutAmount = parseFloat(booking?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+
+            drawSummaryRow("Service Amount:", serviceAmount, true);
+            drawSummaryRow("Admin Charge:", adminCharge, true, true);
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.primary).lineWidth(2).stroke();
             y += 10;
 
             doc.font(FONT_BOLD).fontSize(12).fillColor(COLORS.primary);
-            doc.text("Total Amount:", ML + CW - 180, y, { width: 120, lineBreak: false });
+            doc.text("Total Amount:", ML + CW - 200, y, { width: 120, lineBreak: false });
+            doc.text(`₹${finalPayoutAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
 
-            const totalAmount = parseFloat(booking.totalAmount || 0).toFixed(2);
+            // y += 50;
+            doc.font(FONT_REGULAR).fontSize(9).fillColor(COLORS.gray).text(
+                "Thank you for choosing Car-Mate!",
+                ML,
+                doc.page.height - 94,
+                { width: CW, align: "center" },
+            );
 
-            doc.text(`₹${totalAmount}`, ML + CW - 55, y, { width: 47, align: "right", lineBreak: false });
-
-            y += 50;
-            doc.font(FONT_REGULAR).fontSize(9).fillColor(COLORS.gray).text("Thank you for choosing Car-Mate!", ML, y, { width: CW, align: "center" });
-            doc.text("If you have any questions, contact support@carmate.com.", ML, y + 14, { width: CW, align: "center" });
+            doc.text(
+                "If you have any questions, contact support@carmate.com.",
+                ML,
+                doc.page.height - 80,
+                { width: CW, align: "center" },
+            );
 
             doc.font(FONT_REGULAR).fontSize(7).fillColor(COLORS.gray).text(
                 `Generated on ${formatDate(new Date())}`,

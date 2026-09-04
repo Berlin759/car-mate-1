@@ -1213,15 +1213,7 @@ export const postBookingList = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const searchText = String(search || "").trim();
-
-        const serviceSearchMatch = searchText
-            ? {
-                "serviceDetails.fullName": {
-                    $regex: searchText,
-                    $options: "i",
-                },
-            }
-            : null;
+        const searchRegex = searchText ? new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
 
         const mechanicMatch = {
             mechanicId: new ObjectId(mechanicId),
@@ -1373,7 +1365,7 @@ export const postBookingList = async (req, res) => {
                             },
                         },
                         // Search service name
-                        ...(serviceSearchMatch ? [{ $match: serviceSearchMatch, },] : []),
+                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
 
                         {
                             $sort: {
@@ -1713,7 +1705,7 @@ export const postBookingList = async (req, res) => {
                         },
 
                         // Same search filter for correct total count
-                        ...(serviceSearchMatch ? [{ $match: serviceSearchMatch, },] : []),
+                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
                         {
                             $count: "count",
                         },
@@ -2531,35 +2523,233 @@ export const getBookingInvoice = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid Booking ID."));
         };
 
-        const booking = await Booking.findById(bookingId)
-            .populate("serviceId")
-            .populate("ownerId")
-            .populate("mechanicId");
+        const pipeline = [
+            {
+                $match: {
+                    _id: new ObjectId(bookingId),
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    let: {
+                        mechanicId: "$mechanicId",
+                        serviceId: "$serviceId",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                status: Constants.SERVICE_STATUS.ACTIVE,
+                                $expr: {
+                                    $eq: ["$_id", "$$serviceId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                categoryId: { $toString: "$_id" },
+                                categoryName: { $ifNull: ["$fullName", ""] },
+                                categoryImage: { $ifNull: ["$image", ""] },
+                                subCategory: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: { $ifNull: ["$subCategory", []] },
+                                                as: "sub",
+                                                cond: {
+                                                    $gt: [
+                                                        {
+                                                            $size: {
+                                                                $filter: {
+                                                                    input: { $ifNull: ["$$sub.mechanicIds", []] },
+                                                                    as: "mechanic",
+                                                                    cond: {
+                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                        0,
+                                                    ],
+                                                },
+                                            },
+                                        },
+                                        as: "sub",
+                                        in: {
+                                            subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
+                                            price: {
+                                                $let: {
+                                                    vars: {
+                                                        mechanicData: {
+                                                            $arrayElemAt: [
+                                                                {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ["$$sub.mechanicIds", []],
+                                                                        },
+                                                                        as: "mechanic",
+                                                                        cond: {
+                                                                            $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                0,
+                                                            ],
+                                                        },
+                                                    },
+                                                    in: { $ifNull: ["$$mechanicData.price", 0] },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                    as: "serviceDetails",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "mechanicId",
+                    foreignField: "_id",
+                    as: "mechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                                latitude: 1,
+                                longitude: 1,
+                                address: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$mechanicDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carId",
+                    foreignField: "_id",
+                    as: "carDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                vehicleNumber: 1,
+                                model: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$carDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "earnings",
+                    let: {
+                        bookingId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$bookingId", "$$bookingId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                status: 1,
+                                earningAmount: 1,
+                                serviceAmount: 1,
+                                adminCharge: 1,
+                                finalPayoutAmount: 1,
+                                processedAt: 1,
+                            },
+                        },
+                    ],
+                    as: "earningDetails",
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    ownerId: 1,
+                    mechanicId: 1,
+                    serviceId: 1,
+                    carId: 1,
+                    invoiceNo: 1,
+                    date: 1,
+                    slot: 1,
+                    address: 1,
+                    consultantFee: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    serviceDetails: 1,
+                    ownerDetails: 1,
+                    mechanicDetails: 1,
+                    carDetails: 1,
+                    earningDetails: {
+                        $arrayElemAt: ["$earningDetails", 0],
+                    },
+                },
+            },
+        ];
+
+        const [booking] = await Booking.aggregate(pipeline);
 
         if (!booking) {
             return res.status(404).json(errorResponse("Booking not found."));
         };
 
-        const subTotal = parseFloat(booking.subTotal) || 0;
-
-        let serviceFee = 0;
-        (booking?.serviceId.subCategory || []).forEach(sub => {
-            const serviceMechanic = (sub.mechanicIds || []).find(
-                (m) => m.mechanicId?.toString() === booking?.mechanicId?._id.toString()
-            );
-
-            if (serviceMechanic) {
-                serviceFee += parseFloat(serviceMechanic.price) || 0;
-            };
-        });
-
-        log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
-
-        const bookingObj = booking.toObject();
-
-        bookingObj.servicePrice = parseFloat(serviceFee) || 0;
-
-        const { fileName, filePath, folder } = await generateInvoicePDF(bookingObj, subTotal);
+        const { fileName, filePath, folder } = await generateInvoicePDF(booking);
 
         log1(["getBookingInvoice fileName ----->", fileName]);
         log1(["getBookingInvoice filePath ----->", filePath]);
@@ -3661,8 +3851,8 @@ export const postEarningOverview = async (req, res) => {
                         invoiceId: { $ifNull: ["$transactionDetails.invoiceId", ""] },
                         trxId: { $ifNull: ["$transactionDetails.trxId", ""] },
                         ownerName: { $ifNull: ["$ownerDetails.fullName", ""] },
-                        serviceName: { $ifNull: ["$serviceDetails.fullName", ""] },
-                        serviceImage: { $ifNull: ["$serviceDetails.image", ""] },
+                        categoryName: { $ifNull: ["$serviceDetails.fullName", ""] },
+                        categoryImage: { $ifNull: ["$serviceDetails.image", ""] },
                         earningAmount: { $ifNull: ["$earningAmount", 0] },
                         serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                         adminCharge: { $ifNull: ["$adminCharge", 0] },

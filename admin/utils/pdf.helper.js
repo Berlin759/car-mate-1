@@ -70,6 +70,10 @@ export function generateTransactionPDF(transaction, res) {
     const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
     const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
+    const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
+    const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
+    const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+
     // Header background
     doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
     doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("Transaction Receipt", ML, 18, { width: CW, align: "center" });
@@ -93,11 +97,11 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Invoice ID:", transaction?.invoiceId, 320, y);
         y += 38;
 
-        drawField(doc, "Service Amount:", `₹${transaction?.earningDetails?.serviceAmount || 0}`, ML, y);
-        drawField(doc, "Admin Charge:", `₹${transaction?.earningDetails?.adminCharge || 0}`, 320, y);
+        drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
+        drawField(doc, "Admin Charge:", `₹${adminCharge}`, 320, y);
         y += 38;
 
-        drawField(doc, "Total Payout Amount:", `₹${transaction?.earningDetails?.finalPayoutAmount || 0}`, ML, y);
+        drawField(doc, "Total Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
         drawField(doc, "Payout Status:", payoutStatus.text, 320, y, payoutStatus.color);
         y += 38;
 
@@ -146,9 +150,9 @@ export function generateTransactionPDF(transaction, res) {
     doc.roundedRect(ML, y, CW, 85, 4).fill("#f0f4ff");
     doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
     y += 20;
-    doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${transaction?.earningDetails?.serviceAmount || 0}`, ML + 15, y + 28);
-    doc.text(`Admin Charge: ₹${transaction?.earningDetails?.adminCharge || 0}`, ML + 180, y + 28);
-    doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(transaction?.earningDetails?.finalPayoutAmount || 0)}`, ML + 360, y + 28);
+    doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
+    doc.text(`Admin Charge: ₹${adminCharge}`, ML + 180, y + 28);
+    doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
 
     // Footer line
     doc.moveTo(ML, doc.page.height - 35).lineTo(doc.page.width - MR, doc.page.height - 35).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
@@ -204,18 +208,20 @@ export function generateAllTransactionsPDF(transactionData, res) {
     const failedCount = transactions.filter((t) => t?.status === 3).length;
     const refundedCount = transactions.filter((t) => t?.status === 4).length;
     const pendingCount = transactions.filter((t) => t?.status === 1).length;
-    const completePayoutCount = earningSummary.totalCompletePayout || 0;
-    const pendingPayoutCount = earningSummary.totalPendingPayouts || 0;
+    const completePayoutAmount = earningSummary.totalCompletePayout || 0;
+    const pendingPayoutAmount = earningSummary.totalPendingPayouts || 0;
+
+    const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
 
     doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`1. Total Transaction: ${transactions.length}`, ML, y, { width: USABLE_W, lineBreak: false });
     y += 18;
-    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`2. Revenue Amount: ₹${totalAmount.toFixed(2)}`, ML, y, { width: USABLE_W, lineBreak: false });
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`2. Revenue Amount: ₹${parseFloat(totalAmount || 0).toFixed(2)}`, ML, y, { width: USABLE_W, lineBreak: false });
     y += 18;
     doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`3. Transaction: Completed: ${successCount}  |  Pending: ${pendingCount}  |  Failed: ${failedCount}  |  Refunded: ${refundedCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
     y += 18;
-    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`4. Total Complete Payout: ₹${completePayoutCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`4. Total Complete Payout: ₹${parseFloat(completePayoutAmount || 0).toFixed(2)}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
     y += 18;
-    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`5. Total Pending Payout: ₹${pendingPayoutCount}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
+    doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`5. Total Pending Payout: ₹${parseFloat(pendingPayoutAmount || 0).toFixed(2)}`, ML, y, { width: USABLE_W - 300, lineBreak: false });
     y += 25;
 
     // Column definitions — must sum to USABLE_W
@@ -272,6 +278,10 @@ export function generateAllTransactionsPDF(transactionData, res) {
         const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
         const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
+        const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
+        const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
+        const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+
         const rowData = [
             String(index + 1),
             String(transaction?.trxId || "-").substring(0, 12),
@@ -280,9 +290,9 @@ export function generateAllTransactionsPDF(transactionData, res) {
             String(transaction?.mechanicDetails?.fullName || "-").substring(0, 12),
             String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
             String(transaction?.carDetails?.fullName || "-").substring(0, 12),
-            `₹${transaction?.earningDetails?.serviceAmount || 0}`,
-            `₹${transaction?.earningDetails?.adminCharge || 0}`,
-            `₹${transaction?.earningDetails?.finalPayoutAmount || 0}`,
+            `₹${serviceAmount}`,
+            `₹${adminCharge}`,
+            `₹${finalPayoutAmount}`,
             payoutStatus.text,
             formatDate(transaction?.createdAt),
         ];
