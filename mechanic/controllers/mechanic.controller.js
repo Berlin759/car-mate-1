@@ -2462,9 +2462,19 @@ export const postBookingSendQuote = async (req, res) => {
             return res.status(400).json(errorResponse("Quotation must be an array of items."));
         };
 
+        // Validate quotation price
+        const invalidQuotation = quotation.find(item => {
+            const price = Number(item.price);
+            return !Number.isFinite(price) || price < 1;
+        });
+
+        if (invalidQuotation) {
+            return res.status(400).json(errorResponse(`Invalid price for "${invalidQuotation.serviceName}". Minimum price should be 1.`));
+        };
+
         const formattedQuotation = quotation.map(item => ({
             serviceName: item.serviceName,
-            price: Number(item.price) || 0,
+            price: Number(item.price),
         }));
 
         const existingQuotation = Array.isArray(booking.quotation) ? booking.quotation : [];
