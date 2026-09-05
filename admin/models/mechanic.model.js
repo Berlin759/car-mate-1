@@ -151,6 +151,11 @@ const mechanicSchema = new Schema(
             enum: Object.values(Constants.EMAIL_VERIFICATION_STATUS),
             default: Constants.EMAIL_VERIFICATION_STATUS.FALSE,
         },
+        kycStatus: {
+            type: Number,
+            enum: Object.values(Constants.KYC_STATUS),
+            default: Constants.KYC_STATUS.PENDING,
+        },
         status: {
             type: Number,
             enum: Object.values(Constants.MECHANIC_STATUS),

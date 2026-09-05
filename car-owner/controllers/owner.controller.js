@@ -758,8 +758,24 @@ export const postHomeDetails = async (req, res) => {
                         spherical: true,
                         query: {
                             status: Constants.MECHANIC_STATUS.ACTIVE,
-                            "serviceIds.0": { $exists: true, },
+                            kycStatus: Constants.KYC_STATUS.APPROVED,
                             isDeleted: false,
+                            fullName: { $exists: true, $nin: ["", null] },
+                            profileImage: { $exists: true, $nin: ["", null] },
+                            $or: [
+                                {
+                                    address: { $exists: true, $nin: ["", null] },
+                                },
+                                {
+                                    latitude: { $exists: true, $nin: ["", null, "0", 0] },
+                                    longitude: { $exists: true, $nin: ["", null, "0", 0] },
+                                },
+                            ],
+                            bankAccountNumber: { $exists: true, $nin: ["", null] },
+                            bankIfscCode: { $exists: true, $nin: ["", null] },
+                            bankAccountHolderName: { $exists: true, $nin: ["", null] },
+                            bankName: { $exists: true, $nin: ["", null] },
+                            "serviceIds.0": { $exists: true },
                         },
                     },
                 },
@@ -1050,6 +1066,24 @@ export const postSearchMechanics = async (req, res) => {
                 spherical: true,
                 query: {
                     status: Constants.MECHANIC_STATUS.ACTIVE,
+                    kycStatus: Constants.KYC_STATUS.APPROVED,
+                    isDeleted: false,
+                    fullName: { $exists: true, $nin: ["", null] },
+                    profileImage: { $exists: true, $nin: ["", null] },
+                    $or: [
+                        {
+                            address: { $exists: true, $nin: ["", null] },
+                        },
+                        {
+                            latitude: { $exists: true, $nin: ["", null, "0", 0] },
+                            longitude: { $exists: true, $nin: ["", null, "0", 0] },
+                        },
+                    ],
+                    bankAccountNumber: { $exists: true, $nin: ["", null] },
+                    bankIfscCode: { $exists: true, $nin: ["", null] },
+                    bankAccountHolderName: { $exists: true, $nin: ["", null] },
+                    bankName: { $exists: true, $nin: ["", null] },
+                    "serviceIds.0": { $exists: true },
                 },
             },
         };
@@ -1107,39 +1141,6 @@ export const postSearchMechanics = async (req, res) => {
             },
             {
                 $lookup: {
-                    from: "kycs",
-                    let: {
-                        mechanicId: "$_id",
-                    },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        {
-                                            $eq: ["$mechanicId", "$$mechanicId",],
-                                        },
-                                        {
-                                            $eq: ["$status", Constants.KYC_STATUS.APPROVED,],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        {
-                            $limit: 1,
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                            },
-                        },
-                    ],
-                    as: "approvedKyc",
-                },
-            },
-            {
-                $lookup: {
                     from: "ratings",
                     let: {
                         mechanicId: "$_id",
@@ -1175,9 +1176,6 @@ export const postSearchMechanics = async (req, res) => {
                     averageRating: {
                         $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0,], }, 0,],
                     },
-                    hasApprovedKyc: {
-                        $gt: [{ $size: "$approvedKyc", }, 0,],
-                    },
                 },
             },
             {
@@ -1185,7 +1183,7 @@ export const postSearchMechanics = async (req, res) => {
                     profileCompletionCount: {
                         $add: [
                             {
-                                $cond: ["$hasApprovedKyc", 1, 0,],
+                                $cond: [{ $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] }, 1, 0,],
                             },
                             {
                                 $cond: [
@@ -1325,7 +1323,7 @@ export const postSearchMechanics = async (req, res) => {
                                 averageRating: {
                                     $round: ["$averageRating", 1,],
                                 },
-                                hasApprovedKyc: 1,
+                                hasApprovedKyc: { $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] },
                             },
                         },
                     ],
@@ -2054,6 +2052,24 @@ export const postNearbyMechanics = async (req, res) => {
                 spherical: true,
                 query: {
                     status: Constants.MECHANIC_STATUS.ACTIVE,
+                    kycStatus: Constants.KYC_STATUS.APPROVED,
+                    isDeleted: false,
+                    fullName: { $exists: true, $nin: ["", null] },
+                    profileImage: { $exists: true, $nin: ["", null] },
+                    $or: [
+                        {
+                            address: { $exists: true, $nin: ["", null] },
+                        },
+                        {
+                            latitude: { $exists: true, $nin: ["", null, "0", 0] },
+                            longitude: { $exists: true, $nin: ["", null, "0", 0] },
+                        },
+                    ],
+                    bankAccountNumber: { $exists: true, $nin: ["", null] },
+                    bankIfscCode: { $exists: true, $nin: ["", null] },
+                    bankAccountHolderName: { $exists: true, $nin: ["", null] },
+                    bankName: { $exists: true, $nin: ["", null] },
+                    "serviceIds.0": { $exists: true },
                 },
             },
         };
@@ -2108,39 +2124,6 @@ export const postNearbyMechanics = async (req, res) => {
             },
             {
                 $lookup: {
-                    from: "kycs",
-                    let: {
-                        mechanicId: "$_id",
-                    },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        {
-                                            $eq: ["$mechanicId", "$$mechanicId",],
-                                        },
-                                        {
-                                            $eq: ["$status", Constants.KYC_STATUS.APPROVED,],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        {
-                            $limit: 1,
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                            },
-                        },
-                    ],
-                    as: "approvedKyc",
-                },
-            },
-            {
-                $lookup: {
                     from: "ratings",
                     let: {
                         mechanicId: "$_id",
@@ -2179,10 +2162,6 @@ export const postNearbyMechanics = async (req, res) => {
                     averageRating: {
                         $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0,], }, 0,],
                     },
-
-                    hasApprovedKyc: {
-                        $gt: [{ $size: "$approvedKyc", }, 0,],
-                    },
                 },
             },
             {
@@ -2190,7 +2169,7 @@ export const postNearbyMechanics = async (req, res) => {
                     profileCompletionCount: {
                         $add: [
                             {
-                                $cond: ["$hasApprovedKyc", 1, 0,],
+                                $cond: [{ $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] }, 1, 0,],
                             },
                             {
                                 $cond: [
@@ -2434,9 +2413,24 @@ export const postPopularNearbyMechanics = async (req, res) => {
                     spherical: true,
                     query: {
                         status: Constants.MECHANIC_STATUS.ACTIVE,
-                        "serviceIds.0": {
-                            $exists: true,
-                        },
+                        kycStatus: Constants.KYC_STATUS.APPROVED,
+                        isDeleted: false,
+                        fullName: { $exists: true, $nin: ["", null] },
+                        profileImage: { $exists: true, $nin: ["", null] },
+                        $or: [
+                            {
+                                address: { $exists: true, $nin: ["", null] },
+                            },
+                            {
+                                latitude: { $exists: true, $nin: ["", null, "0", 0] },
+                                longitude: { $exists: true, $nin: ["", null, "0", 0] },
+                            },
+                        ],
+                        bankAccountNumber: { $exists: true, $nin: ["", null] },
+                        bankIfscCode: { $exists: true, $nin: ["", null] },
+                        bankAccountHolderName: { $exists: true, $nin: ["", null] },
+                        bankName: { $exists: true, $nin: ["", null] },
+                        "serviceIds.0": { $exists: true },
                     },
                 },
             },

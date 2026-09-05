@@ -4741,6 +4741,11 @@ export const postApproveKYC = async (req, res) => {
             return res.status(400).json(errorResponse("Failed to approve KYC."));
         };
 
+        await Mechanic.updateOne(
+            { _id: new ObjectId(mechanicId), },
+            { kycStatus: Constants.KYC_STATUS.APPROVED, }
+        );
+
         return res.status(200).json(successResponse("KYC approved successfully!"));
     } catch (error) {
         log1(["Error in postApproveKYC----->", error]);
@@ -4786,6 +4791,11 @@ export const postRejectKYC = async (req, res) => {
         if (!updateKYC) {
             return res.status(400).json(errorResponse("Failed to reject KYC."));
         };
+
+        await Mechanic.updateOne(
+            { _id: new ObjectId(mechanicId), },
+            { kycStatus: Constants.KYC_STATUS.REJECTED, }
+        );
 
         return res.status(200).json(successResponse("KYC rejected successfully!"));
     } catch (error) {

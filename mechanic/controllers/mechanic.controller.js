@@ -174,7 +174,7 @@ export const getProfileDetails = async (req, res) => {
                     panCard: "$kycDetails.panCard",
                     selfie: "$kycDetails.selfie",
                     rejectReason: "$kycDetails.rejectReason",
-                    kycStatus: "$kycDetails.status",
+                    kycStatus: 1,
                     createdAt: 1,
                     updatedAt: 1,
                 },
@@ -186,7 +186,6 @@ export const getProfileDetails = async (req, res) => {
         const response = items[0];
 
         if (response) {
-            const kycRecord = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) }).lean();
             const serviceCount = await Service.countDocuments({
                 "subCategory.mechanicIds.mechanicId": new ObjectId(mechanicId)
             });
@@ -199,7 +198,7 @@ export const getProfileDetails = async (req, res) => {
                 response.profileImage !== ""
             );
 
-            const isKycVerified = !!(kycRecord && kycRecord.status === Constants.KYC_STATUS.APPROVED);
+            const isKycVerified = !!(response.kycStatus === Constants.KYC_STATUS.APPROVED);
 
             const isAddressComplete = !!(
                 response.address &&
@@ -2398,6 +2397,21 @@ export const postBookingUpdateStatus = async (req, res) => {
         let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
         if (!updateBooking) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        };
+
+        if (newStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+            const chatDetails = await Chat.findOne({
+                bookingId: bookingDetails._id,
+                mechanicId: new ObjectId(mechanicId),
+            });
+
+            if (chatDetails) {
+                await ChatMessage.deleteMany({
+                    chatId: chatDetails._id,
+                });
+
+                await Chat.findByIdAndDelete(chatDetails._id);
+            };
         };
 
         if (notificationTitle && bookingDetails.ownerId) {
