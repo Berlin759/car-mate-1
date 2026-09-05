@@ -2350,16 +2350,21 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 const platformFee = pricingDetails?.platformCommission || 0;
 
-                const earningAmount = bookingDetails?.totalAmount - bookingDetails?.consultantFee;
-                const finalAmount = bookingDetails?.totalAmount - platformFee;
+                const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
+
+                const totalAdminCharge = parseFloat((totalBookingAmount * parseFloat(platformFee)) / 100) || 0;
+
+                const earningAmount = totalBookingAmount - bookingDetails?.consultantFee;
+                const finalAmount = totalBookingAmount - totalAdminCharge;
 
                 const createEarning = await Earning.create({
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
                     transactionId: new ObjectId(transactionDetails._id),
                     bookingId: new ObjectId(bookingDetails?._id),
                     earningAmount: earningAmount || 0,
-                    serviceAmount: bookingDetails?.totalAmount || 0,
-                    adminCharge: platformFee || 0,
+                    serviceAmount: totalBookingAmount || 0,
+                    adminCharge: totalAdminCharge || 0,
+                    adminPercentageCharge: parseFloat(platformFee) || 0,
                     finalPayoutAmount: finalAmount || 0,
                     bankAccountNumber: mechanicDetails?.bankAccountNumber,
                     bankIfscCode: mechanicDetails?.bankIfscCode,
@@ -2723,6 +2728,7 @@ export const getBookingInvoice = async (req, res) => {
                                 earningAmount: 1,
                                 serviceAmount: 1,
                                 adminCharge: 1,
+                                adminPercentageCharge: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },
@@ -3870,6 +3876,7 @@ export const postEarningOverview = async (req, res) => {
                         earningAmount: { $ifNull: ["$earningAmount", 0] },
                         serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                         adminCharge: { $ifNull: ["$adminCharge", 0] },
+                        adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
                         finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                         status: 1,
                         processedAt: 1,
@@ -4041,6 +4048,7 @@ export const postEarningList = async (req, res) => {
                                 earningAmount: { $ifNull: ["$earningAmount", 0] },
                                 serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                                 adminCharge: { $ifNull: ["$adminCharge", 0] },
+                                adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
                                 finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                                 status: 1,
                                 processedAt: 1,
@@ -4073,6 +4081,7 @@ export const postEarningList = async (req, res) => {
                                     earnings: { $ifNull: ["$earningAmount", 0] },
                                     serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                                     adminCharge: { $ifNull: ["$adminCharge", 0] },
+                                    adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
                                     finalPayout: { $ifNull: ["$finalPayoutAmount", 0] },
                                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
                                     tipAmount: { $ifNull: ["$transactionDetails.tipAmount", 0] },
@@ -4218,6 +4227,7 @@ export const postEarningDetails = async (req, res) => {
                     earningAmount: 1,
                     serviceAmount: 1,
                     adminCharge: 1,
+                    adminPercentageCharge: 1,
                     finalPayoutAmount: 1,
                     status: 1,
                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },

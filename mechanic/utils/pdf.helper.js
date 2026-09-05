@@ -139,10 +139,11 @@ export const generateInvoicePDF = async (booking) => {
 
             const serviceAmount = parseFloat(booking?.earningDetails?.serviceAmount || 0).toFixed(2);
             const adminCharge = parseFloat(booking?.earningDetails?.adminCharge || 0).toFixed(2);
+            const adminPercentageCharge = parseFloat(booking?.earningDetails?.adminPercentageCharge || 0);
             const finalPayoutAmount = parseFloat(booking?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
 
             drawSummaryRow("Service Amount:", serviceAmount, true);
-            drawSummaryRow("Admin Charge:", adminCharge, true, true);
+            drawSummaryRow(`Admin Charge (${adminPercentageCharge}%):`, adminCharge, true, true);
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.primary).lineWidth(2).stroke();

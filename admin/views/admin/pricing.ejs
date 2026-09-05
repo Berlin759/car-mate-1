@@ -11,19 +11,19 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label text-dark">Base Price (₹)</label>
-                                <input type="number" class="form-control" id="basePrice" name="basePrice" step="0.01" min="0" value="<%= body?.pricing?.basePrice || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control amount-input" id="basePrice" name="basePrice" step="0.01" min="0" value="<%= body?.pricing?.basePrice || 0 %>">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">Per Km Charge (₹)</label>
-                                <input type="number" class="form-control" id="perKmCharge" name="perKmCharge" step="0.01" min="0" value="<%= body?.pricing?.perKmCharge || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control amount-input" id="perKmCharge" name="perKmCharge" step="0.01" min="0" value="<%= body?.pricing?.perKmCharge || 0 %>">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">Minimum Fare (₹)</label>
-                                <input type="number" class="form-control" id="minimumFare" name="minimumFare" step="0.01" min="0" value="<%= body?.pricing?.minimumFare || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control amount-input" id="minimumFare" name="minimumFare" step="0.01" min="0" value="<%= body?.pricing?.minimumFare || 0 %>">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">Cancellation Fee (₹)</label>
-                                <input type="number" class="form-control" id="cancellationFee" name="cancellationFee" step="0.01" min="0" value="<%= body?.pricing?.cancellationFee || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control amount-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" value="<%= body?.pricing?.cancellationFee || 0 %>">
                             </div>
                         </div>
                     </div>
@@ -38,7 +38,7 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label text-dark">Peak-Hour Surcharge (%)</label>
-                                <input type="number" class="form-control" id="peakHourSurcharge" name="peakHourSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.peakHourSurcharge || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="peakHourSurcharge" name="peakHourSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.peakHourSurcharge || 0 %>">
                             </div>
                             <div class="row mb-3">
                                 <div class="col-6">
@@ -62,7 +62,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">Weekend Surcharge (%)</label>
-                                <input type="number" class="form-control" id="weekendSurcharge" name="weekendSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.weekendSurcharge || 0 %>">
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="weekendSurcharge" name="weekendSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.weekendSurcharge || 0 %>">
                             </div>
                         </div>
                     </div>
@@ -77,11 +77,11 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label text-dark">Platform Commission (%)</label>
-                                <input type="number" class="form-control" id="platformCommission" name="platformCommission" step="0.01" min="0" max="100" value="<%= body?.pricing?.platformCommission || 10 %>">
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="platformCommission" name="platformCommission" step="0.01" min="0" max="100" value="<%= body?.pricing?.platformCommission || 0 %>">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">GST (%)</label>
-                                <input type="number" class="form-control" id="gstPercentage" name="gstPercentage" step="0.01" min="0" max="100" value="<%= body?.pricing?.gstPercentage || 18 %>">
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="gstPercentage" name="gstPercentage" step="0.01" min="0" max="100" value="<%= body?.pricing?.gstPercentage || 18 %>">
                             </div>
                         </div>
                     </div>

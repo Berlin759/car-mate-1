@@ -197,7 +197,7 @@
             <span class="fw-md fs-16">&#8377; <%= txn.totalAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Admin Charge</span>
+            <span class="text-gray fs-14 d-block mb-1">Admin Charge (<%= txn?.earningDetails?.adminPercentageCharge %>%)</span>
             <span class="fw-md">&#8377; <%= txn?.earningDetails?.adminCharge || 0 %></span>
         </div>
         <div class="col-md-6">

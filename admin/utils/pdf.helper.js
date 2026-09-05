@@ -72,6 +72,7 @@ export function generateTransactionPDF(transaction, res) {
 
     const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
     const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
+    const adminPercentageCharge = parseFloat(transaction?.earningDetails?.adminPercentageCharge || 0);
     const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
 
     // Header background
@@ -98,7 +99,7 @@ export function generateTransactionPDF(transaction, res) {
         y += 38;
 
         drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
-        drawField(doc, "Admin Charge:", `₹${adminCharge}`, 320, y);
+        drawField(doc, `Admin Charge (${adminPercentageCharge}%):`, `₹${adminCharge}`, 320, y);
         y += 38;
 
         drawField(doc, "Total Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
@@ -151,7 +152,7 @@ export function generateTransactionPDF(transaction, res) {
     doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
     y += 20;
     doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
-    doc.text(`Admin Charge: ₹${adminCharge}`, ML + 180, y + 28);
+    doc.text(`Admin Charge (${adminPercentageCharge}): ₹${adminCharge}`, ML + 180, y + 28);
     doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
 
     // Footer line

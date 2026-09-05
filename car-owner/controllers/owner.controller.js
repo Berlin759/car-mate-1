@@ -5152,6 +5152,7 @@ export const getBookingInvoice = async (req, res) => {
                                 earningAmount: 1,
                                 serviceAmount: 1,
                                 adminCharge: 1,
+                                adminPercentageCharge: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },

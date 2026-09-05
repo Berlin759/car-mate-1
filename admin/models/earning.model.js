@@ -31,6 +31,10 @@ const earningSchema = new Schema(
             type: Number,
             default: 0,
         },
+        adminPercentageCharge: {
+            type: Number,
+            default: 0,
+        },
         finalPayoutAmount: {
             type: Number,
             default: 0,
