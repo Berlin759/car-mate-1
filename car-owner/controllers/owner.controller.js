@@ -5200,12 +5200,8 @@ export const getBookingInvoice = async (req, res) => {
 
         let serviceFee = 0;
         (booking?.serviceDetails.subCategory || []).forEach(sub => {
-            const serviceMechanic = (sub.mechanicIds || []).find(
-                (m) => m.mechanicId?.toString() === booking?.mechanicId?._id.toString()
-            );
-
-            if (serviceMechanic) {
-                serviceFee += parseFloat(serviceMechanic.price) || 0;
+            if (sub.price) {
+                serviceFee += parseFloat(sub.price) || 0;
             };
         });
 
@@ -5215,16 +5211,11 @@ export const getBookingInvoice = async (req, res) => {
 
         const { fileName, filePath, folder } = await generateInvoicePDF(booking);
 
-        log1(["getBookingInvoice fileName ----->", fileName]);
-        log1(["getBookingInvoice filePath ----->", filePath]);
-        log1(["getBookingInvoice folder ----->", folder]);
-
         if (!fileName || !folder) {
             return res.status(500).json(errorResponse("Error generating invoice."));
         };
 
         const invoicePath = `/${folder}/${fileName}`;
-        log1(["getBookingInvoice invoicePath ----->", invoicePath]);
 
         return res.status(200).json(successResponse("Invoice PDF generated successfully.", {
             invoicePath,

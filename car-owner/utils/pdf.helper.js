@@ -121,7 +121,7 @@ export const generateInvoicePDF = async (booking) => {
 
             drawRow(`${booking.serviceDetails?.categoryName || "Service"}`, booking.servicePrice || 0);
 
-            if (booking.consultantFee !== undefined && booking.consultantFee !== null && parseFloat(booking.consultantFee) > 0) {
+            if (booking.consultantFee !== undefined && booking.consultantFee !== null) {
                 drawRow("Consultant Fee", parseFloat(booking.consultantFee || 0).toFixed(2));
             };
 
@@ -129,7 +129,7 @@ export const generateInvoicePDF = async (booking) => {
                 drawRow(`Quotation: ${item.serviceName || "Service"}`, parseFloat(item.price || 0).toFixed(2));
             });
 
-            if (booking.discountAmount !== undefined && booking.discountAmount !== null) {
+            if (booking.discountAmount !== undefined && booking.discountAmount !== null && parseFloat(booking.discountAmount) > 0) {
                 drawRow("Discount", parseFloat(booking.discountAmount || 0).toFixed(2), true);
             };
 
