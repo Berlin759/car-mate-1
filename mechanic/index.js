@@ -51,13 +51,15 @@ setupRedisAdapter();
 
 io.on("connection", async (socket) => {
     const mechanicId = socket?.handshake?.auth?.mechanicId;
-    let authToken = socket?.handshake?.auth?.mechanicToken;
+    const authToken = socket?.handshake?.auth?.authToken;
+
     socket.mechanicId = mechanicId;
     socket.authToken = authToken;
 
     if (mechanicId && ObjectId.isValid(mechanicId)) {
-        io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "online" });
-        await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
+        await Mechanic.findByIdAndUpdate(mechanicId, { isOnline: Constants.ONLINE_STATUS.TRUE });
+
+        io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId, status: "online" });
     };
 
     socket.on(Constants.SOCKET_EVENTS.JOIN_CHAT_ROOM, ({ chatId }) => {
@@ -86,9 +88,12 @@ io.on("connection", async (socket) => {
 
     socket.on(Constants.SOCKET_EVENTS.IS_READ_MESSAGE, async ({ chatId, mechanicId }) => {
         if (!chatId || !mechanicId) return;
+
         const mechanicIdStr = mechanicId.toString();
+
         let chatDetails = await Chat.findById(chatId);
         if (!chatDetails) return;
+
         let readMessages = chatDetails?.readMessages || [];
         const currentTime = moment().utc().toDate();
 
@@ -103,14 +108,30 @@ io.on("connection", async (socket) => {
         };
 
         await Chat.findByIdAndUpdate(chatId, { readMessages: readMessages });
+
+        const myId = chatDetails.ownerId ? chatDetails.ownerId : chatDetails.guestId;
+        const ownerIdStr = myId.toString();
+
+        if (chatDetails.ownerDetailsPageIds.includes(ownerIdStr)) {
+            io.to(chatId.toString()).emit(Constants.SOCKET_EVENTS.OWNER_MESSAGE_SEEN, { chatId, isMessageSeen: true });
+        };
     });
 
     socket.on("disconnect", async () => {
-        if (socket.mechanicId && ObjectId.isValid(socket.mechanicId)) {
-            let mechanicDetails = await Mechanic.findById(socket.mechanicId).select("loginToken");
-            if (mechanicDetails && mechanicDetails.loginToken === socket.authToken) {
-                io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId: socket.mechanicId, status: "offline" });
-                await Mechanic.findByIdAndUpdate({ _id: new ObjectId(socket.mechanicId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
+        const mechanicId = socket.mechanicId;
+        const authToken = socket?.authToken;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return;
+        };
+
+        if (mechanicId && ObjectId.isValid(mechanicId)) {
+            const mechanicDetails = await Mechanic.findById(socket.mechanicId).select("loginToken");
+
+            if (mechanicDetails && mechanicDetails.loginToken === authToken) {
+                await Mechanic.findByIdAndUpdate(mechanicId, { isOnline: Constants.ONLINE_STATUS.FALSE });
+
+                io.emit(Constants.SOCKET_EVENTS.MECHANIC_STATUS_CHANGE, { mechanicId, status: "offline" });
             };
         };
     });

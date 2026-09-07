@@ -28,6 +28,8 @@ const Constants = {
         IS_READ_MESSAGE: "is_read_message",
         IN_OUT_DETAILS_PAGE: "in_out_details_page",
         CHANGE_BOOKING_STATUS: "change_booking_status",
+        OWNER_MESSAGE_SEEN: "owner_message_seen",
+        MECHANIC_MESSAGE_SEEN: "mechanic_message_seen",
     },
     OWNER_STATUS: {
         PENDING: 1,

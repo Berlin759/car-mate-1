@@ -11,6 +11,7 @@ const Constants = {
     DEFAULT_LIMIT: 10,
     DEFAULT_RADIUS: 10,
     DEFAULT_GST_PERCENTAGE: 18,
+    MAX_RADIUS_KM: 100,
     OTP_EXPIRATION_TIME: 1000 * 60 * 10,
     OTP_RESEND_TIME: 1000 * 60 * 2,
     MAX_FILE_SIZE: 10,
@@ -27,6 +28,8 @@ const Constants = {
         IS_READ_MESSAGE: "is_read_message",
         IN_OUT_DETAILS_PAGE: "in_out_details_page",
         CHANGE_BOOKING_STATUS: "change_booking_status",
+        OWNER_MESSAGE_SEEN: "owner_message_seen",
+        MECHANIC_MESSAGE_SEEN: "mechanic_message_seen",
     },
     OWNER_STATUS: {
         PENDING: 1,

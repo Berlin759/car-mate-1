@@ -51,17 +51,22 @@ setupRedisAdapter();
 
 io.on("connection", async (socket) => {
     const ownerId = socket?.handshake?.auth?.ownerId;
-    let authToken = socket?.handshake?.auth?.ownerToken;
+    const guestId = socket?.handshake?.auth?.guestId;
+    const authToken = socket?.handshake?.auth?.authToken;
+
     socket.ownerId = ownerId;
     socket.authToken = authToken;
+    socket.guestId = guestId;
+
+    if (!ownerId && !guestId) return;
+
+    const myId = guestId ? guestId : ownerId;
 
     if (ownerId && ObjectId.isValid(ownerId)) {
-        io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: socket.ownerId, status: "online" });
-        await Owner.findByIdAndUpdate({ _id: new ObjectId(socket.ownerId) }, { isOnline: Constants.ONLINE_STATUS.TRUE });
-    } else {
-        const guestId = socket?.handshake?.auth?.guestId;
-        socket.guestId = guestId;
+        await Owner.findByIdAndUpdate(ownerId, { isOnline: Constants.ONLINE_STATUS.TRUE });
     };
+
+    io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: myId, status: "online" });
 
     socket.on(Constants.SOCKET_EVENTS.JOIN_CHAT_ROOM, ({ chatId }) => {
         socket.join(chatId);
@@ -89,9 +94,12 @@ io.on("connection", async (socket) => {
 
     socket.on(Constants.SOCKET_EVENTS.IS_READ_MESSAGE, async ({ chatId, ownerId }) => {
         if (!chatId || !ownerId) return;
+
         const ownerIdStr = ownerId.toString();
+
         let chatDetails = await Chat.findById(chatId);
         if (!chatDetails) return;
+
         let readMessages = chatDetails?.readMessages || [];
         const currentTime = moment().utc().toDate();
 
@@ -106,16 +114,32 @@ io.on("connection", async (socket) => {
         };
 
         await Chat.findByIdAndUpdate(chatId, { readMessages: readMessages });
+
+        const mechanicIdStr = chatDetails.mechanicId.toString();
+
+        if (chatDetails.mechanicDetailsPageIds.includes(mechanicIdStr)) {
+            io.to(chatId.toString()).emit(Constants.SOCKET_EVENTS.MECHANIC_MESSAGE_SEEN, { chatId, isMessageSeen: true });
+        };
     });
 
     socket.on("disconnect", async () => {
-        if (socket.ownerId && ObjectId.isValid(socket.ownerId)) {
-            let ownerDetails = await Owner.findById(socket.ownerId).select("loginToken");
-            if (ownerDetails && ownerDetails.loginToken === socket.authToken) {
-                io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: socket.ownerId, status: "offline" });
-                await Owner.findByIdAndUpdate({ _id: new ObjectId(socket.ownerId) }, { isOnline: Constants.ONLINE_STATUS.FALSE });
+        const ownerId = socket?.ownerId;
+        const guestId = socket?.guestId;
+        const authToken = socket?.authToken;
+
+        if (!ownerId && !guestId) return;
+
+        const myId = guestId ? guestId : ownerId;
+
+        if (ownerId && ObjectId.isValid(ownerId)) {
+            const ownerDetails = await Owner.findById(ownerId).select("loginToken");
+
+            if (ownerDetails && ownerDetails.loginToken === authToken) {
+                await Owner.findByIdAndUpdate(ownerId, { isOnline: Constants.ONLINE_STATUS.FALSE });
             };
         };
+
+        io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: myId, status: "offline" });
     });
 });
 
