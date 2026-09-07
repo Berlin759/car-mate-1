@@ -1715,8 +1715,122 @@ export const postBookingList = async (req, res) => {
                     ],
                     statusSummary: [
                         {
-                            $match: mechanicMatch,
+                            $match: match,
                         },
+                        {
+                            $lookup: {
+                                from: "services",
+                                let: {
+                                    mechanicId: "$mechanicId",
+                                    serviceId: "$serviceId",
+                                },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            status: Constants.SERVICE_STATUS.ACTIVE,
+                                            $expr: {
+                                                $eq: ["$_id", "$$serviceId"],
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $project: {
+                                            _id: 0,
+                                            categoryId: { $toString: "$_id" },
+                                            categoryName: { $ifNull: ["$fullName", ""] },
+                                            categoryImage: { $ifNull: ["$image", ""] },
+                                            categoryDescription: { $ifNull: ["$description", ""] },
+                                            subCategory: {
+                                                $map: {
+                                                    input: {
+                                                        $filter: {
+                                                            input: { $ifNull: ["$subCategory", []] },
+                                                            as: "sub",
+                                                            cond: {
+                                                                $gt: [
+                                                                    {
+                                                                        $size: {
+                                                                            $filter: {
+                                                                                input: { $ifNull: ["$$sub.mechanicIds", []] },
+                                                                                as: "mechanic",
+                                                                                cond: {
+                                                                                    $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                    0,
+                                                                ],
+                                                            },
+                                                        },
+                                                    },
+                                                    as: "sub",
+                                                    in: {
+                                                        subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
+                                                        price: {
+                                                            $let: {
+                                                                vars: {
+                                                                    mechanicData: {
+                                                                        $arrayElemAt: [
+                                                                            {
+                                                                                $filter: {
+                                                                                    input: {
+                                                                                        $ifNull: ["$$sub.mechanicIds", []],
+                                                                                    },
+                                                                                    as: "mechanic",
+                                                                                    cond: {
+                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                            0,
+                                                                        ],
+                                                                    },
+                                                                },
+                                                                in: { $ifNull: ["$$mechanicData.price", 0] },
+                                                            },
+                                                        },
+                                                        description: {
+                                                            $let: {
+                                                                vars: {
+                                                                    mechanicData: {
+                                                                        $arrayElemAt: [
+                                                                            {
+                                                                                $filter: {
+                                                                                    input: {
+                                                                                        $ifNull: ["$$sub.mechanicIds", []],
+                                                                                    },
+                                                                                    as: "mechanic",
+                                                                                    cond: {
+                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                            0,
+                                                                        ],
+                                                                    },
+                                                                },
+                                                                in: { $ifNull: ["$$mechanicData.description", ""] },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                ],
+                                as: "serviceDetails",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$serviceDetails",
+                                preserveNullAndEmptyArrays: false,
+                            },
+                        },
+
+                        // Same search filter for correct total count
+                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
                         {
                             $group: {
                                 _id: "$status",
