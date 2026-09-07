@@ -727,7 +727,7 @@ export const postHomeDetails = async (req, res) => {
         const [serviceCategories, ownerResult, pricingDetails] = await Promise.all([
             serviceCategoriesPromise,
             ownerDataPromise,
-            Pricing.findOne({}),
+            Pricing.findOne({}).lean(),
         ]);
 
         const [updatedOwner, carList] = ownerResult;

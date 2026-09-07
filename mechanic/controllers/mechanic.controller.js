@@ -853,7 +853,8 @@ export const postHomeDetails = async (req, res) => {
             unreadNotificationsCount,
             pendingPayoutsSum,
             allTimeTotalEarningsSum,
-            kycRecord
+            kycRecord,
+            pricingDetails,
         ] = await Promise.all([
             // Today's total scheduled jobs
             Booking.countDocuments({
@@ -934,6 +935,8 @@ export const postHomeDetails = async (req, res) => {
 
             // KYC record for profile completion
             KYC.findOne({ mechanicId: new ObjectId(mechanicId) }).lean(),
+
+            Pricing.findOne({}).lean(),
         ]);
 
         const avgRating = ratingStats[0]?.avgRating ? parseFloat(ratingStats[0].avgRating.toFixed(1)) : 0;
@@ -977,6 +980,7 @@ export const postHomeDetails = async (req, res) => {
             upcomingBookings,
             profileCompletionCount,
             profileCompletionPercentage,
+            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
         };
 
         return res.status(200).json(successResponse("Home details fetched successfully.", response));
