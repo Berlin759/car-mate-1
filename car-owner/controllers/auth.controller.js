@@ -186,7 +186,7 @@ export const postVerifyOtp = async (req, res) => {
             const chatIds = guestChats.map((chat) => chat._id);
 
             if (chatIds.length > 0) {
-                const [chatUpdateResult, messageUpdateResult] = await Promise.all([
+                await Promise.all([
                     Chat.updateMany(
                         {
                             _id: { $in: chatIds },
@@ -195,6 +195,7 @@ export const postVerifyOtp = async (req, res) => {
                             {
                                 $set: {
                                     ownerId: ownerId,
+                                    guestId: null,
                                     readMessages: {
                                         $map: {
                                             input: { $ifNull: ["$readMessages", []] },
