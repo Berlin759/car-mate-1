@@ -969,6 +969,7 @@ export const postHomeDetails = async (req, res) => {
         const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
 
         const response = {
+            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
             totalEarnings,
             pendingPayouts,
             todayJobs: todayJobsCount,
@@ -976,11 +977,10 @@ export const postHomeDetails = async (req, res) => {
             rating: avgRating,
             todayEarnings,
             unreadNotificationsCount,
-            newJobRequests,
-            upcomingBookings,
             profileCompletionCount,
             profileCompletionPercentage,
-            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
+            newJobRequests,
+            upcomingBookings,
         };
 
         return res.status(200).json(successResponse("Home details fetched successfully.", response));

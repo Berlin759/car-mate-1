@@ -935,11 +935,11 @@ export const postHomeDetails = async (req, res) => {
         const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
+            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
             location: locationObject,
             carList: carList,
             serviceCategories: serviceList,
             popularNearbyMechanics: formattedMechanics,
-            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
