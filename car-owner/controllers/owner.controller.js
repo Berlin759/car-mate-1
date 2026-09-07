@@ -7,6 +7,9 @@ import crypto from 'crypto';
 import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
+import { io } from "../index.js";
+import { sendMail } from "../utils/mailSend.helper.js";
+import { sendPushNotification } from "./pushNotification.js";
 import { custom_validation } from "../lib/validation.js";
 import {
     errorResponse,
@@ -21,10 +24,9 @@ import {
     getTimeFormatFromMilliseconds,
     generateUniqueUsername,
 } from "../lib/general.js";
-import { sendMail } from "../utils/mailSend.helper.js";
-import { sendPushNotification } from "./pushNotification.js";
 import { createOrder, razorpayRefund, verifySignature } from "./razorpay.controller.js";
-import { io } from "../index.js";
+import { generateInvoicePDF } from "../utils/pdf.helper.js";
+
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
 import ChatMessage from "../models/chatMessage.model.js";
@@ -44,7 +46,7 @@ import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 import KYC from "../models/kyc.model.js";
-import { generateInvoicePDF } from "../utils/pdf.helper.js";
+import Pricing from "../models/pricing.model.js";
 
 const __dirname = path.resolve();
 
@@ -722,9 +724,10 @@ export const postHomeDetails = async (req, res) => {
             ])
             : Promise.resolve([null, [],]);
 
-        const [serviceCategories, ownerResult,] = await Promise.all([
+        const [serviceCategories, ownerResult, pricingDetails] = await Promise.all([
             serviceCategoriesPromise,
             ownerDataPromise,
+            Pricing.findOne({}),
         ]);
 
         const [updatedOwner, carList] = ownerResult;
@@ -936,6 +939,7 @@ export const postHomeDetails = async (req, res) => {
             carList: carList,
             serviceCategories: serviceList,
             popularNearbyMechanics: formattedMechanics,
+            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
@@ -3261,7 +3265,7 @@ export const postAddBooking = async (req, res) => {
             ownerId = ownerDetails._id;
         };
 
-        const [serviceDetails, carDetails, addressDetails] = await Promise.all([
+        const [serviceDetails, carDetails, addressDetails, pricingDetails] = await Promise.all([
             Service.findOne({
                 _id: new ObjectId(serviceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
@@ -3277,6 +3281,8 @@ export const postAddBooking = async (req, res) => {
                 _id: new ObjectId(addressId),
                 ownerId: new ObjectId(ownerId),
             }).lean(),
+
+            Pricing.findOne({}).lean(),
         ]);
 
         log1(["postAddBooking serviceDetails----->", serviceDetails]);
@@ -3452,7 +3458,9 @@ export const postAddBooking = async (req, res) => {
 
         const subTotal = parseFloat(totalFee - discountAmount);
 
-        const taxAmount = parseFloat((subTotal * 18) / 100);
+        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+
+        const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
 
         let totalPayAmount = parseFloat(subTotal + taxAmount);
 
@@ -4694,7 +4702,7 @@ export const postRescheduleBooking = async (req, res) => {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
 
-        const [serviceDetails, addressDetails] = await Promise.all([
+        const [serviceDetails, addressDetails, pricingDetails] = await Promise.all([
             Service.findOne({
                 _id: new ObjectId(bookingDetails?.serviceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
@@ -4704,6 +4712,8 @@ export const postRescheduleBooking = async (req, res) => {
                 _id: new ObjectId(addressId),
                 ownerId: new ObjectId(ownerId),
             }).lean(),
+
+            Pricing.findOne({}).lean(),
         ]);
 
         if (!serviceDetails) {
@@ -4787,7 +4797,9 @@ export const postRescheduleBooking = async (req, res) => {
 
         const subTotal = parseFloat(totalFee - discountAmount);
 
-        const taxAmount = parseFloat((subTotal * 18) / 100);
+        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+
+        const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
 
         let totalPayAmount = parseFloat(subTotal + taxAmount);
 
@@ -5435,7 +5447,11 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
                 0
             );
 
-            const gstAmount = Math.round(quoteSum * 0.18);
+            const pricingDetails = await Pricing.findOne({});
+
+            const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+
+            const gstAmount = parseFloat((quoteSum * gstPercentage) / 100);
 
             const totalQuotationAmount = quoteSum + gstAmount;
 

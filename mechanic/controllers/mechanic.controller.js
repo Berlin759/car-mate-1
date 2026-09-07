@@ -5,7 +5,10 @@ import momentTz from "moment-timezone";
 import mongoose from "mongoose";
 import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
+import { io } from "../index.js";
 import { custom_validation } from "../lib/validation.js";
+import { sendMail } from "../utils/mailSend.helper.js";
+import { sendPushNotification } from "./pushNotification.js";
 import {
     errorResponse,
     log1,
@@ -16,11 +19,9 @@ import {
     generateRandomToken,
     getTimeFormatFromMilliseconds,
 } from "../lib/general.js";
-import { sendMail } from "../utils/mailSend.helper.js";
 import { generateInvoicePDF } from "../utils/pdf.helper.js";
-import { sendPushNotification } from "./pushNotification.js";
+import { createOrder } from "./razorpay.controller.js";
 
-import { io } from "../index.js";
 import Mechanic from "../models/mechanic.model.js";
 import Owner from "../models/owner.model.js";
 import Chat from "../models/chat.model.js";
@@ -37,7 +38,6 @@ import Earning from "../models/earning.model.js";
 import Captcha from "../models/captcha.model.js";
 import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
-import { createOrder } from "./razorpay.controller.js";
 import Pricing from "../models/pricing.model.js";
 
 const __dirname = path.resolve();
@@ -2500,16 +2500,12 @@ export const postBookingSendQuote = async (req, res) => {
             0
         );
 
-        // const consultantFee = Number(booking.consultantFee) || 0;
-        // const discountAmount = Number(booking.discountAmount) || 0;
+        const pricingDetails = await Pricing.findOne({});
 
-        // const subTotal = (consultantFee + quoteSum) - discountAmount;
-        const taxAmount = Math.round(quoteSum * 0.18);
+        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+
+        const taxAmount = parseFloat((quoteSum * gstPercentage) / 100);
         const totalAmount = quoteSum + taxAmount;
-
-        // booking.subTotal = subTotal;
-        // booking.taxAmount = taxAmount;
-        // booking.totalAmount = totalAmount;
 
         booking.quotationPaymentStatus = Constants.QUOTATION_PAYMENT_STATUS.PENDING;
 
