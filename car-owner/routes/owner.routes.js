@@ -16,8 +16,6 @@ import {
     postDeviceTokenUpdate,
     postUpdatePreferences,
     postUpdateLocation,
-    postSendEmailOTP,
-    postVerifyEmail,
     postLogout,
     postHomeDetails,
     postSearchMechanics,
@@ -85,10 +83,6 @@ router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
 router.post("/update-location", authMiddleware, postUpdateLocation);
 router.post("/delete-account", authMiddleware, postDeleteOwnerAccount);
-
-// Email Verify
-router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
-router.post("/verify-email", authMiddleware, postVerifyEmail);
 
 router.post("/logout", authMiddleware, postLogout);
 

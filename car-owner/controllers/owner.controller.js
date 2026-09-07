@@ -246,7 +246,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
         let updateObj = {};
 
         // Simple string/number updates
-        const simpleFields = ["fullName", "phoneCode", "email", "latitude", "longitude", "address", "description", "languageCode", "isAutoDetectLanguage"];
+        const simpleFields = ["fullName", "phoneCode", "latitude", "longitude", "address", "description", "languageCode", "isAutoDetectLanguage"];
         simpleFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
                 updateObj[field] = param[field];
@@ -469,122 +469,6 @@ export const postDeleteOwnerAccount = async (req, res) => {
         log1(["Error in postDeleteOwnerAccount ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     }
-};
-
-export const postSendEmailOTP = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        log1(["postSendEmailOTP ownerId ----->", ownerId]);
-        log1(["postSendEmailOTP req.body ----->", req.body]);
-
-        const { email } = req.body;
-
-        const validate = await custom_validation(req.body, "owner.send_email_otp");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
-        };
-
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json(errorResponse("Please enter valid email"));
-        };
-
-        const owner = await Owner.findOne({ email: email });
-        log1(["postSendEmailOTP owner ----->", owner]);
-
-        if (owner) {
-            return res.status(400).json(errorResponse("This email address is already added. Please use different email address."));
-        };
-
-        const otp = await generateOtp();
-        const token = await generateRandomToken();
-        const currentTime = moment().utc().valueOf();
-        const expire_at = moment(currentTime + Constants.OTP_EXPIRATION_TIME).utc().toDate();
-
-        const otpPayload = {
-            email: email,
-            otp: otp,
-            token: token,
-            type: Constants.OTP_TYPE.NEW_REGISTER_OTP,
-            expireAt: expire_at,
-        };
-        await OTP.create(otpPayload);
-
-        const expire_in = getTimeFormatFromMilliseconds(Constants.OTP_EXPIRATION_TIME);
-        const mailFile = await ejs.renderFile(path.join(__dirname, "views/emailFormats/register-otp-email.ejs"), {
-            title: "Verify Email OTP",
-            owner_name: owner?.fullName ? owner?.fullName : "Car Owner",
-            otp: otp,
-            expire_in: expire_in,
-        });
-
-        const mailOptions = {
-            from: `Car Mate Team <${process.env.SUPPORT_MAIL}>`,
-            to: `${email}`,
-            subject: `${otp} is your car mate email verification code`,
-            html: mailFile,
-        };
-        sendMail(mailOptions);
-
-        let response = {
-            email: email,
-            expiryTime: new Date().getTime() + Constants.OTP_EXPIRATION_TIME,
-        };
-
-        return res.status(200).json(successResponse("OTP send your email successfully! Please check your email and verify.", response));
-    } catch (error) {
-        log1(["Error in postSendEmailOTP ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
-export const postVerifyEmail = async (req, res) => {
-    try {
-        const ownerId = req.ownerId;
-        log1(["postVerifyEmail ownerId ----->", ownerId]);
-        log1(["postVerifyEmail req.body ----->", req.body]);
-
-        const { email, otp } = req.body;
-
-        const validate = await custom_validation(req.body, "owner.verify_email");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
-        };
-
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json(errorResponse("Please enter valid email"));
-        };
-
-        const verifyOtpEmail = await OTP.findOne({ email: email });
-        if (!verifyOtpEmail) {
-            return res.status(400).json(errorResponse("Invalid email. Please enter valid email."));
-        };
-
-        if (parseInt(verifyOtpEmail.otp) !== parseInt(otp)) {
-            return res.status(400).json(errorResponse("The OTP you entered is incorrect.Please verify and try again."));
-        };
-
-        if (verifyOtpEmail.expireAt.getTime() < new Date().getTime()) {
-            return res.status(400).json(errorResponse("Your OTP has been expired."));
-        };
-
-        await OTP.deleteMany({ email: verifyOtpEmail.email });
-
-        const owner = await Owner.findOne({ _id: new ObjectId(ownerId) });
-
-        let updatePayload = {
-            email: email,
-            emailVerification: Constants.EMAIL_VERIFICATION_STATUS.TRUE,
-        };
-
-        await Owner.findOneAndUpdate({ _id: owner._id }, updatePayload, { new: true });
-
-        return res.status(200).json(successResponse("Your email verify successfully!"));
-    } catch (error) {
-        log1(["Error in postVerifyEmail ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
-    };
 };
 
 export const postLogout = async (req, res) => {
@@ -1294,7 +1178,6 @@ export const postSearchMechanics = async (req, res) => {
                             $project: {
                                 _id: 1,
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -1905,7 +1788,6 @@ export const postServiceHistory = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3578,145 +3460,138 @@ export const postBookingList = async (req, res) => {
         };
 
         // ---------- AGGREGATE ----------
-        const pipeline = [
-            {
-                $facet: {
-                    items: [
-                        {
-                            $match: match,
+        const serviceLookup = {
+            $lookup: {
+                from: "services",
+                let: {
+                    mechanicId: "$mechanicId",
+                    serviceId: "$serviceId",
+                },
+                pipeline: [
+                    {
+                        $match: {
+                            status: Constants.SERVICE_STATUS.ACTIVE,
+                            $expr: {
+                                $eq: ["$_id", "$$serviceId"],
+                            },
                         },
-                        {
-                            $lookup: {
-                                from: "services",
-                                let: {
-                                    mechanicId: "$mechanicId",
-                                    serviceId: "$serviceId",
-                                },
-                                pipeline: [
-                                    {
-                                        $match: {
-                                            status: Constants.SERVICE_STATUS.ACTIVE,
-                                            $expr: {
-                                                $eq: ["$_id", "$$serviceId"],
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            categoryId: { $toString: "$_id" },
+                            categoryName: { $ifNull: ["$fullName", ""] },
+                            categoryImage: { $ifNull: ["$image", ""] },
+                            categoryDescription: { $ifNull: ["$description", ""] },
+                            subCategory: {
+                                $map: {
+                                    input: {
+                                        $filter: {
+                                            input: {
+                                                $ifNull: ["$subCategory", []],
+                                            },
+                                            as: "sub",
+                                            cond: {
+                                                $in: [
+                                                    "$$mechanicId",
+                                                    {
+                                                        $map: {
+                                                            input: { $ifNull: ["$$sub.mechanicIds", []] },
+                                                            as: "m",
+                                                            in: "$$m.mechanicId",
+                                                        },
+                                                    },
+                                                ],
                                             },
                                         },
                                     },
-                                    {
-                                        $project: {
-                                            _id: 0,
-                                            categoryId: { $toString: "$_id" },
-                                            categoryName: { $ifNull: ["$fullName", ""] },
-                                            categoryImage: { $ifNull: ["$image", ""] },
-                                            categoryDescription: { $ifNull: ["$description", ""] },
-                                            subCategory: {
-                                                $map: {
-                                                    input: {
-                                                        $filter: {
-                                                            input: { $ifNull: ["$subCategory", []] },
-                                                            as: "sub",
-                                                            cond: {
-                                                                $gt: [
-                                                                    {
-                                                                        $size: {
-                                                                            $filter: {
-                                                                                input: { $ifNull: ["$$sub.mechanicIds", []] },
-                                                                                as: "mechanic",
-                                                                                cond: {
-                                                                                    $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                    0,
-                                                                ],
-                                                            },
-                                                        },
-                                                    },
-                                                    as: "sub",
-                                                    in: {
-                                                        subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
-                                                        price: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
+                                    as: "sub",
+                                    in: {
+                                        $let: {
+                                            vars: {
+                                                mechanicData: {
+                                                    $arrayElemAt: [
+                                                        {
+                                                            $filter: {
+                                                                input: {
+                                                                    $ifNull: [
+                                                                        "$$sub.mechanicIds",
+                                                                        [],
+                                                                    ],
                                                                 },
-                                                                in: { $ifNull: ["$$mechanicData.price", 0] },
-                                                            },
-                                                        },
-                                                        description: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
+                                                                as: "m",
+                                                                cond: {
+                                                                    $eq: [
+                                                                        "$$m.mechanicId",
+                                                                        "$$mechanicId",
+                                                                    ],
                                                                 },
-                                                                in: { $ifNull: ["$$mechanicData.description", ""] },
                                                             },
                                                         },
-                                                    },
+                                                        0,
+                                                    ],
+                                                },
+                                            },
+                                            in: {
+                                                subCategoryName: {
+                                                    $ifNull: [
+                                                        "$$sub.fullname",
+                                                        "",
+                                                    ],
+                                                },
+                                                price: {
+                                                    $ifNull: [
+                                                        "$$mechanicData.price",
+                                                        0,
+                                                    ],
+                                                },
+                                                description: {
+                                                    $ifNull: [
+                                                        "$$mechanicData.description",
+                                                        "",
+                                                    ],
                                                 },
                                             },
                                         },
                                     },
-                                ],
-                                as: "serviceDetails",
+                                },
                             },
                         },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: false,
-                            },
-                        },
-                        // Search service name
-                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
+                    },
+                ],
+                as: "serviceDetails",
+            },
+        };
 
-                        {
-                            $sort: {
-                                createdAt: -1,
-                            },
-                        },
-                        { $skip: skip, },
-                        { $limit: limit, },
+        const pipeline = [
+            { $match: match },
+
+            serviceLookup,
+
+            {
+                $unwind: {
+                    path: "$serviceDetails",
+                    preserveNullAndEmptyArrays: false,
+                },
+            },
+
+            ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex } }] : []),
+
+            {
+                $facet: {
+                    items: [
+                        { $sort: { createdAt: -1 } },
+                        { $skip: skip },
+                        { $limit: limit },
                         {
                             $lookup: {
                                 from: "mechanics",
                                 localField: "mechanicId",
                                 foreignField: "_id",
-                                as: "mechanicDetails",
                                 pipeline: [
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -3726,6 +3601,7 @@ export const postBookingList = async (req, res) => {
                                         },
                                     },
                                 ],
+                                as: "mechanicDetails",
                             },
                         },
                         {
@@ -3928,251 +3804,13 @@ export const postBookingList = async (req, res) => {
                         },
                     ],
                     totalRecords: [
-                        {
-                            $match: match,
-                        },
-                        {
-                            $lookup: {
-                                from: "services",
-                                let: {
-                                    mechanicId: "$mechanicId",
-                                    serviceId: "$serviceId",
-                                },
-                                pipeline: [
-                                    {
-                                        $match: {
-                                            status: Constants.SERVICE_STATUS.ACTIVE,
-                                            $expr: {
-                                                $eq: ["$_id", "$$serviceId"],
-                                            },
-                                        },
-                                    },
-                                    {
-                                        $project: {
-                                            _id: 0,
-                                            categoryId: { $toString: "$_id" },
-                                            categoryName: { $ifNull: ["$fullName", ""] },
-                                            categoryImage: { $ifNull: ["$image", ""] },
-                                            categoryDescription: { $ifNull: ["$description", ""] },
-                                            subCategory: {
-                                                $map: {
-                                                    input: {
-                                                        $filter: {
-                                                            input: { $ifNull: ["$subCategory", []] },
-                                                            as: "sub",
-                                                            cond: {
-                                                                $gt: [
-                                                                    {
-                                                                        $size: {
-                                                                            $filter: {
-                                                                                input: { $ifNull: ["$$sub.mechanicIds", []] },
-                                                                                as: "mechanic",
-                                                                                cond: {
-                                                                                    $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                    0,
-                                                                ],
-                                                            },
-                                                        },
-                                                    },
-                                                    as: "sub",
-                                                    in: {
-                                                        subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
-                                                        price: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
-                                                                },
-                                                                in: { $ifNull: ["$$mechanicData.price", 0] },
-                                                            },
-                                                        },
-                                                        description: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
-                                                                },
-                                                                in: { $ifNull: ["$$mechanicData.description", ""] },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                ],
-                                as: "serviceDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: false,
-                            },
-                        },
-
-                        // Same search filter for correct total count
-                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
-                        {
-                            $count: "count",
-                        },
+                        { $count: "count" },
                     ],
                     statusSummary: [
                         {
-                            $match: match,
-                        },
-                        {
-                            $lookup: {
-                                from: "services",
-                                let: {
-                                    mechanicId: "$mechanicId",
-                                    serviceId: "$serviceId",
-                                },
-                                pipeline: [
-                                    {
-                                        $match: {
-                                            status: Constants.SERVICE_STATUS.ACTIVE,
-                                            $expr: {
-                                                $eq: ["$_id", "$$serviceId"],
-                                            },
-                                        },
-                                    },
-                                    {
-                                        $project: {
-                                            _id: 0,
-                                            categoryId: { $toString: "$_id" },
-                                            categoryName: { $ifNull: ["$fullName", ""] },
-                                            categoryImage: { $ifNull: ["$image", ""] },
-                                            categoryDescription: { $ifNull: ["$description", ""] },
-                                            subCategory: {
-                                                $map: {
-                                                    input: {
-                                                        $filter: {
-                                                            input: { $ifNull: ["$subCategory", []] },
-                                                            as: "sub",
-                                                            cond: {
-                                                                $gt: [
-                                                                    {
-                                                                        $size: {
-                                                                            $filter: {
-                                                                                input: { $ifNull: ["$$sub.mechanicIds", []] },
-                                                                                as: "mechanic",
-                                                                                cond: {
-                                                                                    $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                    0,
-                                                                ],
-                                                            },
-                                                        },
-                                                    },
-                                                    as: "sub",
-                                                    in: {
-                                                        subCategoryName: { $ifNull: ["$$sub.fullname", ""] },
-                                                        price: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
-                                                                },
-                                                                in: { $ifNull: ["$$mechanicData.price", 0] },
-                                                            },
-                                                        },
-                                                        description: {
-                                                            $let: {
-                                                                vars: {
-                                                                    mechanicData: {
-                                                                        $arrayElemAt: [
-                                                                            {
-                                                                                $filter: {
-                                                                                    input: {
-                                                                                        $ifNull: ["$$sub.mechanicIds", []],
-                                                                                    },
-                                                                                    as: "mechanic",
-                                                                                    cond: {
-                                                                                        $eq: ["$$mechanic.mechanicId", "$$mechanicId"],
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            0,
-                                                                        ],
-                                                                    },
-                                                                },
-                                                                in: { $ifNull: ["$$mechanicData.description", ""] },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                ],
-                                as: "serviceDetails",
-                            },
-                        },
-                        {
-                            $unwind: {
-                                path: "$serviceDetails",
-                                preserveNullAndEmptyArrays: false,
-                            },
-                        },
-
-                        // Same search filter for correct total count
-                        ...(searchRegex ? [{ $match: { "serviceDetails.categoryName": searchRegex }, }] : []),
-                        {
                             $group: {
                                 _id: "$status",
-                                count: {
-                                    $sum: 1,
-                                },
+                                count: { $sum: 1 },
                             },
                         },
                     ],

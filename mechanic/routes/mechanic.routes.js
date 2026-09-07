@@ -14,8 +14,6 @@ import {
     postUpdateMechanicProfile,
     postUpdatePreferences,
     postDeviceTokenUpdate,
-    postSendEmailOTP,
-    postVerifyEmail,
     postLogout,
     postHomeDetails,
     postAllServicesList,
@@ -73,10 +71,6 @@ router.post("/delete-account", authMiddleware, postDeleteMechanicAccount);
 router.post("/add-bank", authMiddleware, addBank);
 router.get("/bank-details", authMiddleware, getBankDetails);
 router.post("/update-bank-details", authMiddleware, postUpdateBankDetails);
-
-// Email Verify
-router.post("/send-email-otp", authMiddleware, postSendEmailOTP);
-router.post("/verify-email", authMiddleware, postVerifyEmail);
 
 router.post("/logout", authMiddleware, postLogout);
 
