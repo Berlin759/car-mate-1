@@ -76,7 +76,14 @@ const Constants = {
     CHAT_STATUS: {
         HIDDEN: 1,
         SHOW: 2,
-        DELETE: 3
+        DELETE: 3,
+        CLEARED: 4,
+    },
+    CHAT_REPORT_STATUS: {
+        PENDING: 1,
+        IN_REVIEW: 2,
+        RESOLVED: 3,
+        REJECTED: 4,
     },
     INVOICE_STATUS: {
         PENDING: 1,

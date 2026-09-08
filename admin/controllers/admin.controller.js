@@ -26,6 +26,10 @@ import Language from "../models/language.model.js";
 import Announcement from "../models/announcement.model.js";
 import Pricing from "../models/pricing.model.js";
 import Template from "../models/template.model.js";
+import ChatReport from "../models/chatReport.model.js";
+import Chat from "../models/chat.model.js";
+import ChatMessage from "../models/chatMessage.model.js";
+import Block from "../models/block.model.js";
 import { generateTransactionPDF, generateAllTransactionsPDF } from "../utils/pdf.helper.js";
 import Earning from "../models/earning.model.js";
 
@@ -6698,5 +6702,208 @@ export const postToggleLanguageStatus = async (req, res) => {
     } catch (error) {
         log1(["Error in postToggleLanguageStatus ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getChatReportsPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        return res.render("admin/chat-reports", {
+            header: {
+                page: "Chat Reports",
+                admin: admin,
+                title: "Chat Report Management",
+                description: "Manage reported messages by car owners and mechanics",
+                id: "chat-reports",
+            },
+            body: {},
+            footer: {
+                js: ["admin/chat-reports.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getChatReportsPage ----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postChatReportList = async (req, res) => {
+    try {
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            status,
+        } = req.body;
+
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
+
+        let filter = {};
+        if (status) {
+            filter.status = parseInt(status);
+        };
+
+        const [items, total] = await Promise.all([
+            ChatReport.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .populate("chatId")
+                .populate("messageId"),
+            ChatReport.countDocuments(filter),
+        ]);
+
+        const populatedReports = await Promise.all(
+            items.map(async (report) => {
+                const reportObj = report.toObject();
+                if (report.reportedByRole === "owner") {
+                    reportObj.reporterDetails = await Owner.findById(report.reportedBy).select("fullName phoneNumber profileImage");
+                    reportObj.targetDetails = await Mechanic.findById(report.reportedUser).select("fullName phoneNumber profileImage");
+                } else {
+                    reportObj.reporterDetails = await Mechanic.findById(report.reportedBy).select("fullName phoneNumber profileImage");
+                    reportObj.targetDetails = await Owner.findById(report.reportedUser).select("fullName phoneNumber profileImage");
+                };
+
+                return reportObj;
+            }),
+        );
+
+        let response = successResponse();
+        response["blade"] = await ejs.renderFile(path.resolve(__dirname, "views/admin/chat-reports-list.ejs"), {
+            body: {
+                payload: req.body,
+                reportList: populatedReports,
+            },
+        });
+
+        response["total_record"] = total;
+        response["payload"] = req.body;
+
+        return res.status(200).json(response);
+    } catch (error) {
+        log1(["Error in postChatReportList ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getChatReportDetailsPage = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const { id } = req.params;
+
+        if (!id || !ObjectId.isValid(id)) {
+            return res.redirect("/chat-reports");
+        };
+
+        const report = await ChatReport.findById(id).populate("chatId").populate("messageId");
+        if (!report) {
+            return res.redirect("/chat-reports");
+        };
+
+        const reportObj = report.toObject();
+        let reporterDetails = null;
+        let targetDetails = null;
+
+        if (report.reportedByRole === "owner") {
+            reporterDetails = await Owner.findById(report.reportedBy).lean();
+            targetDetails = await Mechanic.findById(report.reportedUser).lean();
+        } else {
+            reporterDetails = await Mechanic.findById(report.reportedBy).lean();
+            targetDetails = await Owner.findById(report.reportedUser).lean();
+        };
+
+        const chatMessages = report.chatId ? await ChatMessage.find({ chatId: report.chatId._id }).sort({ createdAt: 1 }).lean() : [];
+
+        return res.render("admin/chat-report-detail", {
+            header: {
+                page: "Chat Report Detail",
+                admin: admin,
+                title: "Report Details",
+                description: `Viewing report #${report._id}`,
+                id: "chat-reports",
+            },
+            body: {
+                report: reportObj,
+                reporterDetails,
+                targetDetails,
+                chatMessages,
+            },
+            footer: {
+                js: ["admin/chat-reports.js"],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getChatReportDetailsPage ----->", error]);
+        return res.redirect("/chat-reports");
+    };
+};
+
+export const postResolveChatReport = async (req, res) => {
+    try {
+        const { reportId, status, adminNotes } = req.body;
+
+        if (!reportId || !ObjectId.isValid(reportId)) {
+            return res.status(400).json(errorResponse("Invalid Report ID."));
+        };
+
+        const payload = {
+            status: parseInt(status) || Constants.CHAT_REPORT_STATUS.RESOLVED,
+            adminNotes: adminNotes || "",
+            resolvedAt: new Date(),
+        };
+
+        await ChatReport.findByIdAndUpdate(reportId, payload);
+
+        return res.status(200).json(successResponse("Chat report updated successfully."));
+    } catch (error) {
+        log1(["Error in postResolveChatReport ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const getChatAuditHistory = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+        const { ownerId, mechanicId } = req.params;
+
+        let query = {};
+        if (ownerId && ObjectId.isValid(ownerId)) query.ownerId = new ObjectId(ownerId);
+        if (mechanicId && ObjectId.isValid(mechanicId)) query.mechanicId = new ObjectId(mechanicId);
+
+        const allChats = await Chat.find(query)
+            .sort({ chatVersion: -1, createdAt: -1 })
+            .populate("ownerId", "fullName phoneNumber profileImage")
+            .populate("mechanicId", "fullName phoneNumber profileImage")
+            .lean();
+
+        const chatsWithMessages = await Promise.all(
+            allChats.map(async (chat) => {
+                const messages = await ChatMessage.find({ chatId: chat._id }).sort({ createdAt: 1 }).lean();
+                return {
+                    ...chat,
+                    messages,
+                };
+            }),
+        );
+
+        return res.render("admin/chat-audit-history", {
+            header: {
+                page: "Chat Audit History",
+                admin: admin,
+                title: "Chat Session History",
+                description: "Review current and old cleared chat sessions",
+                id: "chat-reports",
+            },
+            body: {
+                chats: chatsWithMessages,
+            },
+            footer: {
+                js: [],
+            },
+        });
+    } catch (error) {
+        log1(["Error in getChatAuditHistory ----->", error]);
+        return res.json(errorResponse(messages.unexpectedDataError));
     };
 };

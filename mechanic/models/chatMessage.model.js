@@ -8,6 +8,11 @@ const chatMessageSchema = new Schema(
             ref: "Chat",
             required: true,
         },
+        reportId: {
+            type: Schema.Types.ObjectId,
+            ref: "ChatReport",
+            required: false,
+        },
         byId: {
             type: String,
             required: true,
@@ -64,6 +69,10 @@ const chatMessageSchema = new Schema(
             type: Number,
             enum: Object.values(Constants.CHAT_MESSAGE_TYPE),
             required: true,
+        },
+        isReported: {
+            type: Boolean,
+            default: false,
         },
     },
     {

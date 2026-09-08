@@ -47,6 +47,8 @@ import CallLog from "../models/callLog.model.js";
 import Language from "../models/language.model.js";
 import KYC from "../models/kyc.model.js";
 import Pricing from "../models/pricing.model.js";
+import Block from "../models/block.model.js";
+import ChatReport from "../models/chatReport.model.js";
 
 const __dirname = path.resolve();
 
@@ -974,6 +976,11 @@ export const postSearchMechanics = async (req, res) => {
                     "serviceIds.0": { $exists: true },
                 },
             },
+        };
+
+        const blockedMechanicIds = await getBlockedMechanicIds(ownerId, guestId);
+        if (blockedMechanicIds.length > 0) {
+            geoNearStage.$geoNear.query._id = { $nin: blockedMechanicIds };
         };
 
         const mechanicMatchStage = {};
@@ -1960,6 +1967,11 @@ export const postNearbyMechanics = async (req, res) => {
             },
         };
 
+        const blockedMechanicIds = await getBlockedMechanicIds(ownerObjectId, chatGuestId);
+        if (blockedMechanicIds.length > 0) {
+            geoNearStage.$geoNear.query._id = { $nin: blockedMechanicIds };
+        };
+
         const matchStage = {};
 
         if (serviceId) {
@@ -2322,6 +2334,11 @@ export const postPopularNearbyMechanics = async (req, res) => {
             },
         ];
 
+        const blockedMechanicIds = await getBlockedMechanicIds(ownerObjectId, chatGuestId);
+        if (blockedMechanicIds.length > 0) {
+            pipeline[0].$geoNear.query._id = { $nin: blockedMechanicIds };
+        };
+
         if (serviceObjectId) {
             pipeline.push({
                 $lookup: {
@@ -2616,6 +2633,11 @@ export const postMechanicDetails = async (req, res) => {
 
         if (!mechanic) {
             return res.status(404).json(errorResponse("Mechanic not found or inactive."));
+        };
+
+        const blockedMechanicIds = await getBlockedMechanicIds(req.ownerId, req.body.guestId);
+        if (blockedMechanicIds.some((id) => id.toString() === mechanicId.toString())) {
+            return res.status(404).json(errorResponse("Mechanic not found or blocked."));
         };
 
         let userLat = parseFloat(latitude);
@@ -6183,11 +6205,15 @@ export const postChatList = async (req, res) => {
         const limit = parseInt(itemPerPage) || 10;
         const skip = (currentPage - 1) * limit || 0;
 
-        let matchQuery = {};
+        let matchQuery = {
+            isLatest: { $ne: false },
+            isClearedByOwner: { $ne: true },
+            status: { $ne: Constants.CHAT_STATUS.CLEARED },
+        };
         if (ownerId) {
-            matchQuery = { ownerId: new ObjectId(ownerId) };
+            matchQuery.ownerId = new ObjectId(ownerId);
         } else if (guestId) {
-            matchQuery = { guestId: guestId };
+            matchQuery.guestId = guestId;
         } else {
             return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
@@ -6302,6 +6328,33 @@ export const postChatList = async (req, res) => {
                     };
                 };
 
+                const targetMechanicId = chat.mechanicDetails ? chat.mechanicDetails._id : chat.mechanicId;
+                const blockDoc = await Block.findOne({
+                    $or: [
+                        { ownerId: ownerId ? new ObjectId(ownerId) : null },
+                        { guestId: guestId || null }
+                    ],
+                    mechanicId: new ObjectId(targetMechanicId)
+                });
+
+                const isBlockedByOwner = chat.isBlockedByOwner || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.OWNER);
+                const isBlockedByMechanic = chat.isBlockedByMechanic || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.MECHANIC);
+                const isBlocked = Boolean(isBlockedByOwner || isBlockedByMechanic);
+
+                let isBlockedByMe = false;
+                let isBlockedByOther = false;
+                let blockedByRole = null;
+
+                if (isBlockedByOwner) {
+                    blockedByRole = Constants.USER_ROLE.OWNER;
+                    isBlockedByMe = true;
+                    isBlockedByOther = false;
+                } else if (isBlockedByMechanic) {
+                    blockedByRole = Constants.USER_ROLE.MECHANIC;
+                    isBlockedByMe = false;
+                    isBlockedByOther = true;
+                };
+
                 return {
                     _id: chat._id,
                     ownerId: chat.ownerId,
@@ -6320,6 +6373,10 @@ export const postChatList = async (req, res) => {
                     } : null,
                     unreadMsgCount,
                     lastMessage: lastMessageObj,
+                    isBlocked,
+                    isBlockedByMe,
+                    isBlockedByOther,
+                    blockedByRole,
                     createdAt: chat.createdAt,
                     updatedAt: chat.updatedAt,
                 };
@@ -6372,11 +6429,61 @@ export const postChatMessagesDetails = async (req, res) => {
             return res.status(404).json(errorResponse("Chat not found."));
         };
 
-        const count = await ChatMessage.countDocuments({ chatId: chat._id });
-        const messagesList = await ChatMessage.find({ chatId: chat._id })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+        const pipeline = [
+            {
+                $match: { chatId: chat._id },
+            },
+            {
+                $sort: {
+                    createdAt: -1,
+                },
+            },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: "chatreports",
+                    localField: "reportId",
+                    foreignField: "_id",
+                    as: "reportDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$reportDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    chatId: 1,
+                    reportId: 1,
+                    byId: 1,
+                    message: 1,
+                    document: 1,
+                    location: 1,
+                    type: 1,
+                    isReported: 1,
+                    reportStatus: "$reportDetails.status",
+                    createdAt: 1,
+                    updatedAt: 1,
+                },
+            },
+        ];
+
+        const [messagesList, count] = await Promise.all([
+            ChatMessage.aggregate(pipeline).allowDiskUse(true),
+
+            ChatMessage.countDocuments({ chatId: chat._id }),
+        ]);
 
         let readMessages = chat.readMessages || [];
         const currentTime = moment().utc().toDate();
@@ -6396,10 +6503,8 @@ export const postChatMessagesDetails = async (req, res) => {
         const mechanicId = chat.mechanicId.toString();
 
         const updatedMessagesList = messagesList.map((message) => {
-            const messageObj = message.toObject();
             let receiverId;
-
-            if (messageObj.byId === myId.toString()) {
+            if (message.byId === myId.toString()) {
                 receiverId = mechanicId;
             } else {
                 receiverId = myId.toString();
@@ -6408,19 +6513,49 @@ export const postChatMessagesDetails = async (req, res) => {
             const receiverReadData = readMessages.find((read) => read.byId === receiverId);
 
             if (!receiverReadData?.lastReadAt) {
-                messageObj.isMessageSeen = false;
+                message.isMessageSeen = false;
             } else {
-                messageObj.isMessageSeen = new Date(receiverReadData.lastReadAt) >= new Date(messageObj.createdAt);
+                message.isMessageSeen = new Date(receiverReadData.lastReadAt) >= new Date(message.createdAt);
             };
 
-            return messageObj;
+            return message;
         });
+
+        const blockDoc = await Block.findOne({
+            $or: [
+                { ownerId: ownerId ? new ObjectId(ownerId) : null },
+                { guestId: guestId || null }
+            ],
+            mechanicId: new ObjectId(mechanicId)
+        });
+
+        const isBlockedByOwner = chat.isBlockedByOwner || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.OWNER);
+        const isBlockedByMechanic = chat.isBlockedByMechanic || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.MECHANIC);
+        const isBlocked = Boolean(isBlockedByOwner || isBlockedByMechanic);
+
+        let isBlockedByMe = false;
+        let isBlockedByOther = false;
+        let blockedByRole = null;
+
+        if (isBlockedByOwner) {
+            blockedByRole = Constants.USER_ROLE.OWNER;
+            isBlockedByMe = true;
+            isBlockedByOther = false;
+        } else if (isBlockedByMechanic) {
+            blockedByRole = Constants.USER_ROLE.MECHANIC;
+            isBlockedByMe = false;
+            isBlockedByOther = true;
+        };
 
         const response = {
             page: Number(currentPage),
             limit: Number(itemPerPage),
             totalRecords: count,
             chatMessagesList: updatedMessagesList.reverse(),
+            isBlocked,
+            isBlockedByMe,
+            isBlockedByOther,
+            blockedByRole,
         };
 
         return res.status(200).json(successResponse("Chat Details Get Successfully.", response));
@@ -6551,6 +6686,17 @@ export const postSendMessage = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid chat message."));
         };
 
+        const blockDoc = await Block.findOne({
+            $or: [
+                { ownerId: ownerId ? new ObjectId(ownerId) : null },
+                { guestId: guestId || null }
+            ],
+            mechanicId: new ObjectId(mechanicId)
+        });
+        if (blockDoc) {
+            return res.status(400).json(errorResponse("Cannot send message. Chat is blocked."));
+        };
+
         let chat = null;
         if (chatId) {
             chat = await Chat.findOne({ _id: new ObjectId(chatId) });
@@ -6558,6 +6704,7 @@ export const postSendMessage = async (req, res) => {
             const findChatQuery = {
                 mechanicId: new ObjectId(mechanicId),
                 bookingId: bookingId ? new ObjectId(bookingId) : null,
+                isLatest: { $ne: false },
             };
             if (ownerId) {
                 findChatQuery.ownerId = new ObjectId(ownerId);
@@ -6567,13 +6714,23 @@ export const postSendMessage = async (req, res) => {
             chat = await Chat.findOne(findChatQuery);
         };
 
-        if (!chat) {
+        if (chat && (chat.isBlockedByOwner || chat.isBlockedByMechanic)) {
+            return res.status(400).json(errorResponse("Cannot send message. Chat is blocked."));
+        };
+
+        if (!chat || chat.isLatest === false || chat.status === Constants.CHAT_STATUS.CLEARED || chat.isClearedByOwner) {
+            const previousChatId = chat ? chat._id : null;
+            const nextVersion = chat ? (chat.chatVersion || 1) + 1 : 1;
             const createPayload = {
                 mechanicId: new ObjectId(mechanicId),
                 bookingId: bookingId ? new ObjectId(bookingId) : null,
                 lastMessage: messageText,
                 lastMessageType: messageType,
                 lastMessageAt: currentTime,
+                isLatest: true,
+                chatVersion: nextVersion,
+                previousChatId,
+                status: Constants.CHAT_STATUS.SHOW,
                 readMessages: [
                     { byId: myId, lastReadAt: currentTime }
                 ],
@@ -6919,4 +7076,179 @@ export const postVerifyCallCaptcha = async (req, res) => {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
         return res.status(500).json(errorResponse(messages.unexpectedDataError));
     };
+};
+
+export const postBlockMechanic = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { mechanicId, guestId, isBlock } = req.body;
+
+        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
+        };
+
+        const myOwnerId = ownerId ? new ObjectId(ownerId) : null;
+        const myGuestId = !ownerId && guestId ? String(guestId) : null;
+
+        if (!myOwnerId && !myGuestId) {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
+        const shouldBlock = isBlock === undefined || isBlock === true || isBlock === "true" || isBlock === 1 || isBlock === "1";
+
+        let query = { mechanicId: new ObjectId(mechanicId) };
+        if (myOwnerId) {
+            query.ownerId = myOwnerId;
+        } else {
+            query.guestId = myGuestId;
+        };
+
+        if (shouldBlock) {
+            await Block.findOneAndUpdate(
+                query,
+                { ...query, blockedByRole: Constants.USER_ROLE.OWNER },
+                { upsert: true, new: true }
+            );
+
+            let chatQuery = { mechanicId: new ObjectId(mechanicId), isLatest: { $ne: false } };
+            if (myOwnerId) {
+                chatQuery.ownerId = myOwnerId;
+            } else {
+                chatQuery.guestId = myGuestId;
+            };
+
+            await Chat.updateMany(chatQuery, {
+                isBlockedByOwner: true,
+                blockedByOwnerAt: new Date(),
+            });
+
+            return res.status(200).json(successResponse("Mechanic blocked successfully."));
+        } else {
+            await Block.deleteOne(query);
+
+            let chatQuery = { mechanicId: new ObjectId(mechanicId) };
+            if (myOwnerId) {
+                chatQuery.ownerId = myOwnerId;
+            } else {
+                chatQuery.guestId = myGuestId;
+            };
+
+            await Chat.updateMany(chatQuery, {
+                isBlockedByOwner: false,
+                blockedByOwnerAt: null,
+            });
+
+            return res.status(200).json(successResponse("Mechanic unblocked successfully."));
+        };
+    } catch (error) {
+        log1(["Error in postBlockMechanic ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postClearChat = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { chatId, guestId } = req.body;
+
+        if (!chatId || !ObjectId.isValid(chatId)) {
+            return res.status(400).json(errorResponse("Invalid chat id."));
+        };
+
+        let matchQuery = { _id: new ObjectId(chatId) };
+        if (ownerId) {
+            matchQuery.ownerId = new ObjectId(ownerId);
+        } else if (guestId) {
+            matchQuery.guestId = guestId;
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
+        const chat = await Chat.findOne(matchQuery);
+        if (!chat) {
+            return res.status(404).json(errorResponse("Chat not found."));
+        };
+
+        await Chat.findByIdAndUpdate(chat._id, {
+            isClearedByOwner: true,
+            isClearedByMechanic: true,
+            clearedByOwnerAt: new Date(),
+            isLatest: false,
+            status: Constants.CHAT_STATUS.CLEARED,
+        });
+
+        return res.status(200).json(successResponse("Chat cleared successfully."));
+    } catch (error) {
+        log1(["Error in postClearChat ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+export const postReportMessage = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { chatId, messageId, reason, description, guestId } = req.body;
+
+        if (!chatId || !ObjectId.isValid(chatId)) {
+            return res.status(400).json(errorResponse("Invalid chat id."));
+        };
+
+        if (!messageId || !ObjectId.isValid(messageId)) {
+            return res.status(400).json(errorResponse("Invalid message id."));
+        };
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json(errorResponse("Reason is required."));
+        };
+
+        const messageDoc = await ChatMessage.findById(messageId);
+        if (!messageDoc) {
+            return res.status(404).json(errorResponse("Message not found."));
+        };
+
+        const chatDoc = await Chat.findById(chatId);
+        if (!chatDoc) {
+            return res.status(404).json(errorResponse("Chat not found."));
+        };
+
+        const reportedBy = ownerId ? new ObjectId(ownerId) : chatDoc.ownerId || chatDoc._id;
+        const reportedUser = chatDoc.mechanicId;
+
+        const report = await ChatReport.create({
+            chatId: new ObjectId(chatId),
+            messageId: new ObjectId(messageId),
+            reportedBy,
+            reportedByRole: Constants.USER_ROLE.OWNER,
+            reportedUser,
+            reportedUserRole: Constants.USER_ROLE.MECHANIC,
+            reason: reason.trim(),
+            description: description ? description.trim() : "",
+            status: Constants.CHAT_REPORT_STATUS.PENDING,
+        });
+
+        await ChatMessage.findByIdAndUpdate(messageId, { reportId: report?._id, isReported: true });
+
+        return res.status(200).json(successResponse("Message reported successfully.", report));
+    } catch (error) {
+        log1(["Error in postReportMessage ----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
+const getBlockedMechanicIds = async (ownerId, guestId) => {
+    let blockQuery = [];
+
+    if (ownerId && ObjectId.isValid(ownerId)) {
+        blockQuery.push({ ownerId: new ObjectId(ownerId) });
+    };
+
+    if (guestId) {
+        blockQuery.push({ guestId: String(guestId) });
+    };
+
+    if (blockQuery.length === 0) return [];
+
+    const blocks = await Block.find({ $or: blockQuery }).select("mechanicId");
+
+    return blocks.map((b) => b.mechanicId);
 };

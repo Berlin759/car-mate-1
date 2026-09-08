@@ -1,0 +1,71 @@
+<%- include('../header.ejs') %>
+    <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
+        <div class="filter-area d-flex align-items-center gap-2 flex-wrap" id="chat-report-filter-section">
+            <div class="dropdown filter-dropdown">
+                <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
+                        <img src="/images/circle-plus.svg" alt="">
+                        Report Status
+                    </span>
+                    <div class="hr-line-sm d-none"></div>
+                    <div class="filter-data d-none"></div>
+                </button>
+                <ul class="dropdown-menu filter-dropdown-menu bs-border bg-white cursor-pointer">
+                    <li><a class="dropdown-item report-status-filter" data-status="1" data-status-text="Pending">Pending</a></li>
+                    <li><a class="dropdown-item report-status-filter" data-status="2" data-status-text="In Review">In Review</a></li>
+                    <li><a class="dropdown-item report-status-filter" data-status="3" data-status-text="Resolved">Resolved</a></li>
+                    <li><a class="dropdown-item report-status-filter" data-status="4" data-status-text="Rejected">Rejected</a></li>
+                    <button id="clear-status-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">Clear filters</button>
+                </ul>
+            </div>
+            <button type="button" id="reset-report-filters" class="d-none f-reset-btn fs-14 fw-md bg-transparent">
+                Reset <img src="/images/f-close.svg" alt="">
+            </button>
+        </div>
+        <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+            <div class="pagination-show d-flex align-items-center" id="pagination-div-chat-report-list-table-data">
+                Show
+                <select id="recordPerPage-chat-report-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/chat-report-list', 'chat-report-list-table-data')">
+                    <option selected="">10</option>
+                    <option value="20">20</option>
+                    <option value="40">40</option>
+                </select>
+            </div>
+            <div class="page navigation example">
+                <ul class="pagination justify-content-end mb-0 gap-0"></ul>
+            </div>
+        </div>
+    </div>
+    <div class="admin-table chat-report-list-table mt-30" id="chat-report-list-table-data"></div>
+
+    <!-- Resolve Report Modal -->
+    <div class="modal custom-popup fade" id="resolveReportModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center mt-3">
+                    <h5 class="modal-title">Resolve Chat Report</h5>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <input type="hidden" id="resolve-report-id">
+                    <div class="mb-3">
+                        <label class="form-label text-dark">Action Status</label>
+                        <select class="form-select" id="resolve-report-status">
+                            <option value="1">Pending</option>
+                            <option value="2">Under Review</option>
+                            <option value="3">Resolved</option>
+                            <option value="4">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-dark">Admin Notes</label>
+                        <textarea class="form-control" id="resolve-admin-notes" rows="3" placeholder="Enter administrative action or notes"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-success" id="confirm-resolve-report">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<%- include('../footer.ejs') %>

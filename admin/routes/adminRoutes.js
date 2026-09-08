@@ -83,6 +83,11 @@ import {
     postDisputeList,
     postResolveDispute,
     getDisputePage,
+    getChatReportsPage,
+    postChatReportList,
+    getChatReportDetailsPage,
+    postResolveChatReport,
+    getChatAuditHistory,
     getBannerPage,
     getFaqPage,
     getAnnouncementPage,
@@ -240,6 +245,13 @@ adminRouter.post("/toggle-announcement-status", authMiddleware, postToggleAnnoun
 adminRouter.get("/disputes", authMiddleware, getDisputePage);
 adminRouter.post("/dispute-list", authMiddleware, postDisputeList);
 adminRouter.post("/resolve-dispute", authMiddleware, postResolveDispute);
+
+// Chat Report & Audit Management
+adminRouter.get("/chat-reports", authMiddleware, getChatReportsPage);
+adminRouter.post("/chat-report-list", authMiddleware, postChatReportList);
+adminRouter.get("/chat-report/:id", authMiddleware, getChatReportDetailsPage);
+adminRouter.post("/resolve-chat-report", authMiddleware, postResolveChatReport);
+adminRouter.get("/chat-history/:ownerId/:mechanicId", authMiddleware, getChatAuditHistory);
 
 // Pricing Management
 adminRouter.get("/pricing", authMiddleware, getPricingPage);

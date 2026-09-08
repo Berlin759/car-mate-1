@@ -34,6 +34,8 @@ export const io = new Server(httpServer, {
     cors: {
         origin: [process.env.APP_URL],
     },
+
+    transports: ["websocket", "polling"],
 });
 
 const setupRedisAdapter = async () => {

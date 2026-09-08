@@ -32,6 +32,9 @@ import {
     postChatList,
     postChatMessagesDetails,
     postSendMessage,
+    postBlockOwner,
+    postClearChat,
+    postReportMessage,
     postSubmitKYC,
     postPerformanceMetrics,
     postReviewsReceived,
@@ -104,6 +107,9 @@ router.post("/transaction-list", authMiddleware, postTransactionList);
 router.post("/chat-list", authMiddleware, postChatList);
 router.post("/chat-messages-details", authMiddleware, postChatMessagesDetails);
 router.post("/send-message", authMiddleware, postSendMessage);
+router.post("/block-owner", authMiddleware, postBlockOwner);
+router.post("/clear-chat", authMiddleware, postClearChat);
+router.post("/report-message", authMiddleware, postReportMessage);
 
 // KYC API
 router.post("/submit-kyc", authMiddleware, postSubmitKYC);

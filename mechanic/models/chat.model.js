@@ -70,6 +70,51 @@ const chatSchema = new Schema(
             enum: Object.values(Constants.CHAT_STATUS),
             default: Constants.CHAT_STATUS.SHOW,
         },
+        isBlockedByOwner: {
+            type: Boolean,
+            default: false,
+        },
+        isBlockedByMechanic: {
+            type: Boolean,
+            default: false,
+        },
+        blockedByOwnerAt: {
+            type: Date,
+            default: null,
+        },
+        blockedByMechanicAt: {
+            type: Date,
+            default: null,
+        },
+        isLatest: {
+            type: Boolean,
+            default: true,
+        },
+        isClearedByOwner: {
+            type: Boolean,
+            default: false,
+        },
+        isClearedByMechanic: {
+            type: Boolean,
+            default: false,
+        },
+        clearedByOwnerAt: {
+            type: Date,
+            default: null,
+        },
+        clearedByMechanicAt: {
+            type: Date,
+            default: null,
+        },
+        chatVersion: {
+            type: Number,
+            default: 1,
+        },
+        previousChatId: {
+            type: Schema.Types.ObjectId,
+            ref: "Chat",
+            default: null,
+        },
     },
     {
         versionKey: false,

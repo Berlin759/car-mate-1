@@ -1,0 +1,174 @@
+<%- include('../header.ejs') %>
+
+<div class="container-fluid p-4">
+    <div class="d-flex align-items-center justify-content-between mb-30">
+        <a href="/chat-reports" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to List
+        </a>
+        <% if (body.report.status === 1 || body.report.status === 2) { %>
+            <div class="d-flex align-items-center gap-2">
+                <button
+                    type="button"
+                    class="btn btn-success resolve-report-btn"
+                    data-report-id="<%= body.report._id %>"
+                    data-report-status="<%= body.report.status %>"
+                >
+                    <i class="fa-solid fa-gavel me-1"></i> Take Admin Action
+                </button>
+            </div>
+        <% } %>
+    </div>
+
+    <div class="row g-4">
+        <!-- Report Info Sidebar -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-light text-dark py-3">
+                    <h5 class="card-title mb-0 fs-16"><i class="fa-solid fa-flag me-2"></i>Report Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted fs-12 text-uppercase fw-bold">Report ID</label>
+                        <div class="fs-14 fw-bold"><%= body.report._id %></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted fs-12 text-uppercase fw-bold">Reporter (<%= body.report.reportedByRole.toUpperCase() %>)</label>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <img src="<%= body.reporterDetails?.profileImage || '/images/default-avatar.png' %>" class="rounded-circle" width="40" height="40" alt="Reporter">
+                            <div>
+                                <div class="fw-bold fs-14"><%= body.reporterDetails?.fullName || "User" %></div>
+                                <div class="text-muted fs-12"><%= body.reporterDetails?.phoneNumber || "-" %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted fs-12 text-uppercase fw-bold">Reported User (<%= body.report.reportedUserRole.toUpperCase() %>)</label>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <img src="<%= body.targetDetails?.profileImage || '/images/default-avatar.png' %>" class="rounded-circle" width="40" height="40" alt="Target">
+                            <div>
+                                <div class="fw-bold fs-14"><%= body.targetDetails?.fullName || "User" %></div>
+                                <div class="text-muted fs-12"><%= body.targetDetails?.phoneNumber || "-" %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted fs-12 text-uppercase fw-bold">Reason</label>
+                        <div class="badge bg-danger fs-13 d-block text-start p-2"><%= body.report.reason %></div>
+                    </div>
+                    <% if (body.report.description) { %>
+                        <div class="mb-3">
+                            <label class="text-muted fs-12 text-uppercase fw-bold">Additional Notes</label>
+                            <div class="p-2 bg-light rounded text-dark fs-13"><%= body.report.description %></div>
+                        </div>
+                    <% } %>
+                    <div class="mb-3">
+                        <label class="text-muted fs-12 text-uppercase fw-bold">Status</label>
+                        <div>
+                            <% if (body.report.status === 4) { %>
+                                <span class="badge bg-danger">Rejected</span>
+                            <% } else if (body.report.status === 3) { %>
+                                <span class="badge bg-success">Resolved</span>
+                            <% } else if (body.report.status === 2) { %>
+                                <span class="badge bg-info">Under Review</span>                                
+                            <% } else { %>
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (body.report.adminNotes) { %>
+                        <div class="mb-3">
+                            <label class="text-muted fs-12 text-uppercase fw-bold">Admin Notes</label>
+                            <div class="p-2 bg-warning bg-opacity-10 border border-warning rounded text-dark fs-13"><%= body.report.adminNotes %></div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Conversation Context -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fs-16"><i class="fa-solid fa-comments me-2"></i>Conversation Context</h5>
+                    <span class="badge bg-light text-dark">Version <%= body.report.chatId?.chatVersion || 1 %></span>
+                </div>
+                <div class="card-body p-4" style="max-height: 600px; overflow-y: auto; background-color: #f8f9fa;">
+                    <% if (body.chatMessages && body.chatMessages.length > 0) { %>
+                        <% body.chatMessages.forEach(function(msg) { %>
+                            <%
+                                const isReportedMessage = String(msg._id) === String(body.report.messageId?._id || body.report.messageId);
+                            %>
+                            <div class="mb-3 p-3 rounded-3 border <%= isReportedMessage ? 'border-danger bg-danger bg-opacity-10 shadow-sm' : 'bg-white border-light shadow-sm' %>" style="<%= isReportedMessage ? 'border-left: 5px solid #dc3545 !important;' : '' %>">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold fs-13 text-dark">
+                                        Sender ID: <%= msg.byId %>
+                                    </span>
+                                    <span class="text-muted fs-12">
+                                        <%= new Date(msg.createdAt).toLocaleString() %>
+                                    </span>
+                                </div>
+                                <% if (isReportedMessage) { %>
+                                    <div class="mb-2">
+                                        <span class="badge bg-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>REPORTED MESSAGE</span>
+                                    </div>
+                                <% } %>
+                                <div class="fs-14 text-dark">
+                                    <% if (msg.message) { %>
+                                        <p class="mb-0"><%= msg.message %></p>
+                                    <% } %>
+                                    <% if (msg.location && msg.location.address) { %>
+                                        <p class="mb-0"><i class="fa-solid fa-location-dot text-danger me-1"></i> <%= msg.location.address %></p>
+                                    <% } %>
+                                    <% if (msg.document && msg.document.length > 0) { %>
+                                        <div class="mt-2 d-flex flex-wrap gap-2">
+                                            <% msg.document.forEach(function(doc) { %>
+                                                <a href="<%= doc.url %>" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fa-solid fa-paperclip me-1"></i> <%= doc.originalName || "Attachment" %>
+                                                </a>
+                                            <% }); %>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    <% } else { %>
+                        <div class="text-center py-5 text-muted">No messages found in this chat session</div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resolve Report Modal -->
+<div class="modal custom-popup fade" id="resolveReportModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header justify-content-center mt-3">
+                <h5 class="modal-title">Resolve Chat Report</h5>
+            </div>
+            <div class="modal-body px-4 pb-4">
+                <input type="hidden" id="resolve-report-id" value="<%= body.report._id %>">
+                <div class="mb-3">
+                    <label class="form-label text-dark">Action Status</label>
+                    <select class="form-select" id="resolve-report-status">
+                        <option value="1" <%= body.report.status === 1 ? 'selected' : '' %>>Pending</option>
+                        <option value="2" <%= body.report.status === 2 ? 'selected' : '' %>>Under Review</option>
+                        <option value="3" <%= body.report.status === 3 ? 'selected' : '' %>>Resolved</option>
+                        <option value="4" <%= body.report.status === 4 ? 'selected' : '' %>>Rejected</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-dark">Admin Notes</label>
+                    <textarea class="form-control" id="resolve-admin-notes" rows="3" placeholder="Enter administrative action or notes"><%= body.report.adminNotes || '' %></textarea>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-success" id="confirm-resolve-report">Save Action</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../footer.ejs') %>

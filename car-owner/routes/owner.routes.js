@@ -58,6 +58,9 @@ import {
     postChatList,
     postChatMessagesDetails,
     postSendMessage,
+    postBlockMechanic,
+    postClearChat,
+    postReportMessage,
     postFileDispute,
     postGenerateCallCaptcha,
     postVerifyCallCaptcha,
@@ -154,6 +157,9 @@ router.post("/rating-list", authMiddleware, postRatingList);
 router.post("/chat-list", unAuthMiddleware, postChatList);
 router.post("/chat-messages-details", unAuthMiddleware, postChatMessagesDetails);
 router.post("/send-message", unAuthMiddleware, postSendMessage);
+router.post("/block-mechanic", unAuthMiddleware, postBlockMechanic);
+router.post("/clear-chat", unAuthMiddleware, postClearChat);
+router.post("/report-message", unAuthMiddleware, postReportMessage);
 
 // Dispute
 router.post("/file-dispute", authMiddleware, postFileDispute);
