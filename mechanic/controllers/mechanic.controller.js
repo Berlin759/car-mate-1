@@ -1102,37 +1102,43 @@ export const postBookingList = async (req, res) => {
         const searchText = String(search || "").trim();
         const searchRegex = searchText ? new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
 
-        const mechanicMatch = {
+        const baseMatch = {
             mechanicId: new ObjectId(mechanicId),
             bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.COMPLETED,
         };
 
-        const match = {
-            ...mechanicMatch,
-        };
+        let statusMatch = null;
 
         if (status !== undefined && status !== null && status !== "") {
-            if (Number(status) === Constants.BOOKING_STATUS.ACCEPTED) {
-                match.status = {
-                    $in: [
-                        Constants.BOOKING_STATUS.ACCEPTED,
-                        Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
-                        Constants.BOOKING_STATUS.ARRIVED
-                    ]
+            const bookingStatus = Number(status);
+
+            if (bookingStatus === Constants.BOOKING_STATUS.ACCEPTED) {
+                statusMatch = {
+                    status: {
+                        $in: [
+                            Constants.BOOKING_STATUS.ACCEPTED,
+                            Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
+                            Constants.BOOKING_STATUS.ARRIVED,
+                        ],
+                    },
                 };
-            } else if (Number(status) === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
-                match.status = {
-                    $in: [
-                        Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                        Constants.BOOKING_STATUS.CLOSED
-                    ]
+            } else if (bookingStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED) {
+                statusMatch = {
+                    status: {
+                        $in: [
+                            Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                            Constants.BOOKING_STATUS.CLOSED,
+                        ],
+                    },
                 };
             } else {
-                match.status = Number(status);
+                statusMatch = {
+                    status: bookingStatus,
+                };
             };
         };
 
-        // ---------- AGGREGATE ----------
+        // ---------------- SERVICE LOOKUP ----------------
         const serviceLookup = {
             $lookup: {
                 from: "services",
@@ -1236,8 +1242,9 @@ export const postBookingList = async (req, res) => {
             },
         };
 
+        // ---------------- PIPELINE ----------------
         const pipeline = [
-            { $match: match },
+            { $match: baseMatch },
 
             serviceLookup,
 
@@ -1252,10 +1259,25 @@ export const postBookingList = async (req, res) => {
 
             {
                 $facet: {
+                    statusSummary: [
+                        {
+                            $group: {
+                                _id: "$status",
+                                count: { $sum: 1 },
+                            },
+                        },
+                    ],
+
+                    totalRecords: [
+                        ...(statusMatch ? [{ $match: statusMatch }] : []),
+                        { $count: "count" },
+                    ],
+
                     items: [
+                        ...(statusMatch ? [{ $match: statusMatch }] : []),
                         { $sort: { createdAt: -1 } },
-                        { $skip: skip, },
-                        { $limit: limit, },
+                        { $skip: skip },
+                        { $limit: limit },
                         {
                             $lookup: {
                                 from: "owners",
@@ -1461,23 +1483,12 @@ export const postBookingList = async (req, res) => {
                                 },
                                 ownerAddressDetails: {
                                     _id: "$ownerAddressDetails._id",
-                                    label: "$ownerAddressDetails.label",
-                                    address: "$ownerAddressDetails.address",
+                                    label: { $ifNull: ["$ownerAddressDetails.label", ""] },
+                                    address: { $ifNull: ["$ownerAddressDetails.address", ""] },
                                     latitude: "$ownerAddressDetails.latitude",
                                     longitude: "$ownerAddressDetails.longitude",
-                                    isDefault: "$ownerAddressDetails.isDefault",
+                                    isDefault: { $ifNull: ["$ownerAddressDetails.isDefault", false] },
                                 },
-                            },
-                        },
-                    ],
-                    totalRecords: [
-                        { $count: "count" },
-                    ],
-                    statusSummary: [
-                        {
-                            $group: {
-                                _id: "$status",
-                                count: { $sum: 1 },
                             },
                         },
                     ],
@@ -1487,9 +1498,11 @@ export const postBookingList = async (req, res) => {
 
         const [result] = await Booking.aggregate(pipeline).allowDiskUse(true);
 
-        const items = result.items || [];
-
-        const totalRecords = result.totalRecords[0]?.count ?? 0;
+        const data = result || {
+            items: [],
+            totalRecords: [],
+            statusSummary: [],
+        };
 
         const statusMap = {
             All: 0,
@@ -1501,43 +1514,39 @@ export const postBookingList = async (req, res) => {
             Cancelled: 0,
         };
 
-        result.statusSummary.forEach((item) => {
-
+        (data.statusSummary || []).forEach((item) => {
             switch (item._id) {
                 case Constants.BOOKING_STATUS.PENDING:
-                    statusMap.Pending = item.count;
+                    statusMap.Pending += item.count;
                     break;
-
                 case Constants.BOOKING_STATUS.ACCEPTED:
-                    statusMap.Accepted = item.count;
+                    statusMap.Accepted += item.count;
                     break;
-
                 case Constants.BOOKING_STATUS.REJECTED:
-                    statusMap.Rejected = item.count;
+                    statusMap.Rejected += item.count;
                     break;
-
                 case Constants.BOOKING_STATUS.SERVICE_STARTED:
-                    statusMap.ServiceStarted = item.count;
+                    statusMap.ServiceStarted += item.count;
                     break;
-
                 case Constants.BOOKING_STATUS.SERVICE_COMPLETED:
-                    statusMap.ServiceCompleted = item.count;
+                    statusMap.ServiceCompleted += item.count;
                     break;
-
                 case Constants.BOOKING_STATUS.CANCELLED:
-                    statusMap.Cancelled = item.count;
+                    statusMap.Cancelled += item.count;
                     break;
-            };
+            }
         });
 
         statusMap.All = Object.values(statusMap).slice(1).reduce((total, count) => total + count, 0);
+
+        const totalRecords = data.totalRecords?.[0]?.count || 0;
 
         const response = {
             page,
             limit,
             totalRecords,
             allBookingCount: statusMap,
-            items,
+            items: data.items || [],
         };
 
         return res.status(200).json(successResponse("Booking List Get Successfully.", response));
