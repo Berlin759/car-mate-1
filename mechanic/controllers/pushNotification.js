@@ -62,7 +62,19 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 messageType: messageType ? messageType : 0,
                 bookingId: payload.bookingId ? payload.bookingId.toString() : "",
                 transactionId: payload.transactionId ? payload.transactionId.toString() : "",
-                chatId: payload.chatId ? payload.chatId.toString() : ""
+                chatId: payload.chatId ? payload.chatId.toString() : "",
+
+                // Owner Details
+                ownerId: payload.ownerId ? payload.ownerId.toString() : "",
+                ownerName: payload.ownerName ? payload.ownerName.toString() : "",
+                ownerProfileImage: payload.ownerProfileImage ? payload.ownerProfileImage.toString() : "",
+                isOwnerOnlineStatus: payload.isOwnerOnlineStatus ? payload.isOwnerOnlineStatus.toString() : "2",
+
+                // Mechanic Details
+                mechanicId: payload.mechanicId ? payload.mechanicId.toString() : "",
+                mechanicName: payload.mechanicName ? payload.mechanicName.toString() : "",
+                mechanicProfileImage: payload.mechanicProfileImage ? payload.mechanicProfileImage.toString() : "",
+                isMechanicOnlineStatus: payload.isMechanicOnlineStatus ? payload.isMechanicOnlineStatus.toString() : "2",
             },
             apns: {
                 headers: {

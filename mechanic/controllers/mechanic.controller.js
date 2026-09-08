@@ -3257,7 +3257,7 @@ export const postSendMessage = async (req, res) => {
             return res.status(400).json(validate);
         };
 
-        let mechanicData = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
+        const mechanicData = await Mechanic.findOne({ _id: new ObjectId(mechanicId) });
         if (!mechanicData) {
             return res.status(400).json(errorResponse("Mechanic not found."));
         };
@@ -3487,6 +3487,10 @@ export const postSendMessage = async (req, res) => {
                     description: notificationDescription,
                     ownerId: receiverOwner._id,
                     chatId: chat._id,
+                    mechanicId: mechanicId,
+                    mechanicName: mechanicData.fullName,
+                    mechanicProfileImage: mechanicData.profileImage,
+                    isMechanicOnlineStatus: mechanicData.isOnline || Constants.ONLINE_STATUS.TRUE,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
 

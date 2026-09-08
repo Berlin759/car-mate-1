@@ -6600,16 +6600,18 @@ export const postSendMessage = async (req, res) => {
             return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        let ownerName = "";
+        let ownerName = "Guest User";
+        let ownerProfileImage = "";
+        let isOnlineStatus = Constants.ONLINE_STATUS.TRUE;
         if (ownerId) {
-            let ownerData = await Owner.findOne({ _id: new ObjectId(ownerId) });
+            const ownerData = await Owner.findById(ownerId).select("fullName profileImage isOnline").lean();
             if (!ownerData) {
                 return res.status(400).json(errorResponse("Owner not found."));
             };
 
             ownerName = ownerData.fullName;
-        } else {
-            ownerName = "Guest User";
+            ownerProfileImage = ownerData.profileImage;
+            isOnlineStatus = ownerData.isOnline;
         };
 
         let bookingDetails = null;
@@ -6819,6 +6821,10 @@ export const postSendMessage = async (req, res) => {
                     description: notificationDescription,
                     mechanicId: receiverMechanic._id,
                     chatId: chat._id,
+                    ownerId: myId,
+                    ownerName: ownerName,
+                    ownerProfileImage: ownerProfileImage,
+                    isOwnerOnlineStatus: isOnlineStatus,
                     type: Constants.NOTIFICATION_TYPE.CHAT,
                 };
 
