@@ -20,7 +20,7 @@ import {
     getTimeFormatFromMilliseconds,
 } from "../lib/general.js";
 import { generateInvoicePDF } from "../utils/pdf.helper.js";
-import { createOrder } from "./razorpay.controller.js";
+import { createOrder, razorpayRefund } from "./razorpay.controller.js";
 
 import Mechanic from "../models/mechanic.model.js";
 import Owner from "../models/owner.model.js";
@@ -1951,15 +1951,23 @@ export const postBookingUpdateStatus = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid status."));
         };
 
-        const bookingDetails = await Booking.findOne({
-            _id: new ObjectId(bookingId),
-            mechanicId: new ObjectId(mechanicId),
-        }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" });
+        const [bookingDetails, transactionDetails, pricingDetails] = await Promise.all([
+            Booking.findOne({
+                _id: new ObjectId(bookingId),
+                mechanicId: new ObjectId(mechanicId),
+            }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" }),
 
-        log1(["postBookingUpdateStatus bookingDetails----->", bookingDetails]);
+            Transaction.findOne({ bookingId: new ObjectId(bookingDetails?._id), }),
+
+            Pricing.findOne({}),
+        ]);
 
         if (!bookingDetails) {
             return res.status(400).json(errorResponse("This Booking is not Available."));
+        };
+
+        if (!transactionDetails) {
+            return res.status(400).json(errorResponse("Invalid transition details."));
         };
 
         let updatePayload = { status: newStatus };
@@ -2003,6 +2011,41 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("Booking can only be rejected from pending status."));
                 };
 
+                if (bookingDetails.status === Constants.BOOKING_STATUS.REJECTED) {
+                    log1(["postBookingUpdateStatus booking status is already rejected"]);
+                    return res.status(400).json(errorResponse("This booking is already rejected."));
+                };
+
+                let refundAmount = parseFloat(bookingDetails.totalAmount);
+
+                let refundPayload = {
+                    razorpayPaymentId: transactionDetails.trxId,
+                    amount: refundAmount,
+                    ownerId: bookingDetails?.ownerId,
+                };
+
+                let paymentRefund = await razorpayRefund(refundPayload);
+                log1(["postBookingUpdateStatus paymentRefund by reject booking----->", paymentRefund]);
+                if (paymentRefund.flag === 0) {
+                    return res.status(400).json(paymentRefund);
+                };
+
+                const refundPayment = paymentRefund.data;
+
+                let transactionPayload = {
+                    trxId: refundPayment.refundId,
+                    ownerId: new ObjectId(bookingDetails?.ownerId),
+                    mechanicId: new ObjectId(bookingDetails?.mechanicId),
+                    serviceId: new ObjectId(bookingDetails.serviceId),
+                    carId: new ObjectId(bookingDetails.carId),
+                    bookingId: bookingDetails._id,
+                    totalAmount: refundAmount,
+                    description: "Refund for mechanic has rejected your booking request.",
+                    status: Constants.TRANSACTION_STATUS.REFUND,
+                };
+
+                await Transaction.create(transactionPayload);
+
                 notificationTitle = "Booking Rejected";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has rejected your booking request.`;
 
@@ -2018,6 +2061,41 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (!reason) {
                     return res.status(400).json(errorResponse("Please enter reason for cancel service."));
                 };
+
+                if (bookingDetails.status === Constants.BOOKING_STATUS.CANCELLED) {
+                    log1(["postBookingUpdateStatus booking status is already cancelled"]);
+                    return res.status(400).json(errorResponse("This booking is already cancelled."));
+                };
+
+                let refundAmount = parseFloat(bookingDetails.totalAmount);
+
+                let refundPayload = {
+                    razorpayPaymentId: transactionDetails.trxId,
+                    amount: refundAmount,
+                    ownerId: bookingDetails?.ownerId,
+                };
+
+                let paymentRefund = await razorpayRefund(refundPayload);
+                log1(["postBookingUpdateStatus paymentRefund by cancel booking----->", paymentRefund]);
+                if (paymentRefund.flag === 0) {
+                    return res.status(400).json(paymentRefund);
+                };
+
+                const refundPayment = paymentRefund.data;
+
+                let transactionPayload = {
+                    trxId: refundPayment.refundId,
+                    ownerId: new ObjectId(bookingDetails?.ownerId),
+                    mechanicId: new ObjectId(bookingDetails?.mechanicId),
+                    serviceId: new ObjectId(bookingDetails.serviceId),
+                    carId: new ObjectId(bookingDetails.carId),
+                    bookingId: bookingDetails._id,
+                    totalAmount: refundAmount,
+                    description: "Refund for mechanic has cancelled your booking.",
+                    status: Constants.TRANSACTION_STATUS.REFUND,
+                };
+
+                await Transaction.create(transactionPayload);
 
                 updatePayload.cancelById = new ObjectId(mechanicId);
                 updatePayload.cancelReason = reason || "";
@@ -2104,18 +2182,6 @@ export const postBookingUpdateStatus = async (req, res) => {
                 if (materialCost) {
                     updatePayload.materialCost = parseFloat(materialCost);
                 };
-
-                const transactionDetails = await Transaction.findOne({
-                    bookingId: new ObjectId(bookingDetails?._id),
-                });
-                log1(["postBookingUpdateStatus transactionDetails----->", transactionDetails]);
-
-                if (!transactionDetails) {
-                    return res.status(400).json(errorResponse("Invalid transition details."));
-                };
-
-                const pricingDetails = await Pricing.findOne({});
-                log1(["postBookingUpdateStatus pricingDetails----->", pricingDetails]);
 
                 const platformFee = pricingDetails?.platformCommission || 0;
 

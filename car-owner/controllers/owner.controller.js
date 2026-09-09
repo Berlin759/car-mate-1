@@ -4700,10 +4700,12 @@ export const postCancelBooking = async (req, res) => {
 
         let filter = { _id: new ObjectId(bookingId) };
 
-        const bookingDetails = await Booking.findOne({ ...filter }).populate([
-            { path: "ownerId" },
+        const [bookingDetails, pricingDetails] = await Promise.all([
+            Booking.findOne({ ...filter }).populate([{ path: "ownerId" }]),
+
+            Pricing.findOne({}),
         ]);
-        log1(["postCancelBooking bookingDetails----->", bookingDetails]);
+
         if (!bookingDetails) {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
@@ -4717,12 +4719,16 @@ export const postCancelBooking = async (req, res) => {
             return res.status(400).json(errorResponse("Cancellation is not permitted after service has started. Please contact support."));
         };
 
+        const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
+
         let cancellationFee = 0;
-        let refundAmount = parseFloat(bookingDetails.totalAmount);
+        let refundAmount = totalBookingAmount;
 
         if (bookingDetails.status >= Constants.BOOKING_STATUS.ACCEPTED) {
-            cancellationFee = Math.round(refundAmount * 0.10);
-            refundAmount = refundAmount - cancellationFee;
+            const cancellationCharge = pricingDetails?.cancellationFee || 0;
+
+            cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
+            refundAmount = totalBookingAmount - cancellationFee;
         };
 
         const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id });

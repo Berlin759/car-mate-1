@@ -18,51 +18,8 @@
                                 <input type="text" inputmode="decimal" class="form-control amount-input" id="perKmCharge" name="perKmCharge" step="0.01" min="0" value="<%= body?.pricing?.perKmCharge || 0 %>">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label text-dark">Minimum Fare (₹)</label>
-                                <input type="text" inputmode="decimal" class="form-control amount-input" id="minimumFare" name="minimumFare" step="0.01" min="0" value="<%= body?.pricing?.minimumFare || 0 %>">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Cancellation Fee (₹)</label>
-                                <input type="text" inputmode="decimal" class="form-control amount-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" value="<%= body?.pricing?.cancellationFee || 0 %>">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Surcharges -->
-                <div class="col-lg-6">
-                    <div class="card bs-border">
-                        <div class="card-header bg-white fw-semibold fs-15">
-                            <i class="fa-solid fa-percent me-2"></i> Surcharges
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Peak-Hour Surcharge (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="peakHourSurcharge" name="peakHourSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.peakHourSurcharge || 0 %>">
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <label class="form-label text-dark">Morning Peak Start</label>
-                                    <input type="time" class="form-control" id="peakHourStart" name="peakHourStart" value="<%= body?.pricing?.peakHourStart || '07:00' %>">
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label text-dark">Morning Peak End</label>
-                                    <input type="time" class="form-control" id="peakHourEnd" name="peakHourEnd" value="<%= body?.pricing?.peakHourEnd || '10:00' %>">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <label class="form-label text-dark">Evening Peak Start</label>
-                                    <input type="time" class="form-control" id="eveningPeakStart" name="eveningPeakStart" value="<%= body?.pricing?.eveningPeakStart || '17:00' %>">
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label text-dark">Evening Peak End</label>
-                                    <input type="time" class="form-control" id="eveningPeakEnd" name="eveningPeakEnd" value="<%= body?.pricing?.eveningPeakEnd || '20:00' %>">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Weekend Surcharge (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="weekendSurcharge" name="weekendSurcharge" step="0.01" min="0" max="100" value="<%= body?.pricing?.weekendSurcharge || 0 %>">
+                                <label class="form-label text-dark">Cancellation Fee (%)</label>
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" max="100" value="<%= body?.pricing?.cancellationFee || 0 %>">
                             </div>
                         </div>
                     </div>

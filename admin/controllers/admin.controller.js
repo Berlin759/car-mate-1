@@ -5986,14 +5986,7 @@ export const postUpdatePricing = async (req, res) => {
         const {
             basePrice,
             perKmCharge,
-            peakHourSurcharge,
-            peakHourStart,
-            peakHourEnd,
-            eveningPeakStart,
-            eveningPeakEnd,
-            weekendSurcharge,
             platformCommission,
-            minimumFare,
             cancellationFee,
             gstPercentage,
         } = req.body;
@@ -6008,36 +6001,8 @@ export const postUpdatePricing = async (req, res) => {
             updatePayload.perKmCharge = parseFloat(perKmCharge);
         };
 
-        if (peakHourSurcharge !== undefined) {
-            updatePayload.peakHourSurcharge = parseFloat(peakHourSurcharge);
-        };
-
-        if (peakHourStart) {
-            updatePayload.peakHourStart = peakHourStart;
-        };
-
-        if (peakHourEnd) {
-            updatePayload.peakHourEnd = peakHourEnd;
-        };
-
-        if (eveningPeakStart) {
-            updatePayload.eveningPeakStart = eveningPeakStart;
-        };
-
-        if (eveningPeakEnd) {
-            updatePayload.eveningPeakEnd = eveningPeakEnd;
-        };
-
-        if (weekendSurcharge !== undefined) {
-            updatePayload.weekendSurcharge = parseFloat(weekendSurcharge);
-        };
-
         if (platformCommission !== undefined) {
             updatePayload.platformCommission = parseFloat(platformCommission);
-        };
-
-        if (minimumFare !== undefined) {
-            updatePayload.minimumFare = parseFloat(minimumFare);
         };
 
         if (cancellationFee !== undefined) {

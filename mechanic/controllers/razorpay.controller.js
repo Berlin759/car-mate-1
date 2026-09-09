@@ -12,6 +12,7 @@ import Mechanic from "../models/mechanic.model.js";
 import Booking from "../models/booking.model.js";
 import Transaction from "../models/transaction.model.js";
 import { sendPushNotification } from "./pushNotification.js";
+import Owner from "../models/owner.model.js";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY,
@@ -142,7 +143,7 @@ export const verifyRazorpayPayment = async (payload) => {
 
 export const razorpayRefund = async (payload) => {
     try {
-        const { razorpayPaymentId, amount, mechanicId } = payload;
+        const { razorpayPaymentId, amount, ownerId } = payload;
 
         if (!razorpayPaymentId) {
             return errorResponse("Payment ID is required for refund.");
@@ -165,31 +166,33 @@ export const razorpayRefund = async (payload) => {
 
         log1(["razorpayRefund refund----->", refund]);
 
-        if (mechanicId) {
-            const mechanicData = await Mechanic.findById(mechanicId);
+        if (ownerId) {
+            const ownerData = await Owner.findById(ownerId);
             if (
-                mechanicData &&
-                mechanicData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
-                mechanicData.deviceToken &&
-                mechanicData.deviceToken !== "" &&
-                mechanicData.deviceToken !== null &&
-                mechanicData.deviceToken !== undefined
+                ownerData &&
+                ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                ownerData.deviceToken &&
+                ownerData.deviceToken !== "" &&
+                ownerData.deviceToken !== null &&
+                ownerData.deviceToken !== undefined
             ) {
                 let notificationObject = {
                     title: "Refund",
                     description: `Refund of ₹${(refund.amount / 100).toFixed(2)} has been initiated.`,
-                    mechanicId: mechanicId,
+                    ownerId: ownerId,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
                 await sendPushNotification(mechanicData.deviceToken, notificationObject);
             };
         };
 
-        return successResponse("Refund processed successfully.", {
+        const response = {
             refundId: refund.id,
             amount: refund.amount / 100,
             status: refund.status,
-        });
+        };
+
+        return successResponse("Refund processed successfully.", response);
     } catch (error) {
         log1(["razorpayRefund Error----->", error.message]);
         return errorResponse(messages.unexpectedDataError);
