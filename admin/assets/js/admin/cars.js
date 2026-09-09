@@ -30,7 +30,7 @@ $(document).on("click", "#reset-car-filters", function () {
     $("#status-filter-btn .filter-data").text("").removeClass("active");
     $("#status-filter-btn .hr-line-sm").removeClass("active");
 
-    fetchAllCarsList({ status: "", email: "" });
+    fetchAllCarsList({ status: "" });
 });
 
 $(document).on("click", ".car_delete", function () {

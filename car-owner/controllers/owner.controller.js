@@ -7179,7 +7179,7 @@ export const postBlockMechanic = async (req, res) => {
                 blockedByOwnerAt: new Date(),
             });
 
-            return res.status(200).json(successResponse("Mechanic blocked successfully."));
+            return res.status(200).json(successResponse("Mechanic blocked successfully.", { isBlocked: true }));
         } else {
             await Block.deleteOne(query);
 
@@ -7195,7 +7195,7 @@ export const postBlockMechanic = async (req, res) => {
                 blockedByOwnerAt: null,
             });
 
-            return res.status(200).json(successResponse("Mechanic unblocked successfully."));
+            return res.status(200).json(successResponse("Mechanic unblocked successfully.", { isBlocked: false }));
         };
     } catch (error) {
         log1(["Error in postBlockMechanic ----->", error]);

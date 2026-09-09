@@ -44,7 +44,6 @@
                     <% } %>
                 </div>
                 <h5 class="mb-1"><%= body?.owner?.fullName || "-" %></h5>
-                <p class="text-gray mb-0"><%= body?.owner?.email || "No email" %></p>
             </div>
             <hr>
             <div class="d-flex flex-column gap-3">
@@ -88,25 +87,12 @@
             <div class="col-md-6">
                 <div class="bg-white rounded-2 bs-border p-4">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #e3f2fd; width: 48px; height: 48px;">
-                            <i class="fa-solid fa-shield-halved text-primary"></i>
-                        </div>
-                        <div>
-                            <span class="fs-14 text-gray d-block">Email Verified</span>
-                            <span class="fs-20 fw-bold"><%= body?.owner?.emailVerification === 2 ? "Yes" : "No" %></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="bg-white rounded-2 bs-border p-4">
-                    <div class="d-flex align-items-center gap-3">
                         <div class="sc-img d-flex align-items-center justify-content-center rounded-circle" style="background: #fff3e0; width: 48px; height: 48px;">
                             <i class="fa-solid fa-bell text-warning"></i>
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Push Notifications</span>
-                            <span class="fs-20 fw-bold"><%= body?.owner?.pushNotification === 1 ? "Enabled" : "Disabled" %></span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.pushNotification === 2 ? "Enabled" : "Disabled" %></span>
                         </div>
                     </div>
                 </div>
@@ -119,7 +105,7 @@
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Online Status</span>
-                            <span class="fs-20 fw-bold"><%= body?.owner?.isOnline === 1 ? "Online" : "Offline" %></span>
+                            <span class="fs-20 fw-bold"><%= body?.owner?.isOnline === 2 ? "Online" : "Offline" %></span>
                         </div>
                     </div>
                 </div>

@@ -2,33 +2,10 @@
     <div class="list-filter p-3 bg-white rounded-2 bs-border d-flex align-items-center justify-content-between">
         <div class="filter-area" id="car-owner-filter-section">
             <div class="dropdown filter-dropdown">
-                <button type="button" class="filter-btn dropdown-toggle" id="email-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="fs-14 fw-md d-flex align-items-center gap-1">
-                        <img src="/images/circle-plus.svg" alt="">
-                        Email
-                    </span>
-                    <div class="hr-line-sm d-none"></div>
-                    <div class="filter-data d-none"></div>
-                </button>
-                <ul class="dropdown-menu filter-dropdown-menu amount-filter bs-border bg-white">
-                    <span class="fw-md fs-14 text-start">Filter by Email</span>
-                    <div class="form-group mt-10">
-                        <input id="email-filter-input" class="form-control" type="text" name="email" placeholder="Enter Email">
-                    </div>
-                    <button id="apply-email-filter" class="btn btn-primary w-100 d-block mt-10 btn-disabled">Apply</button>
-                    <!-- <div class="cl-btn-wrapper">
-                        <button class="clear-btn fs-14 fw-normal text-center w-100">Clear filters</button>
-                    </div> -->
-                    <button id="clear-email-filter" class="clear-btn fs-14 fw-normal text-center w-100 d-none">
-                        Clear filters
-                    </button>
-                </ul>
-            </div>
-            <div class="dropdown filter-dropdown">
                 <button type="button" class="filter-btn dropdown-toggle" id="status-filter-btn" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="fs-14 fw-md d-flex align-items-center gap-1">
                         <img src="/images/circle-plus.svg" alt="">
-                        Owner Status
+                        Status
                     </span>
                     <div class="hr-line-sm d-none"></div>
                     <div class="filter-data d-none"></div>
@@ -97,14 +74,14 @@
         </div>
     </div>
 
-    <!-- Add Car Owner Modal -->
+    <!-- Add Owner Modal -->
     <div class="modal custom-popup fade" id="addCarOwnerModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="addCarOwnerModalLabel" aria-modal="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <!-- Modal Header -->
                 <div class="modal-header justify-content-center mt-3">
                     <h5 class="modal-title" id="addCarOwnerModalLabel">
-                        Add Car Owner
+                        Add Owner
                     </h5>
                 </div>
 
@@ -114,7 +91,7 @@
                         <input type="hidden" id="car_owner_id" name="car_owner_id" value="" />
                         <div class="row g-3">
                             <div class="col-lg-12">
-                                <label for="full_name" class="form-label text-dark">Enter Car Owner Name</label>
+                                <label for="full_name" class="form-label text-dark">Enter Owner Name</label>
                                 <input class="form-control" type="text" name="full_name" id="full_name" placeholder="Enter Car Owner Name" required pattern="[a-zA-Z\s]+" minlength="2" maxlength="50" title="Name must contain only letters and spaces (2-50 characters)">
                             </div>
                             <div class="col-lg-12">
@@ -162,10 +139,10 @@
                         Cancel
                     </button>
                     <button type="button" class="btn btn-primary" id="add_car_owner">
-                        Add Car Owner
+                        Add Owner
                     </button>
                     <button type="button" class="btn btn-primary d-none" id="update_car_owner">
-                        Update Car Owner
+                        Update Owner
                     </button>
                 </div>
             </div>

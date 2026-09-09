@@ -1955,13 +1955,11 @@ export const postBookingUpdateStatus = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid status."));
         };
 
-        const [bookingDetails, transactionDetails, pricingDetails] = await Promise.all([
+        const [bookingDetails, pricingDetails] = await Promise.all([
             Booking.findOne({
                 _id: new ObjectId(bookingId),
                 mechanicId: new ObjectId(mechanicId),
             }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" }),
-
-            Transaction.findOne({ bookingId: new ObjectId(bookingDetails?._id), }),
 
             Pricing.findOne({}),
         ]);
@@ -1969,6 +1967,8 @@ export const postBookingUpdateStatus = async (req, res) => {
         if (!bookingDetails) {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
+
+        const transactionDetails = await Transaction.findOne({ bookingId: new ObjectId(bookingDetails?._id), });
 
         if (!transactionDetails) {
             return res.status(400).json(errorResponse("Invalid transition details."));

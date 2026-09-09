@@ -248,7 +248,6 @@ export const postAllCarOwnerList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            email,
             status,
         } = req?.body;
 
@@ -258,10 +257,6 @@ export const postAllCarOwnerList = async (req, res) => {
 
         let filter = {
             isDeleted: { $ne: true }
-        };
-
-        if (email) {
-            filter["email"] = email;
         };
 
         if (status) {
@@ -300,7 +295,6 @@ export const postAllCarOwnerList = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     phoneCode: 1,
@@ -389,7 +383,6 @@ export const postCarOwnerDetails = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     status: 1,
@@ -529,7 +522,6 @@ export const getCarOwnerDetailPage = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     profileImage: 1,
@@ -538,7 +530,6 @@ export const getCarOwnerDetailPage = async (req, res) => {
                     description: 1,
                     status: 1,
                     totalBooking: 1,
-                    emailVerification: 1,
                     pushNotification: 1,
                     isOnline: 1,
                     lastLoginAt: 1,
@@ -687,7 +678,6 @@ export const postAllMechanicList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            email,
             status,
             kycStatus,
         } = req?.body;
@@ -698,10 +688,6 @@ export const postAllMechanicList = async (req, res) => {
 
         let filter = {
             isDeleted: { $ne: true }
-        };
-
-        if (email) {
-            filter["email"] = email;
         };
 
         if (status) {
@@ -780,7 +766,6 @@ export const postAllMechanicList = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     profileImage: 1,
@@ -869,7 +854,6 @@ export const postMechanicDetails = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     status: 1,
@@ -1009,7 +993,6 @@ export const getMechanicDetailPage = async (req, res) => {
                 $project: {
                     _id: 1,
                     fullName: 1,
-                    email: 1,
                     phoneNumber: 1,
                     countryCode: 1,
                     profileImage: 1,
@@ -1018,7 +1001,6 @@ export const getMechanicDetailPage = async (req, res) => {
                     description: 1,
                     status: 1,
                     totalBooking: 1,
-                    emailVerification: 1,
                     pushNotification: 1,
                     isOnline: 1,
                     lastLoginAt: 1,
@@ -2146,7 +2128,6 @@ export const postAllBookingList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -2174,7 +2155,6 @@ export const postAllBookingList = async (req, res) => {
                                     {
                                         $project: {
                                             fullName: 1,
-                                            email: 1,
                                             phoneNumber: 1,
                                             profileImage: 1,
                                             latitude: 1,
@@ -2326,7 +2306,6 @@ export const postBookingDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -2354,7 +2333,6 @@ export const postBookingDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -2811,7 +2789,6 @@ export const postTransactionDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -2839,7 +2816,6 @@ export const postTransactionDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 latitude: 1,
@@ -3431,7 +3407,6 @@ export const getBookingDetailPage = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3455,7 +3430,6 @@ export const getBookingDetailPage = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3595,7 +3569,6 @@ export const getTransactionDetailPage = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3619,7 +3592,6 @@ export const getTransactionDetailPage = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3967,7 +3939,6 @@ export const postAllReviewList = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -3991,7 +3962,6 @@ export const postAllReviewList = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -4125,7 +4095,6 @@ export const postReviewDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -4149,7 +4118,6 @@ export const postReviewDetails = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                             },
@@ -4439,7 +4407,6 @@ export const getKYCDetailPage = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 bankAccountNumber: 1,
@@ -4516,7 +4483,7 @@ export const getAddKYCPage = async (req, res) => {
         };
 
         let mechanic = await Mechanic.findById(mechanicId)
-            .select("fullName email phoneNumber countryCode profileImage")
+            .select("fullName phoneNumber countryCode profileImage")
             .lean();
 
         if (!mechanic) {
@@ -4617,7 +4584,6 @@ export const postPendingKYCList = async (req, res) => {
         const {
             currentPage = Constants.DEFAULT_PAGE,
             itemPerPage = Constants.DEFAULT_LIMIT,
-            email,
             status,
         } = req?.body;
 
@@ -4645,7 +4611,6 @@ export const postPendingKYCList = async (req, res) => {
                         {
                             $project: {
                                 fullName: 1,
-                                email: 1,
                                 phoneNumber: 1,
                                 profileImage: 1,
                                 bankAccountNumber: 1,

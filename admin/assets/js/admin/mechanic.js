@@ -42,52 +42,6 @@ function initMechanicPhoneValidation() {
     });
 };
 
-// Email Filter Object
-$(document).on("input", "#email-filter-input", function () {
-    let email = $("#email-filter-input").val();
-    email = email.trim();
-    if (email.length > 0) {
-        $("#apply-email-filter").removeClass("btn-disabled");
-        $("#clear-email-filter").removeClass("d-none");
-    } else {
-        $("#apply-email-filter").addClass("btn-disabled");
-        $("#clear-email-filter").addClass("d-none");
-    };
-});
-
-$(document).on("click", "#apply-email-filter", function () {
-    const email = $("#email-filter-input").val()?.trim();
-    let displayEmail = email.length > 15 ? email.substring(0, 15) + "..." : email;
-
-    $("#email-filter-btn .filter-data").text(displayEmail).addClass("active");
-    $("#email-filter-btn .hr-line-sm").addClass("active");
-    $("#clear-email-filter").removeClass("d-none");
-
-    fetchAllMechanicList({ email: email });
-});
-
-$(document).on('keypress', '#email-filter-input', function (e) {
-    if (e.key === "Enter") {
-        const email = $("#email-filter-input").val()?.trim();
-        if (email) {
-            $('#apply-email-filter').click();
-        } else {
-            $('#clear-email-filter').click();
-        }
-    }
-});
-
-$(document).on("click", "#clear-email-filter", function () {
-    $("#email-filter-input").val("");
-
-    $("#apply-email-filter").addClass("btn-disabled");
-    $("#email-filter-btn .filter-data").text("").removeClass("active");
-    $("#email-filter-btn .hr-line-sm").removeClass("active");
-    $("#clear-email-filter").addClass("d-none");
-
-    fetchAllMechanicList({ email: "" });
-});
-
 // Status Filter Object
 $(document).on("click", ".mechanic-status-filter", function () {
     const status = $(this).data('status');
@@ -131,13 +85,6 @@ $(document).on("click", "#clear-kyc-status-filter", function () {
 $(document).on("click", "#reset-mechanic-filters", function () {
     $("#reset-mechanic-filters").addClass("d-none");
 
-    // Email
-    $("#email-filter-input").val("");
-    $("#apply-email-filter").addClass("btn-disabled");
-    $("#email-filter-btn .filter-data").text("").removeClass("active");
-    $("#email-filter-btn .hr-line-sm").removeClass("active");
-    $("#clear-email-filter").addClass("d-none");
-
     // Status
     $("#clear-status-filter").addClass("d-none");
     $("#status-filter-btn .filter-data").text("").removeClass("active");
@@ -148,7 +95,7 @@ $(document).on("click", "#reset-mechanic-filters", function () {
     $("#kyc-status-filter-btn .filter-data").text("").removeClass("active");
     $("#kyc-status-filter-btn .hr-line-sm").removeClass("active");
 
-    fetchAllMechanicList({ status: "", email: "", kycStatus: "" });
+    fetchAllMechanicList({ status: "", kycStatus: "" });
 });
 
 $(document).on("click", ".mechanic_delete", function () {

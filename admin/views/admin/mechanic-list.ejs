@@ -19,7 +19,6 @@
             <tr>
                 <th>#</th>
                 <th>Name</th>
-                <th>Email</th>
                 <th>Phone</th>
                 <th>Bookings</th>
                 <th>Joined</th>
@@ -35,7 +34,6 @@
                     <tr>
                         <td><%= start_index %></td>
                         <td><%= item?.fullName || "-" %></td>
-                        <td><%= item?.email || "-" %></td>
                         <td>
                             <% if(item?.phoneNumber) { %>
                                 <%= item?.phoneCode || "+91" %>  <%= item?.phoneNumber %>
@@ -78,7 +76,7 @@
                 <% }) %>
             <% } else { %>
                 <tr>
-                    <td colspan="9" class="text-center">No mechanics found</td>
+                    <td colspan="8" class="text-center">No mechanics found</td>
                 </tr>
             <% } %>
         </tbody>
