@@ -143,6 +143,10 @@ const bookingSchema = new Schema(
             type: Date,
             default: null,
         },
+        cancellationFee: {
+            type: Number,
+            default: 0,
+        },
         razorpayOrderId: {
             type: String,
             default: "",
