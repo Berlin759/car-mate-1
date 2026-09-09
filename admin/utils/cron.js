@@ -118,7 +118,7 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
  * Core function to process weekly payouts
  */
 export const processWeeklyPayouts = async () => {
-    log1("Running Weekly Earning Payout Process...");
+    log1(["Running Weekly Earning Payout Process..."]);
 
     // Date range: last Monday 12:00:01 AM to Sunday 11:59:59 PM
     const startOfRange = moment().subtract(1, "weeks").startOf("isoWeek").set({ hour: 0, minute: 0, second: 1, millisecond: 0 }).toDate();
@@ -213,13 +213,13 @@ export const processWeeklyPayouts = async () => {
 export const initCronJobs = () => {
     // Schedule cron every Monday at 12:00:00 AM (0 0 * * 1)
     cron.schedule("0 0 * * 1", async () => {
-        log1("Cron trigger fired: Weekly Earning Payout");
+        log1(["Cron trigger fired: Weekly Earning Payout"]);
         await processWeeklyPayouts();
     });
 
     // Schedule cron every 5 Minute
     // cron.schedule("*/5 * * * *", async () => {
-    //     log1("Cron trigger fired: Weekly Earning Payout");
+    //     log1(["Cron trigger fired: Weekly Earning Payout"]);
     //     await processWeeklyPayouts();
     // });
 };

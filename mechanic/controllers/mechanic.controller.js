@@ -2056,23 +2056,22 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("Can only start service after accepting booking."));
                 };
 
-                const slotStartTimes = {
-                    Morning: "09:00 AM",
-                    Afternoon: "01:00 PM",
-                    Evening: "05:00 PM"
-                };
-
-                const slotStartTime = slotStartTimes[bookingDetails.slot];
-                if (!slotStartTime) {
+                const selectedSlot = Constants.BOOKING_SLOT_TIMES[bookingDetails.slot];
+                if (!selectedSlot) {
                     return res.status(400).json(errorResponse("Invalid booking slot."));
                 };
 
                 const nowIST = momentTz().tz(currentTimezone);
-                const bookingDateIST = momentTz(bookingDetails.date).tz(currentTimezone).format("YYYY-MM-DD");
-                const bookingStartIST = moment.tz(`${bookingDateIST} ${slotStartTime}`, "YYYY-MM-DD hh:mm A", currentTimezone);
 
-                if (nowIST.isBefore(bookingStartIST)) {
-                    return res.status(400).json(errorResponse("Service cannot be started before the scheduled date and time. Please try again at the scheduled time."));
+                const bookingDateIST = momentTz(bookingDetails.date).tz(currentTimezone).format("YYYY-MM-DD");
+
+                const slotStart = momentTz(`${bookingDateIST} ${selectedSlot.start}`, "YYYY-MM-DD hh:mm A", currentTimezone);
+                const slotEnd = momentTz(`${bookingDateIST} ${selectedSlot.end}`, "YYYY-MM-DD hh:mm A", currentTimezone);
+
+                const isWithinSlot = bookingDetails.slot === "Evening" ? nowIST.isBetween(slotStart, slotEnd, undefined, "[]") : nowIST.isBetween(slotStart, slotEnd, undefined, "[)");
+                if (!isWithinSlot) {
+                    // return res.status(400).json(errorResponse("Service cannot be started before the scheduled date and time. Please try again at the scheduled time."));
+                    return res.status(400).json(errorResponse("Service can only be started during the scheduled booking slot."));
                 };
 
                 updatePayload.startTime = new Date();
@@ -2259,6 +2258,10 @@ export const postBookingSendQuote = async (req, res) => {
         }));
 
         const existingQuotation = Array.isArray(booking.quotation) ? booking.quotation : [];
+
+        if (existingQuotation.length > 0 && booking.quotationPaymentStatus === Constants.QUOTATION_PAYMENT_STATUS.COMPLETED) {
+            return res.status(400).json(errorResponse("Payment for the quotation has already been completed for this booking. A new quotation cannot be added."));
+        };
 
         booking.quotation = [
             ...existingQuotation,
@@ -2855,13 +2858,18 @@ export const postTransactionList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const mechanicId = req.mechanicId;
-        const { itemPerPage, currentPage, search } = req.body;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            search,
+        } = req.body;
 
         log1(["postChatList mechanicId----->", mechanicId]);
         log1(["postChatList req.body----->", req.body]);
 
-        const limit = parseInt(itemPerPage) || 10;
-        const skip = (currentPage - 1) * limit || 0;
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
         const matchQuery = {
             mechanicId: new ObjectId(mechanicId),
@@ -2873,6 +2881,30 @@ export const postChatList = async (req, res) => {
         const pipeline = [
             {
                 $match: matchQuery
+            },
+            {
+                $sort: {
+                    lastMessageAt: -1,
+                    updatedAt: -1,
+                    createdAt: -1,
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        ownerId: "$ownerId",
+                        guestId: "$guestId",
+                        mechanicId: "$mechanicId",
+                    },
+                    chat: {
+                        $first: "$$ROOT",
+                    },
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: "$chat",
+                },
             },
             {
                 $lookup: {
@@ -2905,17 +2937,13 @@ export const postChatList = async (req, res) => {
         ];
 
         if (search && search.trim()) {
-            const searchText = search.trim();
-
-            const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-            const searchRegex = new RegExp(escapedSearch, "i");
+            const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
             pipeline.push({
                 $match: {
                     $or: [
                         {
-                            "ownerDetails.fullName": searchRegex,
+                            "ownerDetails.fullName": { $regex: escapedSearch, $options: "i" },
                         },
                         {
                             $and: [
@@ -2938,19 +2966,21 @@ export const postChatList = async (req, res) => {
             });
         };
 
-        const countPipeline = [...pipeline];
-
-        countPipeline.push({
-            $count: "total",
-        });
+        const countPipeline = [
+            ...pipeline,
+            {
+                $count: "total",
+            },
+        ];
 
         const countResult = await Chat.aggregate(countPipeline);
-        const count = countResult.length > 0 ? countResult[0].total : 0;
+        const count = countResult[0]?.total || 0;
 
         pipeline.push(
             {
                 $sort: {
                     lastMessageAt: -1,
+                    updatedAt: -1,
                     createdAt: -1,
                 },
             },
@@ -2960,73 +2990,60 @@ export const postChatList = async (req, res) => {
 
         const chats = await Chat.aggregate(pipeline);
 
-        let chatList = [];
-
-        if (chats.length > 0) {
-            chatList = await Promise.all(chats.map(async (chat) => {
+        const chatList = await Promise.all(
+            chats.map(async (chat) => {
                 const findReadMessages = chat?.readMessages?.find((read) => read.byId === mechanicId.toString());
 
-                let unreadMsgCount = 0;
-
-                if (findReadMessages) {
-                    unreadMsgCount = await ChatMessage.countDocuments({
-                        chatId: chat._id,
-                        createdAt: { $gt: findReadMessages.lastReadAt }
-                    });
-                } else {
-                    unreadMsgCount = await ChatMessage.countDocuments({
-                        chatId: chat._id
-                    });
+                const unreadQuery = {
+                    chatId: chat._id,
                 };
 
-                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+                if (findReadMessages?.lastReadAt) {
+                    unreadQuery.createdAt = {
+                        $gt: findReadMessages.lastReadAt,
+                    };
+                };
 
-                let lastMessageObj = null;
+                const unreadMsgCount = await ChatMessage.countDocuments(unreadQuery);
+
+                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 }).lean();
+
+                let lastMessageObj = lastMessageDoc || null;
+
+                const chatOwner = chat.ownerDetails ? {
+                    _id: chat.ownerDetails._id,
+                    fullName: chat.ownerDetails.fullName,
+                    profileImage: chat.ownerDetails.profileImage,
+                    isOnline: chat.ownerDetails.isOnline,
+                } : {
+                    _id: chat.guestId,
+                    fullName: "Guest User",
+                    profileImage: "",
+                    isOnline: Constants.ONLINE_STATUS.FALSE,
+                };
 
                 if (lastMessageDoc) {
-                    lastMessageObj = lastMessageDoc.toObject();
-
                     lastMessageObj.isMessageSeen = null;
 
                     if (lastMessageObj.byId === mechanicId.toString()) {
-                        const receiverId = chat.ownerDetails ? chat.ownerDetails._id.toString() : chat.guestId;
-                        const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
-                        if (findReceiverReadMessages) {
-                            lastMessageObj.isMessageSeen = findReceiverReadMessages.lastReadAt >= lastMessageObj.createdAt;
-                        } else {
-                            lastMessageObj.isMessageSeen = false;
-                        };
-                    };
-                };
+                        const receiverId = chatOwner._id.toString();
 
-                let chatOwner = null;
+                        const receiverRead = chat?.readMessages?.find(read => read.byId === receiverId);
 
-                if (chat.ownerDetails) {
-                    chatOwner = {
-                        _id: chat.ownerDetails._id,
-                        fullName: chat.ownerDetails.fullName,
-                        profileImage: chat.ownerDetails.profileImage,
-                        isOnline: chat.ownerDetails.isOnline,
-                    };
-                } else {
-                    chatOwner = {
-                        _id: chat.guestId,
-                        fullName: "Guest User",
-                        profileImage: "",
-                        isOnline: Constants.ONLINE_STATUS.FALSE,
+                        lastMessageObj.isMessageSeen = receiverRead ? receiverRead.lastReadAt >= lastMessageObj.createdAt : false;
                     };
                 };
 
                 const blockDoc = await Block.findOne({
                     mechanicId: new ObjectId(mechanicId),
                     $or: [
-                        { ownerId: chat.ownerDetails ? chat.ownerDetails._id : (chat.ownerId ? new ObjectId(chat.ownerId) : null) },
-                        { guestId: chat.guestId || null }
-                    ]
-                });
+                        chat.ownerId ? { ownerId: new ObjectId(chat.ownerId) } : null,
+                        chat.guestId ? { guestId: chat.guestId } : null,
+                    ].filter(Boolean),
+                }).lean();
 
-                const isBlockedByOwner = chat.isBlockedByOwner || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.OWNER);
-                const isBlockedByMechanic = chat.isBlockedByMechanic || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.MECHANIC);
+                const isBlockedByOwner = chat.isBlockedByOwner || blockDoc?.blockedByRole === Constants.USER_ROLE.OWNER;
+                const isBlockedByMechanic = chat.isBlockedByMechanic || blockDoc?.blockedByRole === Constants.USER_ROLE.MECHANIC;
                 const isBlocked = Boolean(isBlockedByOwner || isBlockedByMechanic);
 
                 let isBlockedByMe = false;
@@ -3045,9 +3062,9 @@ export const postChatList = async (req, res) => {
 
                 return {
                     _id: chat._id,
-                    ownerId: chat.ownerDetails?._id || null,
+                    ownerId: chat.ownerId,
                     guestId: chat.guestId,
-                    ownerIds: chat.ownerDetails ? [chat.ownerDetails._id] : [],
+                    ownerIds: chat.ownerId ? [chat.ownerId] : [],
                     mechanicIds: [chat.mechanicId],
                     chatOwner,
                     bookingsDetails: chat.bookingDetails ? {
@@ -3056,21 +3073,21 @@ export const postChatList = async (req, res) => {
                     } : null,
                     unreadMsgCount,
                     lastMessage: lastMessageObj,
-                    isBlocked,
-                    isBlockedByMe,
-                    isBlockedByOther,
-                    blockedByRole,
+                    isBlocked: Boolean(isBlockedByOwner || isBlockedByMechanic),
+                    isBlockedByMe: Boolean(isBlockedByMechanic),
+                    isBlockedByOther: Boolean(isBlockedByOwner),
+                    blockedByRole: isBlockedByOwner ? Constants.USER_ROLE.OWNER : isBlockedByMechanic ? Constants.USER_ROLE.MECHANIC : null,
                     createdAt: chat.createdAt,
                     updatedAt: chat.updatedAt,
                 };
-            }));
-        };
+            }),
+        );
 
         const response = {
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
-            totalRecords: count,
-            chatMessagesList: chatList,
+            page,
+            limit,
+            totalRecords: count || 0,
+            chatMessagesList: chatList || [],
         };
 
         return res.status(200).json(successResponse("Chat list get successfully.", response));

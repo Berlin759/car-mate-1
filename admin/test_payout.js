@@ -13,11 +13,11 @@ import { log1 } from "./lib/general.js";
 
 const runTest = async () => {
     try {
-        log1("Connecting to database...");
+        log1(["Connecting to database..."]);
         await connectDB();
 
         // 1. Clean up old test data if any
-        log1("Cleaning up old test data...");
+        log1(["Cleaning up old test data..."]);
         const testMechanicEmail = "test_mechanic_payout@carmate.com";
         const existingMechanic = await Mechanic.findOne({ email: testMechanicEmail });
         if (existingMechanic) {
@@ -27,7 +27,7 @@ const runTest = async () => {
         }
 
         // 2. Create a test Mechanic
-        log1("Creating test mechanic...");
+        log1(["Creating test mechanic..."]);
         const mechanic = await Mechanic.create({
             fullName: "Test Mechanic Payout",
             email: testMechanicEmail,
@@ -57,7 +57,7 @@ const runTest = async () => {
         // 4. Create a mock pending Earning in the previous week range
         const prevWeekMonday = moment().subtract(1, "weeks").startOf("isoWeek").add(2, "days").toDate(); // mid-week
         log1(`Creating mock earning record dated: ${prevWeekMonday.toISOString()}`);
-        
+
         const earning = await Earning.create({
             mechanicId: mechanic._id,
             transactionId: mockTransaction._id,
@@ -72,11 +72,11 @@ const runTest = async () => {
         log1(`Created test earning with ID: ${earning._id}`);
 
         // 5. Trigger the weekly payout processor
-        log1("Executing weekly payout processor...");
+        log1(["Executing weekly payout processor..."]);
         await processWeeklyPayouts();
 
         // 6. Verify database updates
-        log1("Verifying database changes...");
+        log1(["Verifying database changes..."]);
         const updatedEarning = await Earning.findById(earning._id);
         log1(`Earning status after cron: ${updatedEarning.status} (2=SUCCESS, 3=FAILED)`);
         log1(`Earning processedAt: ${updatedEarning.processedAt}`);
@@ -95,7 +95,7 @@ const runTest = async () => {
         await Booking.deleteOne({ _id: mockBooking._id });
         await Transaction.deleteOne({ _id: mockTransaction._id });
 
-        log1("Verification test completed successfully. Exiting...");
+        log1(["Verification test completed successfully. Exiting..."]);
         process.exit(0);
     } catch (error) {
         log1(["Test failed with error:", error]);

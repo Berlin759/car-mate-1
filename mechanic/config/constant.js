@@ -146,6 +146,20 @@ const Constants = {
         FAILED: 10,
         CANCELLED: 11,
     },
+    BOOKING_SLOT_TIMES: {
+        Morning: {
+            start: "06:00 AM",
+            end: "12:00 PM",
+        },
+        Afternoon: {
+            start: "12:00 PM",
+            end: "05:00 PM",
+        },
+        Evening: {
+            start: "05:00 PM",
+            end: "09:00 PM",
+        },
+    },
     CHECK_IN_OUT_STATUS: {
         BOOKED: 1,
         CHECKIN: 2,

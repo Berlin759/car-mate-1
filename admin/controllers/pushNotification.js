@@ -82,8 +82,6 @@ export const sendPushNotification = async (registrationToken, payload) => {
             token: registrationToken,
         };
 
-        log1(["sendPushNotification Message --------->", message]);
-
         if (registrationToken) {
             const response = await admin.messaging().send(message);
             log1(["Push notification sent successfully:", response]);

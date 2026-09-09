@@ -4279,73 +4279,100 @@ export const postBookingDetails = async (req, res) => {
 
             const trackService = [];
 
-            // 1. Payment Stage
-            const isPaymentDone = transactionStatus === (Constants.TRANSACTION_STATUS.SUCCESS || Constants.TRANSACTION_STATUS.REFUND);
+            const isPaymentSuccess = transactionStatus === Constants.TRANSACTION_STATUS.SUCCESS;
+            const isPaymentRefunded = transactionStatus === Constants.TRANSACTION_STATUS.REFUND;
+            const isRejected = bookingStatus === Constants.BOOKING_STATUS.REJECTED;
+            const isCancelled = bookingStatus === Constants.BOOKING_STATUS.CANCELLED;
+            const isTerminated = isRejected || isCancelled;
+            const isBooked = true;
+            const isApproved = bookingStatus >= Constants.BOOKING_STATUS.ACCEPTED && !isRejected && !isCancelled;
+            const isInProgress = bookingStatus >= Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE && bookingStatus <= Constants.BOOKING_STATUS.SERVICE_STARTED;
+            const isServiceCompleted = bookingStatus >= Constants.BOOKING_STATUS.SERVICE_COMPLETED;
+
+            // 1. Service Payment
             trackService.push({
-                title: "Payment",
+                title: "Service Payment",
                 subTitle: `${ownerName} (${categoryName})`,
-                isCompleted: isPaymentDone,
-                isActive: bookingStatus === Constants.BOOKING_STATUS.PENDING,
-                iconType: isPaymentDone ? "success" : (bookingStatus === Constants.BOOKING_STATUS.PENDING ? "current" : "pending")
+                isCompleted: isPaymentSuccess || isPaymentRefunded,
+                isActive: false,
+                iconType: isPaymentSuccess || isPaymentRefunded ? "success" : "pending",
             });
 
-            // 2. Service Booked Stage
+            // 2. Service Booked
             trackService.push({
                 title: "Service Booked",
                 subTitle: bookingDate,
-                isCompleted: true,
+                isCompleted: isBooked,
                 isActive: false,
-                iconType: "success"
+                iconType: "success",
             });
 
-            // 3. Service Approved Stage
-            const isApproved = bookingStatus >= Constants.BOOKING_STATUS.ACCEPTED && bookingStatus !== Constants.BOOKING_STATUS.REJECTED && bookingStatus !== Constants.BOOKING_STATUS.CANCELLED;
-            trackService.push({
-                title: "Service Approved",
-                subTitle: `${ownerName} (${categoryName})`,
-                isCompleted: isApproved,
-                isActive: isPaymentDone && bookingStatus === Constants.BOOKING_STATUS.ACCEPTED,
-                iconType: isApproved ? "success" : (isPaymentDone && bookingStatus === Constants.BOOKING_STATUS.ACCEPTED ? "current" : "pending")
-            });
+            // 3. Service Approved
+            if (!isTerminated) {
+                trackService.push({
+                    title: "Service Approved",
+                    subTitle: `${ownerName} (${categoryName})`,
+                    isCompleted: isApproved,
+                    isActive: bookingStatus === Constants.BOOKING_STATUS.ACCEPTED,
+                    iconType: isApproved ? "success" : (bookingStatus === Constants.BOOKING_STATUS.ACCEPTED ? "current" : "pending"),
+                });
+            };
 
-            if (bookingStatus === Constants.BOOKING_STATUS.CANCELLED) {
+            // 4. Service Rejected
+            if (isRejected) {
                 trackService.push({
-                    title: "Cancelled",
-                    subTitle: "You cancelled this booking",
+                    title: "Service Rejected",
+                    subTitle: "The mechanic rejected this booking.",
                     isCompleted: true,
                     isActive: true,
-                    iconType: "cancelled"
+                    iconType: "cancelled",
                 });
-            } else if (bookingStatus === Constants.BOOKING_STATUS.REJECTED) {
+            };
+
+            // 5. Service Cancelled
+            if (isCancelled) {
                 trackService.push({
-                    title: "Rejected",
-                    subTitle: "Booking was rejected",
+                    title: "Service Cancelled",
+                    subTitle: response.cancelReason || "This booking was cancelled.",
                     isCompleted: true,
                     isActive: true,
-                    iconType: "cancelled"
+                    iconType: "cancelled",
                 });
-            } else {
-                // 4. Service In Progress Stage
-                const isInProgress = bookingStatus >= Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE && bookingStatus <= Constants.BOOKING_STATUS.SERVICE_STARTED;
-                const isProgressCompleted = bookingStatus >= Constants.BOOKING_STATUS.SERVICE_COMPLETED;
+            };
+
+            // 6. Payment Refunded
+            if (isTerminated && isPaymentRefunded) {
+                trackService.push({
+                    title: "Payment Refunded",
+                    subTitle: "Payment has been refunded successfully.",
+                    isCompleted: true,
+                    isActive: false,
+                    iconType: "success",
+                });
+            };
+
+            // 7. Service In Progress
+            if (!isTerminated) {
+                const isProgressCompleted = isServiceCompleted;
                 trackService.push({
                     title: "Service In Progress",
-                    subTitle: isInProgress ? "Service is in progress" : "Service will begin shortly",
+                    subTitle: isInProgress ? "Service is in progress." : "Service will begin shortly.",
                     isCompleted: isProgressCompleted,
                     isActive: isInProgress,
-                    iconType: isProgressCompleted ? "success" : (isInProgress ? "current" : "pending")
+                    iconType: isProgressCompleted ? "success" : (isInProgress ? "current" : "pending"),
                 });
+            };
 
-                // 5. Service Completed Stage
-                const isCompleted = bookingStatus >= Constants.BOOKING_STATUS.SERVICE_COMPLETED;
+            // 8. Service Completed
+            if (!isTerminated) {
                 trackService.push({
                     title: "Service Completed",
-                    subTitle: "Service completion and clean up",
-                    isCompleted: isCompleted,
+                    subTitle: "Service completion and clean up.",
+                    isCompleted: isServiceCompleted,
                     isActive: bookingStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED,
-                    iconType: isCompleted ? "success" : (bookingStatus === Constants.BOOKING_STATUS.SERVICE_COMPLETED ? "current" : "pending")
+                    iconType: isServiceCompleted ? "success" : "pending",
                 });
-            }
+            };
 
             response.trackService = trackService;
         }
@@ -5080,8 +5107,10 @@ export const postVerifyRazorPaySignature = async (req, res) => {
             const createTransaction = await Transaction.create(transactionPayload);
 
             if (ownerData) {
-                if (ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE
-                    // && ownerData.deviceToken && ownerData.deviceToken !== ""
+                if (
+                    ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                    ownerData.deviceToken &&
+                    ownerData.deviceToken !== ""
                 ) {
                     log1(["postVerifyRazorPaySignature notificaiton send process ----->"]);
                     let notificationObject = {
@@ -5095,8 +5124,10 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                     await sendPushNotification(ownerData.deviceToken, notificationObject);
                 };
 
-                if (ownerData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE
-                    // && ownerData.deviceToken && ownerData.deviceToken !== ""
+                if (
+                    ownerData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                    ownerData.deviceToken &&
+                    ownerData.deviceToken !== ""
                 ) {
                     log1(["postVerifyRazorPaySignature booking notificaiton send process ----->"]);
                     let notificationObject = {
@@ -5294,6 +5325,7 @@ export const postBookingPaymentFail = async (req, res) => {
     try {
         const ownerId = req.ownerId;
         const { bookingId } = req.params;
+        const { isQuotationFailed = false } = req.body;
 
         if (!bookingId || !ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid Booking ID."));
@@ -5310,13 +5342,15 @@ export const postBookingPaymentFail = async (req, res) => {
             return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
         };
 
-        await Booking.updateOne(
-            { _id: booking._id },
-            {
-                status: Constants.BOOKING_STATUS.CANCELLED,
-                bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.FAILED,
-            }
-        );
+        if (!isQuotationFailed) {
+            await Booking.updateOne(
+                { _id: booking._id },
+                {
+                    status: Constants.BOOKING_STATUS.CANCELLED,
+                    bookingPaymentStatus: Constants.BOOKING_PAYMENT_STATUS.FAILED,
+                },
+            );
+        };
 
         const transaction = await Transaction.findOne({ bookingId: booking._id });
         if (transaction) {
@@ -6197,19 +6231,26 @@ export const postRatingList = async (req, res) => {
 export const postChatList = async (req, res) => {
     try {
         const ownerId = req.ownerId;
-        const { currentPage, itemPerPage, guestId, search } = req.body;
+        const {
+            currentPage = Constants.DEFAULT_PAGE,
+            itemPerPage = Constants.DEFAULT_LIMIT,
+            guestId,
+            search,
+        } = req.body;
 
         log1(["postChatList ownerId----->", ownerId]);
         log1(["postChatList req.body----->", req.body]);
 
-        const limit = parseInt(itemPerPage) || 10;
-        const skip = (currentPage - 1) * limit || 0;
+        const page = Math.max(1, Number(currentPage));
+        const limit = Math.max(1, Number(itemPerPage));
+        const skip = (page - 1) * limit;
 
         let matchQuery = {
             isLatest: { $ne: false },
             isClearedByOwner: { $ne: true },
             status: { $ne: Constants.CHAT_STATUS.CLEARED },
         };
+
         if (ownerId) {
             matchQuery.ownerId = new ObjectId(ownerId);
         } else if (guestId) {
@@ -6221,6 +6262,30 @@ export const postChatList = async (req, res) => {
         const pipeline = [
             {
                 $match: matchQuery,
+            },
+            {
+                $sort: {
+                    lastMessageAt: -1,
+                    updatedAt: -1,
+                    createdAt: -1,
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        ownerId: "$ownerId",
+                        guestId: "$guestId",
+                        mechanicId: "$mechanicId",
+                    },
+                    chat: {
+                        $first: "$$ROOT",
+                    },
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: "$chat",
+                },
             },
             {
                 $lookup: {
@@ -6253,32 +6318,30 @@ export const postChatList = async (req, res) => {
         ];
 
         if (search && search.trim()) {
-            const searchText = search.trim();
-
-            const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-            const searchRegex = new RegExp(escapedSearch, "i");
+            const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
             pipeline.push({
                 $match: {
-                    "mechanicDetails.fullName": searchRegex,
+                    "mechanicDetails.fullName": { $regex: escapedSearch, $options: "i" },
                 },
             });
         };
 
-        const countPipeline = [...pipeline];
-
-        countPipeline.push({
-            $count: "total",
-        });
+        const countPipeline = [
+            ...pipeline,
+            {
+                $count: "total",
+            },
+        ];
 
         const countResult = await Chat.aggregate(countPipeline);
-        const count = countResult.length > 0 ? countResult[0].total : 0;
+        const count = countResult[0]?.total || 0;
 
         pipeline.push(
             {
                 $sort: {
                     lastMessageAt: -1,
+                    updatedAt: -1,
                     createdAt: -1,
                 },
             },
@@ -6288,72 +6351,50 @@ export const postChatList = async (req, res) => {
 
         const chats = await Chat.aggregate(pipeline);
 
-        let chatList = [];
+        const myId = ownerId ? ownerId.toString() : guestId;
 
-        if (chats.length > 0) {
-            chatList = await Promise.all(chats.map(async (chat) => {
-                const myId = ownerId ? ownerId.toString() : guestId;
+        const chatList = await Promise.all(
+            chats.map(async (chat) => {
                 const findReadMessages = chat?.readMessages?.find((read) => read.byId === myId);
 
-                let unreadMsgCount = 0;
-
-                if (findReadMessages) {
-                    unreadMsgCount = await ChatMessage.countDocuments({
-                        chatId: chat._id,
-                        createdAt: { $gt: findReadMessages.lastReadAt }
-                    });
-                } else {
-                    unreadMsgCount = await ChatMessage.countDocuments({
-                        chatId: chat._id
-                    });
+                const unreadQuery = {
+                    chatId: chat._id,
                 };
 
-                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
-
-                let lastMessageObj = null;
-
-                if (lastMessageDoc) {
-                    lastMessageObj = lastMessageDoc.toObject();
-
-                    lastMessageObj.isMessageSeen = null;
-
-                    if (lastMessageObj.byId === myId) {
-                        const receiverId = chat.mechanicId?._id?.toString();
-                        const findReceiverReadMessages = chat?.readMessages?.find((read) => read.byId === receiverId);
-                        if (findReceiverReadMessages) {
-                            lastMessageObj.isMessageSeen = findReceiverReadMessages.lastReadAt >= lastMessageObj.createdAt;
-                        } else {
-                            lastMessageObj.isMessageSeen = false;
-                        };
+                if (findReadMessages?.lastReadAt) {
+                    unreadQuery.createdAt = {
+                        $gt: findReadMessages.lastReadAt,
                     };
                 };
 
-                const targetMechanicId = chat.mechanicDetails ? chat.mechanicDetails._id : chat.mechanicId;
-                const blockDoc = await Block.findOne({
-                    $or: [
-                        { ownerId: ownerId ? new ObjectId(ownerId) : null },
-                        { guestId: guestId || null }
-                    ],
-                    mechanicId: new ObjectId(targetMechanicId)
-                });
+                const unreadMsgCount = await ChatMessage.countDocuments(unreadQuery);
 
-                const isBlockedByOwner = chat.isBlockedByOwner || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.OWNER);
-                const isBlockedByMechanic = chat.isBlockedByMechanic || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.MECHANIC);
-                const isBlocked = Boolean(isBlockedByOwner || isBlockedByMechanic);
+                const lastMessageDoc = await ChatMessage.findOne({ chatId: chat._id }).sort({ createdAt: -1 }).lean();
 
-                let isBlockedByMe = false;
-                let isBlockedByOther = false;
-                let blockedByRole = null;
+                let lastMessageObj = lastMessageDoc || null;
 
-                if (isBlockedByOwner) {
-                    blockedByRole = Constants.USER_ROLE.OWNER;
-                    isBlockedByMe = true;
-                    isBlockedByOther = false;
-                } else if (isBlockedByMechanic) {
-                    blockedByRole = Constants.USER_ROLE.MECHANIC;
-                    isBlockedByMe = false;
-                    isBlockedByOther = true;
+                if (lastMessageDoc) {
+                    lastMessageObj.isMessageSeen = null;
+
+                    if (lastMessageObj.byId === myId) {
+                        const receiverId = chat.mechanicId?.toString();
+
+                        const receiverRead = chat?.readMessages?.find(read => read.byId === receiverId);
+
+                        lastMessageObj.isMessageSeen = receiverRead ? receiverRead.lastReadAt >= lastMessageObj.createdAt : false;
+                    };
                 };
+
+                const blockDoc = await Block.findOne({
+                    mechanicId: new ObjectId(chat.mechanicId),
+                    $or: [
+                        ownerId ? { ownerId: new ObjectId(ownerId) } : null,
+                        guestId ? { guestId } : null,
+                    ].filter(Boolean),
+                }).lean();
+
+                const isBlockedByOwner = chat.isBlockedByOwner || blockDoc?.blockedByRole === Constants.USER_ROLE.OWNER;
+                const isBlockedByMechanic = chat.isBlockedByMechanic || blockDoc?.blockedByRole === Constants.USER_ROLE.MECHANIC;
 
                 return {
                     _id: chat._id,
@@ -6365,29 +6406,29 @@ export const postChatList = async (req, res) => {
                         _id: chat.mechanicDetails._id,
                         fullName: chat.mechanicDetails.fullName,
                         profileImage: chat.mechanicDetails.profileImage,
-                        isOnline: chat.mechanicDetails.isOnline
+                        isOnline: chat.mechanicDetails.isOnline,
                     } : null,
                     bookingsDetails: chat.bookingDetails ? {
                         _id: chat.bookingDetails._id,
-                        status: chat.bookingDetails.status
+                        status: chat.bookingDetails.status,
                     } : null,
                     unreadMsgCount,
                     lastMessage: lastMessageObj,
-                    isBlocked,
-                    isBlockedByMe,
-                    isBlockedByOther,
-                    blockedByRole,
+                    isBlocked: Boolean(isBlockedByOwner || isBlockedByMechanic),
+                    isBlockedByMe: Boolean(isBlockedByOwner),
+                    isBlockedByOther: Boolean(isBlockedByMechanic),
+                    blockedByRole: isBlockedByOwner ? Constants.USER_ROLE.OWNER : isBlockedByMechanic ? Constants.USER_ROLE.MECHANIC : null,
                     createdAt: chat.createdAt,
                     updatedAt: chat.updatedAt,
                 };
-            }));
-        };
+            }),
+        );
 
         const response = {
-            page: Number(currentPage),
-            limit: Number(itemPerPage),
-            totalRecords: count,
-            chatMessagesList: chatList,
+            page,
+            limit,
+            totalRecords: count || 0,
+            chatMessagesList: chatList || [],
         };
 
         return res.status(200).json(successResponse("Chat list get successfully.", response));

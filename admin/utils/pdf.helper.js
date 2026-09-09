@@ -152,7 +152,7 @@ export function generateTransactionPDF(transaction, res) {
     doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
     y += 20;
     doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
-    doc.text(`Admin Charge (${adminPercentageCharge}): ₹${adminCharge}`, ML + 180, y + 28);
+    doc.text(`Admin Charge (${adminPercentageCharge}%): ₹${adminCharge}`, ML + 180, y + 28);
     doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
 
     // Footer line

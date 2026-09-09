@@ -12,7 +12,7 @@ export const handleRazorpayPayoutWebhook = async (req, res) => {
         const signature = req.headers["x-razorpay-signature"];
 
         if (!webhookSecret) {
-            log1("Razorpay webhook secret is not configured.");
+            log1(["Razorpay webhook secret is not configured."]);
             return res.status(500).json({ status: "error", message: "Webhook secret not configured." });
         };
 
