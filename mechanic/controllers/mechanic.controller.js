@@ -3671,6 +3671,12 @@ export const postSubmitKYC = async (req, res) => {
                 updateObj,
                 { new: true },
             );
+
+            await Mechanic.findOneAndUpdate(
+                { _id: new ObjectId(mechanicId) },
+                { kycStatus: Constants.KYC_STATUS.PENDING },
+                { new: true },
+            );
         } else {
             updateObj.mechanicId = new ObjectId(mechanicId);
             kycData = await KYC.create(updateObj);
