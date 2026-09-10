@@ -2071,35 +2071,37 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("This booking is already cancelled."));
                 };
 
-                let refundAmount = parseFloat(bookingDetails.totalAmount);
+                if (transactionDetails.trxId) {
+                    let refundAmount = parseFloat(bookingDetails.totalAmount);
 
-                let refundPayload = {
-                    razorpayPaymentId: transactionDetails.trxId,
-                    amount: refundAmount,
-                    ownerId: bookingDetails?.ownerId,
+                    let refundPayload = {
+                        razorpayPaymentId: transactionDetails.trxId,
+                        amount: refundAmount,
+                        ownerId: bookingDetails?.ownerId,
+                    };
+
+                    let paymentRefund = await razorpayRefund(refundPayload);
+                    log1(["postBookingUpdateStatus paymentRefund by cancel booking----->", paymentRefund]);
+                    if (paymentRefund.flag === 0) {
+                        return res.status(400).json(paymentRefund);
+                    };
+
+                    const refundPayment = paymentRefund.data;
+
+                    let transactionPayload = {
+                        trxId: refundPayment.refundId,
+                        ownerId: new ObjectId(bookingDetails?.ownerId),
+                        mechanicId: new ObjectId(bookingDetails?.mechanicId),
+                        serviceId: new ObjectId(bookingDetails.serviceId),
+                        carId: new ObjectId(bookingDetails.carId),
+                        bookingId: bookingDetails._id,
+                        totalAmount: refundAmount,
+                        description: "Refund for mechanic has cancelled your booking.",
+                        status: Constants.TRANSACTION_STATUS.REFUND,
+                    };
+
+                    await Transaction.create(transactionPayload);
                 };
-
-                let paymentRefund = await razorpayRefund(refundPayload);
-                log1(["postBookingUpdateStatus paymentRefund by cancel booking----->", paymentRefund]);
-                if (paymentRefund.flag === 0) {
-                    return res.status(400).json(paymentRefund);
-                };
-
-                const refundPayment = paymentRefund.data;
-
-                let transactionPayload = {
-                    trxId: refundPayment.refundId,
-                    ownerId: new ObjectId(bookingDetails?.ownerId),
-                    mechanicId: new ObjectId(bookingDetails?.mechanicId),
-                    serviceId: new ObjectId(bookingDetails.serviceId),
-                    carId: new ObjectId(bookingDetails.carId),
-                    bookingId: bookingDetails._id,
-                    totalAmount: refundAmount,
-                    description: "Refund for mechanic has cancelled your booking.",
-                    status: Constants.TRANSACTION_STATUS.REFUND,
-                };
-
-                await Transaction.create(transactionPayload);
 
                 updatePayload.cancelById = new ObjectId(mechanicId);
                 updatePayload.cancelReason = reason || "";
