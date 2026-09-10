@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { log1, errorResponse, successResponse } from "../lib/general.js";
+import Constants from "../config/constant.js";
 
 const __dirname = path.resolve();
 
@@ -147,6 +148,12 @@ export const generateInvoicePDF = async (booking) => {
                 y += 18;
             };
 
+            let feeTypeVal = "%";
+            if (booking?.platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                feeTypeVal = "&#8377;";
+            };
+
+            drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking.platformFee || 0).toFixed(2));
             drawSummaryRow("Subtotal:", parseFloat(booking.subTotal || 0).toFixed(2));
             drawSummaryRow("GST (18%):", parseFloat(booking.taxAmount || 0).toFixed(2));
 

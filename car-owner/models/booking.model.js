@@ -29,11 +29,6 @@ const bookingSchema = new Schema(
             ref: "Addresse",
             required: false,
         },
-        cancelById: {
-            type: Schema.Types.ObjectId,
-            ref: "Owner",
-            required: false,
-        },
         couponId: {
             type: Schema.Types.ObjectId,
             ref: "Coupon",
@@ -93,6 +88,15 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
+        platformFee: {
+            type: Number,
+            default: 0,
+        },
+        platformFeeType: {
+            type: String,
+            enum: Object.values(Constants.PLATFORM_FEE_TYPE),
+            default: null,
+        },
         totalServiceFee: {
             type: Number,
             default: 0,
@@ -102,10 +106,6 @@ const bookingSchema = new Schema(
             default: 0,
         },
         subTotal: {
-            type: Number,
-            default: 0,
-        },
-        cancelFee: {
             type: Number,
             default: 0,
         },
@@ -146,6 +146,15 @@ const bookingSchema = new Schema(
         cancellationFee: {
             type: Number,
             default: 0,
+        },
+        canceledBy: {
+            type: Schema.Types.ObjectId,
+            required: false,
+        },
+        canceledByRole: {
+            type: String,
+            enum: Object.values(Constants.USER_ROLE),
+            required: false,
         },
         razorpayOrderId: {
             type: String,

@@ -209,6 +209,10 @@ const Constants = {
         FAILED: 3,
         PROCESSING: 4,
     },
+    PLATFORM_FEE_TYPE: {
+        PERCENTAGE: 1,
+        FIXED: 2,
+    },
     USER_ROLE: {
         OWNER: "owner",
         MECHANIC: "mechanic",

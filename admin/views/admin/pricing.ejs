@@ -2,30 +2,6 @@
     <div class="p-3">
         <form id="pricing-form">
             <div class="row g-4">
-                <!-- Base Pricing -->
-                <div class="col-lg-6">
-                    <div class="card bs-border">
-                        <div class="card-header bg-white fw-semibold fs-15">
-                            <i class="fa-solid fa-indian-rupee-sign me-2"></i> Base Pricing
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Base Price (₹)</label>
-                                <input type="text" inputmode="decimal" class="form-control amount-input" id="basePrice" name="basePrice" step="0.01" min="0" value="<%= body?.pricing?.basePrice || 0 %>">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Per Km Charge (₹)</label>
-                                <input type="text" inputmode="decimal" class="form-control amount-input" id="perKmCharge" name="perKmCharge" step="0.01" min="0" value="<%= body?.pricing?.perKmCharge || 0 %>">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Cancellation Fee (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" max="100" value="<%= body?.pricing?.cancellationFee || 0 %>">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Commission & Tax -->
                 <div class="col-lg-6">
                     <div class="card bs-border">
                         <div class="card-header bg-white fw-semibold fs-15">
@@ -33,12 +9,52 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
-                                <label class="form-label text-dark">Platform Commission (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="platformCommission" name="platformCommission" step="0.01" min="0" max="100" value="<%= body?.pricing?.platformCommission || 0 %>">
+                                <label class="form-label text-dark">Platform Fee Type</label>
+                                <select class="form-select" id="platformFeeType" name="platformFeeType" required>
+                                    <option value="1" <%= body?.pricing?.platformFeeType === 1 ? "selected" : "" %>>Percentage (%)</option>
+                                    <option value="2" <%= body?.pricing?.platformFeeType === 2 ? "selected" : "" %>>Fixed Amount(&#8377;)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark" id="platformFeeLabel">Platform Fee (%)</label>
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    class="form-control percentage-input"
+                                    id="platformFee"
+                                    name="platformFee"
+                                    min="0"
+                                    value="<%= body?.pricing?.platformFee || 5 %>"
+                                    autocomplete="off"
+                                >
                             </div>
                             <div class="mb-3">
                                 <label class="form-label text-dark">GST (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="gstPercentage" name="gstPercentage" step="0.01" min="0" max="100" value="<%= body?.pricing?.gstPercentage || 18 %>">
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    class="form-control percentage-input"
+                                    id="gstPercentage"
+                                    name="gstPercentage"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value="<%= body?.pricing?.gstPercentage || 18 %>"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card bs-border">
+                        <div class="card-header bg-white fw-semibold fs-15">
+                            <i class="fa-solid fa-indian-rupee-sign me-2"></i> Base Pricing
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Cancellation Fee (%)</label>
+                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" max="100" value="<%= body?.pricing?.cancellationFee || 0 %>">
                             </div>
                         </div>
                     </div>

@@ -56,8 +56,10 @@ const validate_rules = {
             serviceId: "required",
         },
         update_pricing: {
-            basePrice: "required",
-            platformCommission: "required",
+            platformFee: "required",
+            platformFeeType: "required",
+            gstPercentage: "required",
+            cancellationFee: "required",
         },
     },
 };

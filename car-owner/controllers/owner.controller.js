@@ -731,31 +731,42 @@ export const postHomeDetails = async (req, res) => {
                                 },
                             },
                             {
-                                $unwind: {
-                                    path: "$subCategory",
-                                    preserveNullAndEmptyArrays: false,
-                                },
+                                $unwind: "$subCategory",
                             },
                             {
-                                $unwind: {
-                                    path: "$subCategory.mechanicIds",
-                                    preserveNullAndEmptyArrays: false,
-                                },
+                                $unwind: "$subCategory.mechanicIds",
                             },
                             {
                                 $match: {
                                     $expr: {
-                                        $eq: ["$subCategory.mechanicIds.mechanicId", "$$mechanicId",],
+                                        $eq: ["$subCategory.mechanicIds.mechanicId", "$$mechanicId"],
+                                    },
+                                },
+                            },
+                            {
+                                $group: {
+                                    _id: "$_id",
+                                    categoryId: { $first: { $toString: "$_id" } },
+                                    categoryName: { $first: { $ifNull: ["$fullName", ""] } },
+                                    categoryImage: { $first: { $ifNull: ["$image", ""] } },
+                                    categoryDescription: { $first: { $ifNull: ["$description", ""] } },
+                                    subCategory: {
+                                        $push: {
+                                            subCategoryName: { $ifNull: ["$subCategory.fullName", ""] },
+                                            price: { $ifNull: ["$subCategory.mechanicIds.price", 0] },
+                                            description: { $ifNull: ["$subCategory.mechanicIds.description", ""] },
+                                        },
                                     },
                                 },
                             },
                             {
                                 $project: {
                                     _id: 0,
-                                    categoryId: { $toString: "$_id", },
-                                    categoryName: { $ifNull: ["$fullName", "",], },
-                                    categoryImage: { $ifNull: ["$image", "",], },
-                                    categoryDescription: { $ifNull: ["$description", "",], },
+                                    categoryId: { $toString: "$categoryId" },
+                                    categoryName: { $ifNull: ["$categoryName", ""] },
+                                    categoryImage: { $ifNull: ["$categoryImage", ""] },
+                                    categoryDescription: { $ifNull: ["$categoryDescription", ""] },
+                                    // subCategory: 1,
                                 },
                             },
                         ],
@@ -2485,16 +2496,10 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                     },
                                 },
                                 {
-                                    $unwind: {
-                                        path: "$subCategory",
-                                        preserveNullAndEmptyArrays: false,
-                                    },
+                                    $unwind: "$subCategory",
                                 },
                                 {
-                                    $unwind: {
-                                        path: "$subCategory.mechanicIds",
-                                        preserveNullAndEmptyArrays: false,
-                                    },
+                                    $unwind: "$subCategory.mechanicIds",
                                 },
                                 {
                                     $match: {
@@ -2504,12 +2509,29 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                     },
                                 },
                                 {
+                                    $group: {
+                                        _id: "$_id",
+                                        categoryId: { $first: { $toString: "$_id" } },
+                                        categoryName: { $first: { $ifNull: ["$fullName", ""] } },
+                                        categoryImage: { $first: { $ifNull: ["$image", ""] } },
+                                        categoryDescription: { $first: { $ifNull: ["$description", ""] } },
+                                        subCategory: {
+                                            $push: {
+                                                subCategoryName: { $ifNull: ["$subCategory.fullName", ""] },
+                                                price: { $ifNull: ["$subCategory.mechanicIds.price", 0] },
+                                                description: { $ifNull: ["$subCategory.mechanicIds.description", ""] },
+                                            },
+                                        },
+                                    },
+                                },
+                                {
                                     $project: {
                                         _id: 0,
-                                        categoryId: { $toString: "$_id", },
-                                        categoryName: "$fullName",
-                                        categoryImage: "$image",
-                                        categoryDescription: "$description",
+                                        categoryId: { $toString: "$categoryId" },
+                                        categoryName: { $ifNull: ["$categoryName", ""] },
+                                        categoryImage: { $ifNull: ["$categoryImage", ""] },
+                                        categoryDescription: { $ifNull: ["$categoryDescription", ""] },
+                                        // subCategory: 1,
                                     },
                                 },
                             ],
@@ -3385,7 +3407,20 @@ export const postAddBooking = async (req, res) => {
         };
         log1(["postAddBooking discountAmount----->", discountAmount]);
 
-        const subTotal = parseFloat(totalFee - discountAmount);
+        const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
+        const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+
+        const remainingAmount = parseFloat(totalFee - discountAmount);
+
+        let platformAmount = 0;
+
+        if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+            platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+        } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+            platformAmount = platformFee;
+        };
+
+        const subTotal = parseFloat(remainingAmount + platformAmount);
 
         const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
 
@@ -3407,6 +3442,8 @@ export const postAddBooking = async (req, res) => {
             consultantFee: consultantFee,
             totalServiceFee: serviceFee,
             discountAmount: discountAmount,
+            platformFee: platformAmount,
+            platformFeeType: platformFeeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
             totalAmount: totalPayAmount,
@@ -3836,6 +3873,8 @@ export const postBookingList = async (req, res) => {
                                 totalServiceFee: 1,
                                 consultantFee: 1,
                                 discountAmount: 1,
+                                platformFee: 1,
+                                platformFeeType: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
                                 totalAmount: 1,
@@ -3853,18 +3892,11 @@ export const postBookingList = async (req, res) => {
                                 mechanicDetails: 1,
                                 transactionDetails: 1,
                                 chatId: {
-                                    $let: {
-                                        vars: {
-                                            chat: { $arrayElemAt: ["$chatDetails", 0] },
-                                        },
-                                        in: {
-                                            $cond: [
-                                                { $ifNull: ["$$chat._id", false] },
-                                                { $toString: "$$chat._id" },
-                                                null,
-                                            ],
-                                        },
-                                    },
+                                    $cond: [
+                                        { $ifNull: ["$chatDetails._id", false] },
+                                        { $toString: "$chatDetails._id" },
+                                        null,
+                                    ],
                                 },
                                 isRatingAdded: {
                                     $ne: [{ $ifNull: ["$ratingDetails._id", null] }, null],
@@ -4276,6 +4308,8 @@ export const postBookingDetails = async (req, res) => {
                     totalServiceFee: 1,
                     consultantFee: 1,
                     discountAmount: 1,
+                    platformFee: 1,
+                    platformFeeType: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -4293,18 +4327,11 @@ export const postBookingDetails = async (req, res) => {
                     mechanicDetails: 1,
                     transactionDetails: 1,
                     chatId: {
-                        $let: {
-                            vars: {
-                                chat: { $arrayElemAt: ["$chatDetails", 0] },
-                            },
-                            in: {
-                                $cond: [
-                                    { $ifNull: ["$$chat._id", false] },
-                                    { $toString: "$$chat._id" },
-                                    null,
-                                ],
-                            },
-                        },
+                        $cond: [
+                            { $ifNull: ["$chatDetails._id", false] },
+                            { $toString: "$chatDetails._id" },
+                            null,
+                        ],
                     },
                     feedback: {
                         rating: "$ratingDetails.rating",
@@ -4666,7 +4693,20 @@ export const postRescheduleBooking = async (req, res) => {
         };
         log1(["postRescheduleBooking discountAmount----->", discountAmount]);
 
-        const subTotal = parseFloat(totalFee - discountAmount);
+        const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
+        const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+
+        const remainingAmount = parseFloat(totalFee - discountAmount);
+
+        let platformAmount = 0;
+
+        if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+            platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+        } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+            platformAmount = platformFee;
+        };
+
+        const subTotal = parseFloat(remainingAmount + platformAmount);
 
         const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
 
@@ -4688,6 +4728,8 @@ export const postRescheduleBooking = async (req, res) => {
             consultantFee: consultantFee,
             totalServiceFee: serviceFee,
             discountAmount: discountAmount,
+            platformFee: platformAmount,
+            platformFeeType: platformFeeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
             totalAmount: totalPayAmount,
@@ -4782,15 +4824,9 @@ export const postCancelBooking = async (req, res) => {
 
         const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
-        let cancellationFee = 0;
-        let refundAmount = totalBookingAmount;
-
-        if (bookingDetails.status >= Constants.BOOKING_STATUS.ACCEPTED) {
-            const cancellationCharge = pricingDetails?.cancellationFee || 0;
-
-            cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
-            refundAmount = totalBookingAmount - cancellationFee;
-        };
+        const cancellationCharge = pricingDetails?.cancellationFee || 0;
+        const cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
+        const refundAmount = totalBookingAmount - cancellationFee;
 
         const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id });
 
@@ -4826,7 +4862,8 @@ export const postCancelBooking = async (req, res) => {
         };
 
         let updatePayload = {
-            cancelById: new ObjectId(ownerId),
+            canceledBy: new ObjectId(ownerId),
+            canceledByRole: Constants.USER_ROLE.OWNER,
             cancelReason: reason,
             cancelTime: new Date(),
             cancellationFee: cancellationFee,
@@ -5064,6 +5101,8 @@ export const getBookingInvoice = async (req, res) => {
                     consultantFee: 1,
                     quotation: 1,
                     discountAmount: 1,
+                    platformFee: 1,
+                    platformFeeType: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -6012,17 +6051,26 @@ export const postNotificationList = async (req, res) => {
         log1(["postNotificationList ownerId----->", ownerId]);
         log1(["postNotificationList req.body----->", req.body]);
 
-        let filter = {
-            ownerId: new ObjectId(ownerId),
-        };
-
-        if (type && type !== Constants.NOTIFICATION_TYPE.DEFAULT) {
-            filter["type"] = parseInt(type);
-        };
-
         const page = Math.max(1, Number(currentPage));
         const limit = Math.max(1, Number(itemPerPage));
         const skip = (page - 1) * limit;
+
+        const match = {
+            ownerId: new ObjectId(ownerId),
+        };
+
+
+        if (type) {
+            const validType = Object.values(Constants.NOTIFICATION_TYPE);
+
+            if (!validType.includes(parseInt(type))) {
+                return res.status(400).json(errorResponse("Invalid type."));
+            };
+
+            if (type !== Constants.NOTIFICATION_TYPE.DEFAULT) {
+                match.type = parseInt(type);
+            };
+        };
 
         const [notificationList, totalCount, unReadNotificationsCount,] = await Promise.all([
             Notification.aggregate([
@@ -6038,7 +6086,7 @@ export const postNotificationList = async (req, res) => {
             // Unread notifications count
             Notification.countDocuments({
                 ownerId: new ObjectId(ownerId),
-                isRead: false
+                isRead: false,
             }),
         ]);
 

@@ -198,6 +198,10 @@ const Constants = {
         PERCENTAGE: "percentage",
         FIXED: "fixed",
     },
+    PLATFORM_FEE_TYPE: {
+        PERCENTAGE: 1,
+        FIXED: 2,
+    },
     USER_ROLE: {
         OWNER: "owner",
         MECHANIC: "mechanic",

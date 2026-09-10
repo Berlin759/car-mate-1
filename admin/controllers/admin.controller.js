@@ -3478,7 +3478,7 @@ export const getBookingDetailPage = async (req, res) => {
                     taxAmount: 1,
                     subTotal: 1,
                     discountAmount: 1,
-                    cancelFee: 1,
+                    cancellationFee: 1,
                     totalAmount: 1,
                     beforePhotos: 1,
                     afterPhotos: 1,
@@ -5949,42 +5949,82 @@ export const postPricingDetails = async (req, res) => {
 export const postUpdatePricing = async (req, res) => {
     try {
         const {
-            basePrice,
-            perKmCharge,
-            platformCommission,
-            cancellationFee,
+            platformFee,
+            platformFeeType,
             gstPercentage,
+            cancellationFee,
         } = req.body;
 
-        let updatePayload = {};
+        const type = Number(platformFeeType);
 
-        if (basePrice !== undefined) {
-            updatePayload.basePrice = parseFloat(basePrice);
+        if (!Object.values(Constants.PLATFORM_FEE_TYPE).includes(type)) {
+            return res.status(400).json(errorResponse("Invalid platform fee type."));
         };
 
-        if (perKmCharge !== undefined) {
-            updatePayload.perKmCharge = parseFloat(perKmCharge);
-        };
+        if (platformFee !== undefined) {
+            const fee = Number(platformFee);
 
-        if (platformCommission !== undefined) {
-            updatePayload.platformCommission = parseFloat(platformCommission);
-        };
+            if (!Number.isFinite(fee) || fee < 0) {
+                return res.status(400).json(errorResponse("Platform fee must be a valid number."));
+            };
 
-        if (cancellationFee !== undefined) {
-            updatePayload.cancellationFee = parseFloat(cancellationFee);
+            if (type === Constants.PLATFORM_FEE_TYPE.PERCENTAGE && fee > 100) {
+                return res.status(400).json(errorResponse("Platform fee percentage must be between 0 and 100."));
+            };
+
+            if (!/^\d+(\.\d{1,2})?$/.test(String(platformFee))) {
+                return res.status(400).json(errorResponse("Platform fee can have maximum 2 decimal places."));
+            };
         };
 
         if (gstPercentage !== undefined) {
-            updatePayload.gstPercentage = parseFloat(gstPercentage);
+            const gst = Number(gstPercentage);
+
+            if (!Number.isFinite(gst) || gst < 0 || gst > 100) {
+                return res.status(400).json(errorResponse("GST percentage must be between 0 and 100."));
+            };
+
+            if (!/^\d+(\.\d{1,2})?$/.test(String(gstPercentage))) {
+                return res.status(400).json(errorResponse("GST percentage can have maximum 2 decimal places."));
+            };
+        };
+
+        if (cancellationFee !== undefined) {
+            const cancellation = Number(cancellationFee);
+
+            if (!Number.isFinite(cancellation) || cancellation < 0 || cancellation > 100) {
+                return res.status(400).json(errorResponse("Cancellation fee must be between 0 and 100."));
+            };
+
+            if (!/^\d+(\.\d{1,2})?$/.test(String(cancellationFee))) {
+                return res.status(400).json(errorResponse("Cancellation fee can have maximum 2 decimal places."));
+            };
+        };
+
+        const updatePayload = {
+            ...(platformFee !== undefined && {
+                platformFee: Number(platformFee),
+            }),
+
+            platformFeeType: type,
+
+            ...(gstPercentage !== undefined && {
+                gstPercentage: Number(gstPercentage),
+            }),
+
+            ...(cancellationFee !== undefined && {
+                cancellationFee: Number(cancellationFee),
+            }),
         };
 
         if (Object.keys(updatePayload).length === 0) {
             return res.status(400).json(errorResponse("No fields to update."));
         };
 
-        let pricing = await Pricing.findOne();
+        const pricing = await Pricing.findOne();
+
         if (pricing) {
-            await Pricing.findByIdAndUpdate(pricing._id, updatePayload);
+            await Pricing.findByIdAndUpdate(pricing._id, updatePayload, { new: true, runValidators: true, });
         } else {
             await Pricing.create(updatePayload);
         };

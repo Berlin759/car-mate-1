@@ -1461,6 +1461,8 @@ export const postBookingList = async (req, res) => {
                                 totalServiceFee: 1,
                                 consultantFee: 1,
                                 discountAmount: 1,
+                                platformFee: 1,
+                                platformFeeType: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
                                 totalAmount: 1,
@@ -1890,6 +1892,8 @@ export const postBookingDetails = async (req, res) => {
                     totalServiceFee: 1,
                     consultantFee: 1,
                     discountAmount: 1,
+                    platformFee: 1,
+                    platformFeeType: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -2039,7 +2043,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("This booking is already rejected."));
                 };
 
-                let refundAmount = parseFloat(bookingDetails.totalAmount);
+                const refundAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
                 let refundPayload = {
                     razorpayPaymentId: transactionDetails.trxId,
@@ -2090,12 +2094,15 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("This booking is already cancelled."));
                 };
 
-                if (transactionDetails.trxId) {
-                    let refundAmount = parseFloat(bookingDetails.totalAmount);
+                const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
+                const cancellationCharge = pricingDetails?.cancellationFee || 0;
+                const cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
+
+                if (transactionDetails.trxId) {
                     let refundPayload = {
                         razorpayPaymentId: transactionDetails.trxId,
-                        amount: refundAmount,
+                        amount: totalBookingAmount,
                         ownerId: bookingDetails?.ownerId?._id,
                     };
 
@@ -2114,7 +2121,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                         serviceId: new ObjectId(bookingDetails.serviceId),
                         carId: new ObjectId(bookingDetails.carId),
                         bookingId: bookingDetails._id,
-                        totalAmount: refundAmount,
+                        totalAmount: totalBookingAmount,
                         description: "Refund for mechanic has cancelled your booking.",
                         status: Constants.TRANSACTION_STATUS.REFUND,
                     };
@@ -2122,9 +2129,11 @@ export const postBookingUpdateStatus = async (req, res) => {
                     await Transaction.create(transactionPayload);
                 };
 
-                updatePayload.cancelById = new ObjectId(mechanicId);
+                updatePayload.canceledBy = new ObjectId(mechanicId);
+                updatePayload.canceledByRole = Constants.USER_ROLE.MECHANIC;
                 updatePayload.cancelReason = reason || "";
                 updatePayload.cancelTime = new Date();
+                updatePayload.cancellationFee = cancellationFee;
 
                 notificationTitle = "Booking Cancelled";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has cancelled your booking.`;
@@ -2208,7 +2217,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     updatePayload.materialCost = parseFloat(materialCost);
                 };
 
-                const platformFee = pricingDetails?.platformCommission || 0;
+                const platformFee = pricingDetails?.platformFee || 0;
 
                 const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
@@ -2669,33 +2678,42 @@ export const postNotificationList = async (req, res) => {
             mechanicId: new ObjectId(mechanicId),
         };
 
+
         if (type) {
             const validType = Object.values(Constants.NOTIFICATION_TYPE);
+
             if (!validType.includes(parseInt(type))) {
                 return res.status(400).json(errorResponse("Invalid type."));
             };
 
-            match.type = parseInt(type);
+            if (type !== Constants.NOTIFICATION_TYPE.DEFAULT) {
+                match.type = parseInt(type);
+            };
         };
 
-        const result = await Notification.aggregate([
-            { $match: match },
-            { $sort: { createdAt: -1 } },
-            {
-                $facet: {
-                    totalCount: [{ $count: "count" }],
-                    notifications: [{ $skip: skip }, { $limit: limit }]
-                },
-            },
-        ]);
+        const [notificationList, totalCount, unReadNotificationsCount,] = await Promise.all([
+            Notification.aggregate([
+                { $match: match },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip }, { $limit: limit },
+            ]),
 
-        const totalCount = result[0].totalCount[0] ? result[0].totalCount[0].count : 0;
-        const notificationList = result[0].notifications;
+            Notification.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+            }),
+
+            // Unread notifications count
+            Notification.countDocuments({
+                mechanicId: new ObjectId(mechanicId),
+                isRead: false,
+            }),
+        ]);
 
         const response = {
             page: page,
             limit: limit,
             totalRecords: totalCount,
+            unReadNotificationsCount: unReadNotificationsCount,
             items: notificationList,
         };
 
@@ -4083,6 +4101,8 @@ export const postEarningList = async (req, res) => {
                                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
                                     totalServiceFee: { $ifNull: ["$bookingDetails.totalServiceFee", 0] },
                                     discountAmount: { $ifNull: ["$bookingDetails.discountAmount", 0] },
+                                    platformFee: { $ifNull: ["$bookingDetails.platformFee", 0] },
+                                    platformFeeType: { $ifNull: ["$bookingDetails.discountAmount", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
                                     taxAmount: { $ifNull: ["$bookingDetails.taxAmount", 0] },
                                     subTotal: { $ifNull: ["$bookingDetails.subTotal", 0] },
                                     totalAmount: { $ifNull: ["$bookingDetails.totalAmount", 0] },
