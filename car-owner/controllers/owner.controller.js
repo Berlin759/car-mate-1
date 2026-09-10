@@ -534,6 +534,21 @@ export const postHomeDetails = async (req, res) => {
         log1(["postHomeDetails param----->", param]);
         log1(["postHomeDetails ownerId----->", ownerId]);
 
+        let ownerObjectId = null;
+        let guestStringId = null;
+
+        if (ownerId) {
+            if (!ObjectId.isValid(ownerId)) {
+                return res.status(400).json(errorResponse("Invalid ownerId."));
+            };
+
+            ownerObjectId = new ObjectId(ownerId);
+        } else if (param?.guestId) {
+            guestStringId = String(param?.guestId);
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
+        };
+
         const { latitude, longitude, radius, } = param;
 
         const nearbyLatitude =
@@ -575,7 +590,7 @@ export const postHomeDetails = async (req, res) => {
 
         const ownerUpdatePayload = {};
 
-        if (ownerId) {
+        if (ownerObjectId) {
             const simpleFields = [
                 "countryName",
                 "countryCode",
@@ -600,13 +615,16 @@ export const postHomeDetails = async (req, res) => {
 
         const serviceCategoriesPromise = Service.find({ status: Constants.SERVICE_STATUS.ACTIVE, }).select("_id fullName description image").lean();
 
-        const ownerDataPromise = ownerId
+        const ownerDataPromise = ownerObjectId
             ? Promise.all([
                 Object.keys(ownerUpdatePayload).length > 0
-                    ? Owner.findByIdAndUpdate(ownerId, { $set: ownerUpdatePayload, }, { new: false, }).lean()
+                    ? Owner.findByIdAndUpdate(ownerObjectId, { $set: ownerUpdatePayload, }, { new: false, }).lean()
                     : Promise.resolve(null),
 
-                Car.find({ ownerId, status: Constants.CAR_STATUS.VALID, }).select("_id fullName vehicleNumber registerNumber images model").lean(),
+                Car.find({
+                    ownerId: ownerObjectId,
+                    status: Constants.CAR_STATUS.VALID,
+                }).select("_id fullName vehicleNumber registerNumber images model").lean(),
             ])
             : Promise.resolve([null, [],]);
 
@@ -618,7 +636,7 @@ export const postHomeDetails = async (req, res) => {
 
         const [updatedOwner, carList] = ownerResult;
 
-        if (ownerId && Object.keys(ownerUpdatePayload).length > 0 && !updatedOwner) {
+        if (ownerObjectId && Object.keys(ownerUpdatePayload).length > 0 && !updatedOwner) {
             return res.status(400).json(errorResponse(messages.unexpectedDataError));
         };
 
@@ -668,9 +686,15 @@ export const postHomeDetails = async (req, res) => {
                         },
                     },
                 },
-                {
-                    $limit: 5,
-                },
+            ];
+
+            const blockedMechanicIds = await getBlockedMechanicIds(ownerObjectId, guestStringId);
+            if (blockedMechanicIds.length > 0) {
+                mechanicPipeline[0].$geoNear.query._id = { $nin: blockedMechanicIds };
+            };
+
+            mechanicPipeline.push(
+                { $limit: 5 },
                 {
                     $lookup: {
                         from: "ratings",
@@ -789,7 +813,7 @@ export const postHomeDetails = async (req, res) => {
                         services: "$servicesData",
                     },
                 },
-            ];
+            );
 
             popularNearbyMechanics = await Mechanic.aggregate(mechanicPipeline);
         };
@@ -978,7 +1002,7 @@ export const postSearchMechanics = async (req, res) => {
             },
         };
 
-        const blockedMechanicIds = await getBlockedMechanicIds(ownerId, guestId);
+        const blockedMechanicIds = await getBlockedMechanicIds(ownerObjectId, chatGuestId);
         if (blockedMechanicIds.length > 0) {
             geoNearStage.$geoNear.query._id = { $nin: blockedMechanicIds };
         };
@@ -1012,9 +1036,12 @@ export const postSearchMechanics = async (req, res) => {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$mechanicId", "$$mechanicId"], },
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
                                         ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
                                         ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                        { $ne: ["$isLatest", false] },
+                                        { $ne: ["$isClearedByOwner", true] },
+                                        { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                     ],
                                 },
                             },
@@ -1024,7 +1051,7 @@ export const postSearchMechanics = async (req, res) => {
                                 updatedAt: -1,
                             },
                         },
-                        { $limit: 1, },
+                        { $limit: 1 },
                         {
                             $project: {
                                 _id: 1,
@@ -1044,19 +1071,15 @@ export const postSearchMechanics = async (req, res) => {
                         {
                             $match: {
                                 $expr: {
-                                    $eq: ["$mechanicId", "$$mechanicId",],
+                                    $eq: ["$mechanicId", "$$mechanicId"],
                                 },
                             },
                         },
                         {
                             $group: {
                                 _id: null,
-                                ratingCount: {
-                                    $sum: 1,
-                                },
-                                averageRating: {
-                                    $avg: "$rating",
-                                },
+                                ratingCount: { $sum: 1 },
+                                averageRating: { $avg: "$rating" },
                             },
                         },
                     ],
@@ -1066,10 +1089,10 @@ export const postSearchMechanics = async (req, res) => {
             {
                 $addFields: {
                     ratingCount: {
-                        $ifNull: [{ $arrayElemAt: ["$ratingData.ratingCount", 0,], }, 0,],
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.ratingCount", 0] }, 0],
                     },
                     averageRating: {
-                        $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0,], }, 0,],
+                        $ifNull: [{ $arrayElemAt: ["$ratingData.averageRating", 0] }, 0],
                     },
                 },
             },
@@ -1078,7 +1101,7 @@ export const postSearchMechanics = async (req, res) => {
                     profileCompletionCount: {
                         $add: [
                             {
-                                $cond: [{ $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] }, 1, 0,],
+                                $cond: [{ $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] }, 1, 0],
                             },
                             {
                                 $cond: [
@@ -1086,15 +1109,15 @@ export const postSearchMechanics = async (req, res) => {
                                         $or: [
                                             {
                                                 $and: [
-                                                    { $ne: [{ $ifNull: ["$address", "",], }, "",], },
+                                                    { $ne: [{ $ifNull: ["$address", ""] }, ""] },
                                                 ],
                                             },
                                             {
                                                 $and: [
-                                                    { $ne: [{ $ifNull: ["$latitude", "",], }, "",], },
-                                                    { $ne: [{ $ifNull: ["$longitude", "",], }, "",], },
-                                                    { $ne: ["$latitude", "0",], },
-                                                    { $ne: ["$longitude", "0",], },
+                                                    { $ne: [{ $ifNull: ["$latitude", ""] }, ""] },
+                                                    { $ne: [{ $ifNull: ["$longitude", ""] }, ""] },
+                                                    { $ne: ["$latitude", "0"] },
+                                                    { $ne: ["$longitude", "0"] },
                                                 ],
                                             },
                                         ],
@@ -1107,8 +1130,8 @@ export const postSearchMechanics = async (req, res) => {
                                 $cond: [
                                     {
                                         $and: [
-                                            { $ne: [{ $ifNull: ["$fullName", "",], }, "",], },
-                                            { $ne: [{ $ifNull: ["$profileImage", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$fullName", ""] }, ""], },
+                                            { $ne: [{ $ifNull: ["$profileImage", ""] }, ""] },
                                         ],
                                     },
                                     1,
@@ -1118,7 +1141,7 @@ export const postSearchMechanics = async (req, res) => {
                             {
                                 $cond: [
                                     {
-                                        $gt: [{ $size: { $ifNull: ["$serviceIds", [],], }, }, 0,],
+                                        $gt: [{ $size: { $ifNull: ["$serviceIds", []] } }, 0],
                                     },
                                     1,
                                     0,
@@ -1128,10 +1151,10 @@ export const postSearchMechanics = async (req, res) => {
                                 $cond: [
                                     {
                                         $and: [
-                                            { $ne: [{ $ifNull: ["$bankAccountNumber", "",], }, "",], },
-                                            { $ne: [{ $ifNull: ["$bankIfscCode", "",], }, "",], },
-                                            { $ne: [{ $ifNull: ["$bankAccountHolderName", "",], }, "",], },
-                                            { $ne: [{ $ifNull: ["$bankName", "",], }, "",], },
+                                            { $ne: [{ $ifNull: ["$bankAccountNumber", ""] }, ""] },
+                                            { $ne: [{ $ifNull: ["$bankIfscCode", "",] }, ""] },
+                                            { $ne: [{ $ifNull: ["$bankAccountHolderName", ""] }, ""] },
+                                            { $ne: [{ $ifNull: ["$bankName", ""] }, ""] },
                                         ],
                                     },
                                     1,
@@ -1145,19 +1168,19 @@ export const postSearchMechanics = async (req, res) => {
             {
                 $addFields: {
                     profileCompletionPercentage: {
-                        $multiply: [{ $divide: ["$profileCompletionCount", 5,], }, 100,],
+                        $multiply: [{ $divide: ["$profileCompletionCount", 5] }, 100],
                     },
                 },
             },
             {
                 $addFields: {
-                    distance: { $divide: ["$distanceInMeters", 1000,], },
+                    distance: { $divide: ["$distanceInMeters", 1000] },
                 },
             },
             {
                 $addFields: {
                     minutes: {
-                        $round: [{ $multiply: [{ $divide: ["$distance", 30,], }, 60,], }, 0,],
+                        $round: [{ $multiply: [{ $divide: ["$distance", 30] }, 60] }, 0],
                     },
                 },
             },
@@ -1175,12 +1198,8 @@ export const postSearchMechanics = async (req, res) => {
                         },
                     ],
                     items: [
-                        {
-                            $skip: skip,
-                        },
-                        {
-                            $limit: limit,
-                        },
+                        { $skip: skip },
+                        { $limit: limit },
                         {
                             $project: {
                                 _id: 1,
@@ -1194,28 +1213,28 @@ export const postSearchMechanics = async (req, res) => {
                                 chatId: {
                                     $let: {
                                         vars: {
-                                            chat: { $arrayElemAt: ["$chatData", 0], },
+                                            chat: { $arrayElemAt: ["$chatData", 0] },
                                         },
                                         in: {
                                             $cond: [
-                                                { $ifNull: ["$$chat._id", false,], },
-                                                { $toString: "$$chat._id", },
+                                                { $ifNull: ["$$chat._id", false] },
+                                                { $toString: "$$chat._id" },
                                                 null,
                                             ],
                                         },
                                     },
                                 },
                                 distance: {
-                                    $round: ["$distance", 2,],
+                                    $round: ["$distance", 2],
                                 },
                                 minutes: 1,
                                 profileCompletionCount: 1,
                                 profileCompletionPercentage: {
-                                    $round: ["$profileCompletionPercentage", 0,],
+                                    $round: ["$profileCompletionPercentage", 0],
                                 },
                                 ratingCount: 1,
                                 averageRating: {
-                                    $round: ["$averageRating", 1,],
+                                    $round: ["$averageRating", 1],
                                 },
                                 hasApprovedKyc: { $eq: ["$kycStatus", Constants.KYC_STATUS.APPROVED] },
                             },
@@ -1998,9 +2017,12 @@ export const postNearbyMechanics = async (req, res) => {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$mechanicId", "$$mechanicId"], },
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
                                         ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
                                         ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                        { $ne: ["$isLatest", false] },
+                                        { $ne: ["$isClearedByOwner", true] },
+                                        { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                     ],
                                 },
                             },
@@ -2178,33 +2200,33 @@ export const postNearbyMechanics = async (req, res) => {
                                 profileImage: 1,
                                 latitude: 1,
                                 longitude: 1,
-                                address: { $ifNull: ["$address", ""], },
+                                address: { $ifNull: ["$address", ""] },
                                 consultantFee: 1,
                                 chatId: {
                                     $let: {
                                         vars: {
-                                            chat: { $arrayElemAt: ["$chatData", 0], },
+                                            chat: { $arrayElemAt: ["$chatData", 0] },
                                         },
                                         in: {
                                             $cond: [
-                                                { $ifNull: ["$$chat._id", false,], },
-                                                { $toString: "$$chat._id", },
+                                                { $ifNull: ["$$chat._id", false] },
+                                                { $toString: "$$chat._id" },
                                                 null,
                                             ],
                                         },
                                     },
                                 },
                                 distance: {
-                                    $round: ["$distance", 2,],
+                                    $round: ["$distance", 2],
                                 },
                                 minutes: 1,
                                 profileCompletionCount: 1,
                                 profileCompletionPercentage: {
-                                    $round: ["$profileCompletionPercentage", 0,],
+                                    $round: ["$profileCompletionPercentage", 0],
                                 },
                                 ratingCount: 1,
                                 averageRating: {
-                                    $round: ["$averageRating", 1,],
+                                    $round: ["$averageRating", 1],
                                 },
                             },
                         },
@@ -2402,9 +2424,12 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                     $match: {
                                         $expr: {
                                             $and: [
-                                                { $eq: ["$mechanicId", "$$mechanicId"], },
+                                                { $eq: ["$mechanicId", "$$mechanicId"] },
                                                 ...(ownerObjectId ? [{ $eq: ["$ownerId", ownerObjectId] }] : []),
                                                 ...(chatGuestId ? [{ $eq: ["$guestId", chatGuestId,] }] : []),
+                                                { $ne: ["$isLatest", false] },
+                                                { $ne: ["$isClearedByOwner", true] },
+                                                { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                             ],
                                         },
                                     },
@@ -2494,20 +2519,20 @@ export const postPopularNearbyMechanics = async (req, res) => {
                     {
                         $project: {
                             _id: 1,
-                            fullName: { $ifNull: ["$fullName", ""], },
-                            phoneNumber: { $ifNull: ["$phoneNumber", ""], },
-                            profileImage: { $ifNull: ["$profileImage", ""], },
-                            address: { $ifNull: ["$address", ""], },
-                            consultantFee: { $ifNull: ["$consultantFee", 0], },
+                            fullName: { $ifNull: ["$fullName", ""] },
+                            phoneNumber: { $ifNull: ["$phoneNumber", ""] },
+                            profileImage: { $ifNull: ["$profileImage", ""] },
+                            address: { $ifNull: ["$address", ""] },
+                            consultantFee: { $ifNull: ["$consultantFee", 0] },
                             chatId: {
                                 $let: {
                                     vars: {
-                                        chat: { $arrayElemAt: ["$chatData", 0], },
+                                        chat: { $arrayElemAt: ["$chatData", 0] },
                                     },
                                     in: {
                                         $cond: [
-                                            { $ifNull: ["$$chat._id", false,], },
-                                            { $toString: "$$chat._id", },
+                                            { $ifNull: ["$$chat._id", false] },
+                                            { $toString: "$$chat._id" },
                                             null,
                                         ],
                                     },
@@ -2515,7 +2540,7 @@ export const postPopularNearbyMechanics = async (req, res) => {
                             },
                             distanceInKm: {
                                 $round: [
-                                    { $divide: ["$distanceInMeters", 1000,], },
+                                    { $divide: ["$distanceInMeters", 1000] },
                                     1,
                                 ],
                             },
@@ -2525,7 +2550,7 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                         $multiply: [
                                             {
                                                 $divide: [
-                                                    { $divide: ["$distanceInMeters", 1000,], },
+                                                    { $divide: ["$distanceInMeters", 1000] },
                                                     30,
                                                 ],
                                             },
@@ -2539,7 +2564,7 @@ export const postPopularNearbyMechanics = async (req, res) => {
                                 $round: [
                                     {
                                         $ifNull: [
-                                            { $arrayElemAt: ["$ratingData.avgRating", 0,], },
+                                            { $arrayElemAt: ["$ratingData.avgRating", 0] },
                                             0,
                                         ],
                                     },
@@ -2548,11 +2573,11 @@ export const postPopularNearbyMechanics = async (req, res) => {
                             },
                             totalReviews: {
                                 $ifNull: [
-                                    { $arrayElemAt: ["$ratingData.totalReviews", 0,], },
+                                    { $arrayElemAt: ["$ratingData.totalReviews", 0] },
                                     0,
                                 ],
                             },
-                            totalServices: { $size: "$servicesData", },
+                            totalServices: { $size: "$servicesData" },
                             services: "$servicesData",
                         },
                     },
@@ -3772,9 +3797,12 @@ export const postBookingList = async (req, res) => {
                                         $match: {
                                             $expr: {
                                                 $and: [
-                                                    { $eq: ["$bookingId", "$$bookingId",], },
-                                                    { $eq: ["$ownerId", "$$ownerId",], },
-                                                    { $eq: ["$mechanicId", "$$mechanicId",], },
+                                                    { $eq: ["$bookingId", "$$bookingId"] },
+                                                    { $eq: ["$ownerId", "$$ownerId"] },
+                                                    { $eq: ["$mechanicId", "$$mechanicId"] },
+                                                    { $ne: ["$isLatest", false] },
+                                                    { $ne: ["$isClearedByOwner", true] },
+                                                    { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                                 ],
                                             },
                                         },
@@ -3824,7 +3852,20 @@ export const postBookingList = async (req, res) => {
                                 serviceDetails: 1,
                                 mechanicDetails: 1,
                                 transactionDetails: 1,
-                                chatId: "$chatDetails._id",
+                                chatId: {
+                                    $let: {
+                                        vars: {
+                                            chat: { $arrayElemAt: ["$chatDetails", 0] },
+                                        },
+                                        in: {
+                                            $cond: [
+                                                { $ifNull: ["$$chat._id", false] },
+                                                { $toString: "$$chat._id" },
+                                                null,
+                                            ],
+                                        },
+                                    },
+                                },
                                 isRatingAdded: {
                                     $ne: [{ $ifNull: ["$ratingDetails._id", null] }, null],
                                 },
@@ -4197,9 +4238,12 @@ export const postBookingDetails = async (req, res) => {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$bookingId", "$$bookingId",], },
-                                        { $eq: ["$ownerId", "$$ownerId",], },
-                                        { $eq: ["$mechanicId", "$$mechanicId",], },
+                                        { $eq: ["$bookingId", "$$bookingId"] },
+                                        { $eq: ["$ownerId", "$$ownerId",] },
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
+                                        { $ne: ["$isLatest", false] },
+                                        { $ne: ["$isClearedByOwner", true] },
+                                        { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                     ],
                                 },
                             },
@@ -4248,7 +4292,20 @@ export const postBookingDetails = async (req, res) => {
                     serviceDetails: 1,
                     mechanicDetails: 1,
                     transactionDetails: 1,
-                    chatId: "$chatDetails._id",
+                    chatId: {
+                        $let: {
+                            vars: {
+                                chat: { $arrayElemAt: ["$chatDetails", 0] },
+                            },
+                            in: {
+                                $cond: [
+                                    { $ifNull: ["$$chat._id", false] },
+                                    { $toString: "$$chat._id" },
+                                    null,
+                                ],
+                            },
+                        },
+                    },
                     feedback: {
                         rating: "$ratingDetails.rating",
                         description: "$ratingDetails.description",
@@ -4705,9 +4762,9 @@ export const postCancelBooking = async (req, res) => {
         let filter = { _id: new ObjectId(bookingId) };
 
         const [bookingDetails, pricingDetails] = await Promise.all([
-            Booking.findOne({ ...filter }).populate([{ path: "ownerId" }]),
+            Booking.findOne({ ...filter }).lean(),
 
-            Pricing.findOne({}),
+            Pricing.findOne({}).lean(),
         ]);
 
         if (!bookingDetails) {
@@ -6468,11 +6525,19 @@ export const postChatMessagesDetails = async (req, res) => {
             return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
-        let matchQuery = { _id: new ObjectId(chatId) };
+        let matchQuery = {
+            _id: new ObjectId(chatId),
+            isLatest: { $ne: false },
+            isClearedByOwner: { $ne: true },
+            status: { $ne: Constants.CHAT_STATUS.CLEARED },
+        };
+
         if (ownerId) {
             matchQuery.ownerId = new ObjectId(ownerId);
-        } else {
+        } else if (guestId) {
             matchQuery.guestId = guestId;
+        } else {
+            return res.status(400).json(errorResponse("guestId or ownerId is required."));
         };
 
         const chat = await Chat.findOne(matchQuery);
@@ -7270,6 +7335,16 @@ export const postReportMessage = async (req, res) => {
 
         const reportedBy = ownerId ? new ObjectId(ownerId) : chatDoc.ownerId || chatDoc._id;
         const reportedUser = chatDoc.mechanicId;
+
+        const existingChatReport = await ChatReport.findOne({
+            chatId: new ObjectId(chatId),
+            messageId: new ObjectId(messageId),
+            status: { $in: [Constants.CHAT_REPORT_STATUS.PENDING, Constants.CHAT_REPORT_STATUS.IN_REVIEW] },
+        });
+
+        if (existingChatReport) {
+            return res.status(400).json(errorResponse("This message has already been reported and is currently under review."));
+        };
 
         const report = await ChatReport.create({
             chatId: new ObjectId(chatId),

@@ -1422,9 +1422,12 @@ export const postBookingList = async (req, res) => {
                                         $match: {
                                             $expr: {
                                                 $and: [
-                                                    { $eq: ["$bookingId", "$$bookingId",], },
-                                                    { $eq: ["$ownerId", "$$ownerId",], },
-                                                    { $eq: ["$mechanicId", "$$mechanicId",], },
+                                                    { $eq: ["$bookingId", "$$bookingId"] },
+                                                    { $eq: ["$ownerId", "$$ownerId"] },
+                                                    { $eq: ["$mechanicId", "$$mechanicId"] },
+                                                    { $ne: ["$isLatest", false] },
+                                                    { $ne: ["$isClearedByOwner", true] },
+                                                    { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                                 ],
                                             },
                                         },
@@ -1474,7 +1477,14 @@ export const postBookingList = async (req, res) => {
                                 serviceDetails: 1,
                                 ownerDetails: 1,
                                 transactionDetails: 1,
-                                chatId: "$chatDetails._id",
+                                chatId: {
+                                    $cond: [
+                                        { $ifNull: ["$chatDetails._id", false] },
+                                        { $toString: "$chatDetails._id" },
+                                        null,
+                                    ],
+                                },
+
                                 feedback: {
                                     rating: "$ratingDetails.rating",
                                     description: "$ratingDetails.description",
@@ -1841,9 +1851,12 @@ export const postBookingDetails = async (req, res) => {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$bookingId", "$$bookingId",], },
-                                        { $eq: ["$ownerId", "$$ownerId",], },
-                                        { $eq: ["$mechanicId", "$$mechanicId",], },
+                                        { $eq: ["$bookingId", "$$bookingId"] },
+                                        { $eq: ["$ownerId", "$$ownerId"] },
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
+                                        { $ne: ["$isLatest", false] },
+                                        { $ne: ["$isClearedByOwner", true] },
+                                        { $ne: ["$status", Constants.CHAT_STATUS.CLEARED] },
                                     ],
                                 },
                             },
@@ -1893,7 +1906,13 @@ export const postBookingDetails = async (req, res) => {
                     serviceDetails: 1,
                     ownerDetails: 1,
                     transactionDetails: 1,
-                    chatId: "$chatDetails._id",
+                    chatId: {
+                        $cond: [
+                            { $ifNull: ["$chatDetails._id", false] },
+                            { $toString: "$chatDetails._id" },
+                            null
+                        ]
+                    },
                     feedback: {
                         rating: "$ratingDetails.rating",
                         description: "$ratingDetails.description",
@@ -1961,7 +1980,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                 mechanicId: new ObjectId(mechanicId),
             }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" }),
 
-            Pricing.findOne({}),
+            Pricing.findOne({}).lean(),
         ]);
 
         if (!bookingDetails) {
@@ -2025,7 +2044,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                 let refundPayload = {
                     razorpayPaymentId: transactionDetails.trxId,
                     amount: refundAmount,
-                    ownerId: bookingDetails?.ownerId,
+                    ownerId: bookingDetails?.ownerId?._id,
                 };
 
                 let paymentRefund = await razorpayRefund(refundPayload);
@@ -2038,7 +2057,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 let transactionPayload = {
                     trxId: refundPayment.refundId,
-                    ownerId: new ObjectId(bookingDetails?.ownerId),
+                    ownerId: new ObjectId(bookingDetails?.ownerId?._id),
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
                     serviceId: new ObjectId(bookingDetails.serviceId),
                     carId: new ObjectId(bookingDetails.carId),
@@ -2077,7 +2096,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     let refundPayload = {
                         razorpayPaymentId: transactionDetails.trxId,
                         amount: refundAmount,
-                        ownerId: bookingDetails?.ownerId,
+                        ownerId: bookingDetails?.ownerId?._id,
                     };
 
                     let paymentRefund = await razorpayRefund(refundPayload);
@@ -2090,7 +2109,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                     let transactionPayload = {
                         trxId: refundPayment.refundId,
-                        ownerId: new ObjectId(bookingDetails?.ownerId),
+                        ownerId: new ObjectId(bookingDetails?.ownerId?._id),
                         mechanicId: new ObjectId(bookingDetails?.mechanicId),
                         serviceId: new ObjectId(bookingDetails.serviceId),
                         carId: new ObjectId(bookingDetails.carId),
@@ -3186,7 +3205,10 @@ export const postChatMessagesDetails = async (req, res) => {
 
         const chat = await Chat.findOne({
             _id: new ObjectId(chatId),
-            mechanicId: new ObjectId(mechanicId)
+            mechanicId: new ObjectId(mechanicId),
+            isLatest: { $ne: false },
+            isClearedByMechanic: { $ne: true },
+            status: { $ne: Constants.CHAT_STATUS.CLEARED },
         });
 
         if (!chat) {
@@ -4809,7 +4831,7 @@ export const postBlockOwner = async (req, res) => {
                 blockedByMechanicAt: new Date()
             });
 
-            return res.status(200).json(successResponse("Owner blocked successfully."));
+            return res.status(200).json(successResponse("Owner blocked successfully.", { isBlocked: true }));
         } else {
             await Block.deleteOne(query);
 
@@ -4825,7 +4847,7 @@ export const postBlockOwner = async (req, res) => {
                 blockedByMechanicAt: null,
             });
 
-            return res.status(200).json(successResponse("Owner unblocked successfully."));
+            return res.status(200).json(successResponse("Owner unblocked successfully.", { isBlocked: false }));
         };
     } catch (error) {
         log1(["Error in postBlockOwner ----->", error]);
@@ -4894,6 +4916,16 @@ export const postReportMessage = async (req, res) => {
 
         const reportedBy = new ObjectId(mechanicId);
         const reportedUser = chatDoc.ownerId || chatDoc._id;
+
+        const existingChatReport = await ChatReport.findOne({
+            chatId: new ObjectId(chatId),
+            messageId: new ObjectId(messageId),
+            status: { $in: [Constants.CHAT_REPORT_STATUS.PENDING, Constants.CHAT_REPORT_STATUS.IN_REVIEW] },
+        });
+
+        if (existingChatReport) {
+            return res.status(400).json(errorResponse("This message has already been reported and is currently under review."));
+        };
 
         const report = await ChatReport.create({
             chatId: new ObjectId(chatId),
