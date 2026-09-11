@@ -856,7 +856,10 @@ export const postHomeDetails = async (req, res) => {
         const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
-            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
+            gstPercentage: pricingDetails?.gstPercentage ?? Constants.DEFAULT_GST_PERCENTAGE,
+            platformFee: pricingDetails?.platformFee ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            cancellationFee: pricingDetails?.cancellationFee ?? Constants.DEFAULT_CANCELLATION_FEE,
             location: locationObject,
             carList: carList,
             serviceCategories: serviceList,
@@ -3442,7 +3445,8 @@ export const postAddBooking = async (req, res) => {
             consultantFee: consultantFee,
             totalServiceFee: serviceFee,
             discountAmount: discountAmount,
-            platformFee: platformAmount,
+            adminCharge: platformAmount,
+            platformFee: platformFee,
             platformFeeType: platformFeeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
@@ -3875,6 +3879,7 @@ export const postBookingList = async (req, res) => {
                                 discountAmount: 1,
                                 platformFee: 1,
                                 platformFeeType: 1,
+                                adminCharge: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
                                 totalAmount: 1,
@@ -3885,6 +3890,8 @@ export const postBookingList = async (req, res) => {
                                 bookingPaymentStatus: 1,
                                 cancelReason: 1,
                                 cancelTime: 1,
+                                canceledBy: 1,
+                                canceledByRole: 1,
                                 cancellationFee: 1,
                                 status: 1,
                                 createdAt: 1,
@@ -4310,6 +4317,7 @@ export const postBookingDetails = async (req, res) => {
                     discountAmount: 1,
                     platformFee: 1,
                     platformFeeType: 1,
+                    adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -4320,6 +4328,8 @@ export const postBookingDetails = async (req, res) => {
                     bookingPaymentStatus: 1,
                     cancelReason: 1,
                     cancelTime: 1,
+                    canceledBy: 1,
+                    canceledByRole: 1,
                     cancellationFee: 1,
                     status: 1,
                     createdAt: 1,
@@ -4728,7 +4738,8 @@ export const postRescheduleBooking = async (req, res) => {
             consultantFee: consultantFee,
             totalServiceFee: serviceFee,
             discountAmount: discountAmount,
-            platformFee: platformAmount,
+            adminCharge: platformAmount,
+            platformFee: platformFee,
             platformFeeType: platformFeeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
@@ -5077,8 +5088,9 @@ export const getBookingInvoice = async (req, res) => {
                                 status: 1,
                                 earningAmount: 1,
                                 serviceAmount: 1,
+                                totalAdminCharge: 1,
                                 adminCharge: 1,
-                                adminPercentageCharge: 1,
+                                adminChargeType: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },
@@ -5103,6 +5115,7 @@ export const getBookingInvoice = async (req, res) => {
                     discountAmount: 1,
                     platformFee: 1,
                     platformFeeType: 1,
+                    adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -5176,7 +5189,10 @@ export const postVerifyRazorPaySignature = async (req, res) => {
             razorpay_signature: razorpaySignature,
         });
 
-        const booking = await Booking.findOne({ razorpayOrderId });
+        const [booking, ownerData] = await Promise.all([
+            Booking.findOne({ razorpayOrderId }).lean(),
+            Owner.findById(ownerId).lean(),
+        ]);
 
         if (!booking) {
             return res.status(400).json(errorResponse("Booking not found or unauthorized!"));
@@ -5195,7 +5211,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                 }
             );
 
-            const ownerData = await Owner.findById(ownerId);
+            const mechanicData = await Mechanic.findById(booking.mechanicId).lean();
 
             let transactionPayload = {
                 ownerId: booking.ownerId,
@@ -5218,7 +5234,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                     ownerData.deviceToken &&
                     ownerData.deviceToken !== ""
                 ) {
-                    log1(["postVerifyRazorPaySignature notificaiton send process ----->"]);
+                    log1(["postVerifyRazorPaySignature notificaiton send process on owner ----->"]);
                     let notificationObject = {
                         title: "Payment Successful!",
                         description: `Payment for booking #${booking._id} was successful. The mechanic will accept your booking request soon.`,
@@ -5235,7 +5251,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                     ownerData.deviceToken &&
                     ownerData.deviceToken !== ""
                 ) {
-                    log1(["postVerifyRazorPaySignature booking notificaiton send process ----->"]);
+                    log1(["postVerifyRazorPaySignature booking notificaiton send process on owner ----->"]);
                     let notificationObject = {
                         title: "Booking Create Successful!",
                         description: `Your booking was create successful. The mechanic will accept your booking request soon.`,
@@ -5245,6 +5261,25 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                     };
 
                     await sendPushNotification(ownerData.deviceToken, notificationObject);
+                };
+            };
+
+            if (mechanicData) {
+                if (
+                    mechanicData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                    mechanicData.deviceToken &&
+                    mechanicData.deviceToken !== ""
+                ) {
+                    log1(["postVerifyRazorPaySignature booking notificaiton send process on mechanic ----->"]);
+                    let notificationObject = {
+                        title: "New Booking Request!",
+                        description: `You have received a new booking request. Please review the booking details and accept or decline the request.`,
+                        mechanicId: mechanicData?._id,
+                        bookingId: booking._id,
+                        type: Constants.NOTIFICATION_TYPE.BOOKING,
+                    };
+
+                    await sendPushNotification(mechanicData.deviceToken, notificationObject);
                 };
             };
         };
@@ -6074,7 +6109,7 @@ export const postNotificationList = async (req, res) => {
 
         const [notificationList, totalCount, unReadNotificationsCount,] = await Promise.all([
             Notification.aggregate([
-                { $match: filter },
+                { $match: match },
                 { $sort: { createdAt: -1 } },
                 { $skip: skip }, { $limit: limit },
             ]),

@@ -9,6 +9,12 @@ const Constants = {
     DEFAULT_LIMIT: 10,
     MAX_FILE_SIZE: 10,
     MAX_VIDEO_FILE_SIZE: 15,
+    DEFAULT_RADIUS: 10,
+    MAX_RADIUS_KM: 100,
+    CURRENT_TIMEZONE: process.env.TZ || "Asia/Kolkata",
+    DEFAULT_PLATFORM_FEE: 5,
+    DEFAULT_GST_PERCENTAGE: 18,
+    DEFAULT_CANCELLATION_FEE: 3,
 
     OWNER_STATUS: {
         PENDING: 1,
@@ -83,6 +89,10 @@ const Constants = {
         SUCCESS: 2,
         FAILED: 3,
         PROCESSING: 4,
+    },
+    EARNING_TYPE: {
+        SERVICE: 1,
+        CANCELLATION_DEDUCTION: 2,
     },
     IS_SUSPENDED_STATUS: {
         UNSUSPENDED: 0,

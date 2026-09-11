@@ -148,12 +148,12 @@ export const generateInvoicePDF = async (booking) => {
                 y += 18;
             };
 
-            let feeTypeVal = "%";
+            let feeTypeVal = `${booking.platformFee}%`;
             if (booking?.platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
-                feeTypeVal = "&#8377;";
+                feeTypeVal = "Fixed ₹";
             };
 
-            drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking.platformFee || 0).toFixed(2));
+            drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking.adminCharge || 0).toFixed(2));
             drawSummaryRow("Subtotal:", parseFloat(booking.subTotal || 0).toFixed(2));
             drawSummaryRow("GST (18%):", parseFloat(booking.taxAmount || 0).toFixed(2));
 

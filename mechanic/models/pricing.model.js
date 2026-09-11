@@ -6,17 +6,17 @@ const pricingSchema = new Schema(
     {
         platformFee: {
             type: Number,
-            default: 5,
+            default: Constants.DEFAULT_PLATFORM_FEE,
             description: "Platform fee",
         },
         gstPercentage: {
             type: Number,
-            default: 18,
+            default: Constants.DEFAULT_GST_PERCENTAGE,
             description: "GST percentage",
         },
         cancellationFee: {
             type: Number,
-            default: 3,
+            default: Constants.DEFAULT_CANCELLATION_FEE,
             description: "Cancellation fee charged to customer",
         },
         platformFeeType: {

@@ -1,27 +1,53 @@
 import cron from "node-cron";
 import moment from "moment";
+import momentTz from "moment-timezone";
 import Razorpay from "razorpay";
 import Constants from "../config/constant.js";
-import Earning from "../models/earning.model.js";
-import Mechanic from "../models/mechanic.model.js";
 import { log1 } from "../lib/general.js";
 import { sendPushNotification } from "../controllers/pushNotification.js";
+import Earning from "../models/earning.model.js";
+import Mechanic from "../models/mechanic.model.js";
+import Booking from "../models/booking.model.js";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY,
     key_secret: process.env.RAZORPAY_SECRET,
 });
 
-export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
+export const triggerRazorpayPayout = async (
+    mechanic,
+    bankDetails,
+    payoutAmount,
+    payoutReferenceId,
+    idempotencyKey,
+) => {
     const accountNumber = process.env.RAZORPAYX_ACCOUNT_NUMBER;
 
     if (!accountNumber) {
         throw new Error("Razorpay Account number is missing.");
     };
 
+    if (!payoutAmount || Number(payoutAmount) <= 0) {
+        throw new Error("Payout amount must be greater than ₹0.");
+    };
+
+    const amountInPaise = Math.round(Number(payoutAmount) * 100);
+
+    if (amountInPaise < 100) {
+        throw new Error("Payout amount must be at least ₹1.");
+    };
+
+
+    /**
+     * ---------------------------------------------------------
+     * CREATE / GET RAZORPAY CONTACT
+     * ---------------------------------------------------------
+     */
+
     let contactId = mechanic.razorpayContactId;
+
     if (!contactId) {
-        log1(`Creating Razorpay contact for Mechanic: ${mechanic.fullName || mechanic._id}`);
+        log1([`Creating Razorpay contact for Mechanic: ${mechanic.fullName || mechanic._id}`]);
         try {
             const contactRes = await razorpay.api.post({
                 url: "/contacts",
@@ -38,7 +64,7 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
             mechanic.razorpayContactId = contactId;
 
             await mechanic.save();
-            log1(`Razorpay contact created: ${contactId}`);
+            log1([`Razorpay contact created: ${contactId}`]);
         } catch (error) {
             const errData = error.error || error.response?.data?.error || error;
             log1(["Failed to create Razorpay contact:", errData]);
@@ -46,9 +72,17 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
         };
     };
 
+
+    /**
+     * ---------------------------------------------------------
+     * CREATE / GET RAZORPAY FUND ACCOUNT
+     * ---------------------------------------------------------
+     */
+
     let fundAccountId = mechanic.razorpayFundAccountId;
+
     if (!fundAccountId) {
-        log1(`Creating Razorpay fund account for contact: ${contactId}`);
+        log1([`Creating Razorpay fund account for contact: ${contactId}`]);
         try {
             const fundRes = await razorpay.fundAccount.create({
                 contact_id: contactId,
@@ -61,7 +95,7 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
             });
 
             fundAccountId = fundRes.id;
-            log1(`Razorpay fund account created: ${fundAccountId}`);
+            log1([`Razorpay fund account created: ${fundAccountId}`]);
 
             if (
                 bankDetails.bankAccountNumber === mechanic.bankAccountNumber &&
@@ -77,27 +111,33 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
         };
     };
 
-    const payoutAmount = Math.round(Number(earning.finalPayoutAmount) * 100);
-    if (payoutAmount < 100) {
-        throw new Error("Payout amount must be at least ₹1.");
-    };
 
-    const idempotencyKey = `earning-${earning._id.toString()}`;
+    /**
+     * ---------------------------------------------------------
+     * CREATE ONE WEEKLY PAYOUT
+     * ---------------------------------------------------------
+     */
 
-    log1(`Triggering Razorpay payout for fund account: ${fundAccountId}, amount: ${payoutAmount}, earningId: ${earning._id.toString()}`);
+    log1(
+        `Triggering Razorpay payout. Mechanic: ${mechanic._id}, ` +
+        `Fund Account: ${fundAccountId}, ` +
+        `Amount: ${amountInPaise}, ` +
+        `Reference: ${payoutReferenceId}`,
+    );
+
     try {
         const payoutRes = await razorpay.api.post({
             url: "/payouts",
             data: {
                 account_number: accountNumber,
                 fund_account_id: fundAccountId,
-                amount: payoutAmount,
+                amount: amountInPaise,
                 currency: Constants.BASE_CURRENCY || "INR",
                 mode: "IMPS",
                 purpose: "payout",
                 queue_if_low_balance: true,
-                reference_id: earning._id.toString(),
-                narration: "CarMate Service Payout",
+                reference_id: payoutReferenceId,
+                narration: "CarMate Weekly Service Payout",
             },
             headers: {
                 "X-Payout-Idempotency": idempotencyKey,
@@ -120,86 +160,161 @@ export const triggerRazorpayPayout = async (earning, mechanic, bankDetails) => {
 export const processWeeklyPayouts = async () => {
     log1(["Running Weekly Earning Payout Process..."]);
 
-    // Date range: last Monday 12:00:01 AM to Sunday 11:59:59 PM
-    const startOfRange = moment().subtract(1, "weeks").startOf("isoWeek").set({ hour: 0, minute: 0, second: 1, millisecond: 0 }).toDate();
-    const endOfRange = moment().subtract(1, "weeks").endOf("isoWeek").set({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toDate();
+    const currentDate = momentTz.tz(Constants.CURRENT_TIMEZONE);
 
-    log1(`Payout Date Range: From ${startOfRange.toISOString()} To ${endOfRange.toISOString()}`);
+    const startOfRange = currentDate.clone().subtract(1, "week").startOf("isoWeek").startOf("day");
+    const endOfRange = startOfRange.clone().endOf("isoWeek");
+
+    const startDate = startOfRange.toDate();
+    const endDate = endOfRange.toDate();
+
+    const weekStart = startOfRange.format("YYYY-MM-DD");
+    const weekEnd = endOfRange.format("YYYY-MM-DD");
+
+    log1([`Payout Date Range: From:- ${startDate.toISOString()}, To:- ${endDate.toISOString()}`]);
 
     try {
         const earnings = await Earning.find({
             status: Constants.EARNING_STATUS.PENDING,
-            createdAt: { $gte: startOfRange, $lte: endOfRange },
+            // createdAt: { $gte: startDate, $lte: endDate },
         }).populate("mechanicId");
 
-        log1(`Found ${earnings.length} pending earning records to process.`);
+        log1([`Found ${earnings.length} pending earning records to process.`]);
+
+        if (!earnings.length) {
+            log1(["No pending weekly earnings found."]);
+            return;
+        };
+
+        const mechanicEarningsMap = new Map();
 
         for (const earning of earnings) {
-            log1(`Processing earning record ID: ${earning._id} for mechanic ID: ${earning.mechanicId?._id}`);
-
-            const mechanic = earning.mechanicId;
-            if (!mechanic) {
-                log1(`Warning: Earning record ${earning._id} does not have a valid mechanic populated. Skipping.`);
+            if (!earning.mechanicId) {
+                log1([`Skipping earning ${earning._id}, Mechanic not found.`]);
                 continue;
             };
 
-            const bankAccountNumber = earning.bankAccountNumber || mechanic.bankAccountNumber;
-            const bankIfscCode = earning.bankIfscCode || mechanic.bankIfscCode;
-            const bankAccountHolderName = earning.bankAccountHolderName || mechanic.bankAccountHolderName;
+            const mechanicId = earning.mechanicId?._id.toString();
 
-            if (!bankAccountNumber || !bankIfscCode || !bankAccountHolderName) {
-                log1(`Skipping payout for earning ${earning._id}: Bank details are incomplete.`);
-                continue;
+            if (!mechanicEarningsMap.has(mechanicId)) {
+                mechanicEarningsMap.set(mechanicId, {
+                    mechanic: earning.mechanicId,
+                    earnings: [],
+                });
             };
 
-            if (!earning.bankAccountNumber || !earning.bankIfscCode || !earning.bankAccountHolderName) {
-                earning.bankAccountNumber = bankAccountNumber;
-                earning.bankIfscCode = bankIfscCode;
-                earning.bankAccountHolderName = bankAccountHolderName;
-                await earning.save();
-                log1(`Saved mechanic bank details to earning record ${earning._id}.`);
-            };
+            mechanicEarningsMap.get(mechanicId).earnings.push(earning);
+        };
 
-            const bankDetails = {
-                bankAccountNumber,
-                bankIfscCode,
-                bankAccountHolderName,
-            };
+        log1([`Found ${mechanicEarningsMap.size} mechanics for weekly payout.`]);
+
+        for (const [mechanicId, mechanicData] of mechanicEarningsMap) {
+            const mechanic = mechanicData.mechanic;
+            const mechanicEarnings = mechanicData.earnings;
+
+            log1([`Processing weekly payout for mechanic: ${mechanicId}. Earning count: ${mechanicEarnings.length}`]);
 
             try {
-                const payoutData = await triggerRazorpayPayout(earning, mechanic, bankDetails);
-                log1(`Razorpay payout response status: ${payoutData.status}`);
+                const earningWithBankDetails = mechanicEarnings.find(
+                    (earning) => earning.bankAccountNumber && earning.bankIfscCode && earning.bankAccountHolderName,
+                );
 
-                earning.razorpayPayoutId = payoutData.id || "";
-                earning.payoutReferenceId = earning._id.toString();
-                earning.razorpayContactId = mechanic.razorpayContactId || "";
-                earning.razorpayFundAccountId = mechanic.razorpayFundAccountId || "";
+                const bankAccountNumber = earningWithBankDetails?.bankAccountNumber || mechanic.bankAccountNumber || "";
+                const bankIfscCode = earningWithBankDetails?.bankIfscCode || mechanic.bankIfscCode || "";
+                const bankAccountHolderName = earningWithBankDetails?.bankAccountHolderName || mechanic.bankAccountHolderName || "";
+
+                if (!bankAccountNumber || !bankIfscCode || !bankAccountHolderName) {
+                    log1(["Skipping weekly payout for mechanic Bank details are incomplete.", mechanicId]);
+
+                    continue;
+                };
+
+                for (const earning of mechanicEarnings) {
+                    let changed = false;
+
+                    if (!earning.bankAccountNumber) {
+                        earning.bankAccountNumber = bankAccountNumber;
+                        changed = true;
+                    };
+
+                    if (!earning.bankIfscCode) {
+                        earning.bankIfscCode = bankIfscCode;
+                        changed = true;
+                    };
+
+                    if (!earning.bankAccountHolderName) {
+                        earning.bankAccountHolderName = bankAccountHolderName;
+                        changed = true;
+                    };
+
+                    if (changed) {
+                        await earning.save();
+                    };
+                };
+
+                const finalPayoutAmount = mechanicEarnings.reduce((total, earning) => total + (Number(earning.finalPayoutAmount) || 0), 0);
+
+                const roundedPayoutAmount = Math.round((finalPayoutAmount + Number.EPSILON) * 100) / 100;
+
+                log1([`Weekly payout calculation for mechanic ${mechanicId}:`, { earningCount: mechanicEarnings.length, finalPayoutAmount: roundedPayoutAmount }]);
+
+                if (roundedPayoutAmount <= 0) {
+                    log1(`No Razorpay payout required for mechanic ${mechanicId}. Net pending amount: ₹${roundedPayoutAmount}`);
+
+                    continue;
+                };
+
+                const payoutReferenceId = `WP-${mechanicId.slice(-12)}-${moment(weekStart).format("YYMMDD")}`;
+                const idempotencyKey = `weekly-payout-${mechanicId}-${weekStart}`;
+
+                const payoutData = await triggerRazorpayPayout(
+                    mechanic,
+                    {
+                        bankAccountNumber,
+                        bankIfscCode,
+                        bankAccountHolderName,
+                    },
+                    roundedPayoutAmount,
+                    payoutReferenceId,
+                    idempotencyKey,
+                );
+
+                log1([`Weekly Razorpay payout created for mechanic:- ${mechanicId}: ${payoutData.id}`]);
+
+                for (const earning of mechanicEarnings) {
+                    earning.razorpayPayoutId = payoutData.id || "";
+                    earning.payoutReferenceId = payoutReferenceId;
+                    earning.razorpayContactId = mechanic.razorpayContactId || "";
+                    earning.razorpayFundAccountId = mechanic.razorpayFundAccountId || "";
+                    earning.status = Constants.EARNING_STATUS.PROCESSING;
+                    earning.processedAt = new Date();
+
+                    await earning.save();
+                };
 
                 const deviceToken = mechanic.deviceToken || null;
-                const amountStr = earning.finalPayoutAmount.toFixed(2);
-
-                log1(`Earning record ${earning._id} marked as Processing.`);
-                earning.status = Constants.EARNING_STATUS.PROCESSING;
-
-                earning.processedAt = new Date();
-                await earning.save();
+                const amountStr = roundedPayoutAmount.toFixed(2);
 
                 const isPushEnabled = mechanic.paymentNotification !== Constants.NOTIFICATION_PREFERENCES_STATUS.FALSE;
-                log1(`Sending payout notification to mechanic device: ${deviceToken}`);
 
-                await sendPushNotification(isPushEnabled ? deviceToken : null, {
-                    mechanicId: mechanic._id,
-                    transactionId: earning.transactionId,
-                    bookingId: earning.bookingId,
-                    type: Constants.NOTIFICATION_TYPE.TRANSACTION,
-                    title: "Payment in Processing",
-                    description: `An amount of ₹${amountStr} is currently processing for transfer to your account for CarMate services.`,
-                });
-            } catch (payoutError) {
-                log1(`Error processing payout for earning ${earning._id}: ${payoutError.message}`);
-                earning.status = Constants.EARNING_STATUS.FAILED;
-                earning.processedAt = new Date();
-                await earning.save();
+                log1([`Sending weekly payout notification to mechanic: ${mechanicId}`]);
+
+                await sendPushNotification(isPushEnabled ? deviceToken : null,
+                    {
+                        mechanicId: mechanic._id,
+                        transactionId: mechanicEarnings[0]?.transactionId || null,
+                        bookingId: mechanicEarnings[0]?.bookingId || null,
+                        type: Constants.NOTIFICATION_TYPE.TRANSACTION,
+                        title: "Weekly Payment in Processing",
+                        description: `An amount of ₹${amountStr} is currently processing for transfer to your account for CarMate services.`,
+                    },
+                );
+
+                log1([`Weekly payout completed for mechanic ${mechanicId}.`]);
+            } catch (mechanicPayoutError) {
+                log1([`Error processing weekly payout for mechanic ${mechanicId}:`, mechanicPayoutError.message]);
+
+                continue;
             };
         };
     } catch (dbError) {
@@ -211,15 +326,20 @@ export const processWeeklyPayouts = async () => {
  * Initializes the weekly payout cron schedule
  */
 export const initCronJobs = () => {
-    // Schedule cron every Monday at 12:00:00 AM (0 0 * * 1)
+    /**
+     * For Run Cron Schedule every Monday at 12:00:00 AM (0 0 * * 1)
+     */
     cron.schedule("0 0 * * 1", async () => {
         log1(["Cron trigger fired: Weekly Earning Payout"]);
-        await processWeeklyPayouts();
-    });
 
-    // Schedule cron every 5 Minute
+        await processWeeklyPayouts();
+    }, { timezone: Constants.CURRENT_TIMEZONE });
+
+    /**
+     * For Testing Run Cron Schedule every 5 Minute
+     */
     // cron.schedule("*/5 * * * *", async () => {
-    //     log1(["Cron trigger fired: Weekly Earning Payout"]);
+    //     log1(["Cron trigger fired for testing: Weekly Earning Payout"]);
     //     await processWeeklyPayouts();
-    // });
+    // }, { timezone: Constants.CURRENT_TIMEZONE });
 };

@@ -97,6 +97,10 @@ const bookingSchema = new Schema(
             enum: Object.values(Constants.PLATFORM_FEE_TYPE),
             default: null,
         },
+        adminCharge: {
+            type: Number,
+            default: 0,
+        },
         totalServiceFee: {
             type: Number,
             default: 0,

@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
+import Constants from "../config/constant.js";
 
 let FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 let FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
@@ -71,9 +72,15 @@ export function generateTransactionPDF(transaction, res) {
     const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
     const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
+    const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
     const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
-    const adminPercentageCharge = parseFloat(transaction?.earningDetails?.adminPercentageCharge || 0);
+    const adminChargeType = parseFloat(transaction?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
     const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+
+    let feeTypeVal = `${adminCharge}%`;
+    if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+        feeTypeVal = "Fixed ₹";
+    };
 
     // Header background
     doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
@@ -99,7 +106,7 @@ export function generateTransactionPDF(transaction, res) {
         y += 38;
 
         drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
-        drawField(doc, `Admin Charge (${adminPercentageCharge}%):`, `₹${adminCharge}`, 320, y);
+        drawField(doc, `Admin Charge (${feeTypeVal}):`, `₹${totalAdminCharge}`, 320, y);
         y += 38;
 
         drawField(doc, "Total Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
@@ -152,7 +159,7 @@ export function generateTransactionPDF(transaction, res) {
     doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
     y += 20;
     doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
-    doc.text(`Admin Charge (${adminPercentageCharge}%): ₹${adminCharge}`, ML + 180, y + 28);
+    doc.text(`Admin Charge (${feeTypeVal}): ₹${totalAdminCharge}`, ML + 180, y + 28);
     doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
 
     // Footer line
@@ -280,7 +287,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
         const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
         const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
-        const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
+        const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
         const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
 
         const rowData = [
@@ -292,7 +299,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
             String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
             String(transaction?.carDetails?.fullName || "-").substring(0, 12),
             `₹${serviceAmount}`,
-            `₹${adminCharge}`,
+            `₹${totalAdminCharge}`,
             `₹${finalPayoutAmount}`,
             payoutStatus.text,
             formatDate(transaction?.createdAt),

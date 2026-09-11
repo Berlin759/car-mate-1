@@ -12,11 +12,16 @@ const earningSchema = new Schema(
         transactionId: {
             type: Schema.Types.ObjectId,
             ref: "Transaction",
-            required: true,
+            required: false,
         },
         bookingId: {
             type: Schema.Types.ObjectId,
             ref: "Booking",
+            required: true,
+        },
+        earningType: {
+            type: Number,
+            enum: Object.values(Constants.EARNING_TYPE),
             required: true,
         },
         earningAmount: {
@@ -27,13 +32,18 @@ const earningSchema = new Schema(
             type: Number,
             default: 0,
         },
+        totalAdminCharge: {
+            type: Number,
+            default: 0,
+        },
         adminCharge: {
             type: Number,
             default: 0,
         },
-        adminPercentageCharge: {
+        adminChargeType: {
             type: Number,
-            default: 0,
+            enum: Object.values(Constants.PLATFORM_FEE_TYPE),
+            default: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
         },
         finalPayoutAmount: {
             type: Number,
@@ -87,7 +97,11 @@ const earningSchema = new Schema(
     },
 );
 
-earningSchema.index({ mechanicId: 1 });
+earningSchema.index({
+    status: 1,
+    createdAt: 1,
+    mechanicId: 1,
+});
 
 earningSchema.virtual('readableCreatedAt').get(function () {
     return DateInHumanReadableFormat(this.createdAt);

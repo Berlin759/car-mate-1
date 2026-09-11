@@ -855,7 +855,10 @@ export const postHomeDetails = async (req, res) => {
         const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
 
         const response = {
-            gstPercentage: pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE,
+            gstPercentage: pricingDetails?.gstPercentage ?? Constants.DEFAULT_GST_PERCENTAGE,
+            platformFee: pricingDetails?.platformFee ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            cancellationFee: pricingDetails?.cancellationFee ?? Constants.DEFAULT_CANCELLATION_FEE,
             totalEarnings,
             pendingPayouts,
             todayJobs: todayJobsCount,
@@ -1463,6 +1466,7 @@ export const postBookingList = async (req, res) => {
                                 discountAmount: 1,
                                 platformFee: 1,
                                 platformFeeType: 1,
+                                adminCharge: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
                                 totalAmount: 1,
@@ -1894,6 +1898,7 @@ export const postBookingDetails = async (req, res) => {
                     discountAmount: 1,
                     platformFee: 1,
                     platformFeeType: 1,
+                    adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
                     totalAmount: 1,
@@ -1904,6 +1909,8 @@ export const postBookingDetails = async (req, res) => {
                     bookingPaymentStatus: 1,
                     cancelReason: 1,
                     cancelTime: 1,
+                    canceledBy: 1,
+                    canceledByRole: 1,
                     cancellationFee: 1,
                     status: 1,
                     createdAt: 1,
@@ -1978,7 +1985,9 @@ export const postBookingUpdateStatus = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid status."));
         };
 
-        const [bookingDetails, pricingDetails] = await Promise.all([
+        const [mechanicDetails, bookingDetails, pricingDetails] = await Promise.all([
+            Mechanic.findById(mechanicId).lean(),
+
             Booking.findOne({
                 _id: new ObjectId(bookingId),
                 mechanicId: new ObjectId(mechanicId),
@@ -2004,8 +2013,6 @@ export const postBookingUpdateStatus = async (req, res) => {
 
         let notificationTitle = "";
         let notificationDescription = "";
-
-        const mechanicDetails = await Mechanic.findById(mechanicId).select("fullName");
 
         switch (newStatus) {
             case Constants.BOOKING_STATUS.ACCEPTED: {
@@ -2129,6 +2136,25 @@ export const postBookingUpdateStatus = async (req, res) => {
                     await Transaction.create(transactionPayload);
                 };
 
+                if (cancellationFee > 0) {
+                    await Earning.create({
+                        mechanicId: new ObjectId(bookingDetails?.mechanicId),
+                        transactionId: null,
+                        bookingId: new ObjectId(bookingDetails?._id),
+                        earningType: Constants.EARNING_TYPE.CANCELLATION_DEDUCTION,
+                        earningAmount: 0,
+                        serviceAmount: 0,
+                        totalAdminCharge: cancellationFee,
+                        adminCharge: cancellationCharge,
+                        adminChargeType: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+                        finalPayoutAmount: -Math.abs(cancellationFee),
+                        bankAccountNumber: mechanicDetails.bankAccountNumber || "",
+                        bankIfscCode: mechanicDetails.bankIfscCode || "",
+                        bankAccountHolderName: mechanicDetails.bankAccountHolderName || "",
+                        status: Constants.EARNING_STATUS.PENDING,
+                    });
+                };
+
                 updatePayload.canceledBy = new ObjectId(mechanicId);
                 updatePayload.canceledByRole = Constants.USER_ROLE.MECHANIC;
                 updatePayload.cancelReason = reason || "";
@@ -2217,11 +2243,18 @@ export const postBookingUpdateStatus = async (req, res) => {
                     updatePayload.materialCost = parseFloat(materialCost);
                 };
 
-                const platformFee = pricingDetails?.platformFee || 0;
+                const platformFee = parseFloat(pricingDetails?.platformFee) || 0;
+                const platformFeeType = pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
                 const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
-                const totalAdminCharge = parseFloat((totalBookingAmount * parseFloat(platformFee)) / 100) || 0;
+                let totalAdminCharge = 0;
+
+                if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                    totalAdminCharge = parseFloat((totalBookingAmount * parseFloat(platformFee)) / 100) || 0;
+                } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                    totalAdminCharge = platformFee;
+                };
 
                 const earningAmount = totalBookingAmount - bookingDetails?.consultantFee;
                 const finalAmount = totalBookingAmount - totalAdminCharge;
@@ -2230,10 +2263,12 @@ export const postBookingUpdateStatus = async (req, res) => {
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
                     transactionId: new ObjectId(transactionDetails._id),
                     bookingId: new ObjectId(bookingDetails?._id),
+                    earningType: Constants.EARNING_TYPE.SERVICE,
                     earningAmount: earningAmount || 0,
                     serviceAmount: totalBookingAmount || 0,
-                    adminCharge: totalAdminCharge || 0,
-                    adminPercentageCharge: parseFloat(platformFee) || 0,
+                    totalAdminCharge: totalAdminCharge || 0,
+                    adminCharge: platformFee,
+                    adminChargeType: platformFeeType,
                     finalPayoutAmount: finalAmount || 0,
                     bankAccountNumber: mechanicDetails?.bankAccountNumber,
                     bankIfscCode: mechanicDetails?.bankIfscCode,
@@ -2596,8 +2631,9 @@ export const getBookingInvoice = async (req, res) => {
                                 status: 1,
                                 earningAmount: 1,
                                 serviceAmount: 1,
+                                totalAdminCharge: 1,
                                 adminCharge: 1,
-                                adminPercentageCharge: 1,
+                                adminChargeType: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },
@@ -3909,8 +3945,9 @@ export const postEarningOverview = async (req, res) => {
                         categoryImage: { $ifNull: ["$serviceDetails.image", ""] },
                         earningAmount: { $ifNull: ["$earningAmount", 0] },
                         serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                        totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                         adminCharge: { $ifNull: ["$adminCharge", 0] },
-                        adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
+                        adminChargeType: { $ifNull: ["$adminChargeType", 0] },
                         finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                         status: 1,
                         processedAt: 1,
@@ -4081,8 +4118,9 @@ export const postEarningList = async (req, res) => {
                                 trxId: { $ifNull: ["$transactionDetails.trxId", ""] },
                                 earningAmount: { $ifNull: ["$earningAmount", 0] },
                                 serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                                totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                                 adminCharge: { $ifNull: ["$adminCharge", 0] },
-                                adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
+                                adminChargeType: { $ifNull: ["$adminChargeType", 0] },
                                 finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                                 status: 1,
                                 processedAt: 1,
@@ -4101,6 +4139,7 @@ export const postEarningList = async (req, res) => {
                                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
                                     totalServiceFee: { $ifNull: ["$bookingDetails.totalServiceFee", 0] },
                                     discountAmount: { $ifNull: ["$bookingDetails.discountAmount", 0] },
+                                    adminCharge: { $ifNull: ["$bookingDetails.adminCharge", 0] },
                                     platformFee: { $ifNull: ["$bookingDetails.platformFee", 0] },
                                     platformFeeType: { $ifNull: ["$bookingDetails.discountAmount", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
                                     taxAmount: { $ifNull: ["$bookingDetails.taxAmount", 0] },
@@ -4116,8 +4155,9 @@ export const postEarningList = async (req, res) => {
                                 pricingSummary: {
                                     earnings: { $ifNull: ["$earningAmount", 0] },
                                     serviceAmount: { $ifNull: ["$serviceAmount", 0] },
+                                    totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                                     adminCharge: { $ifNull: ["$adminCharge", 0] },
-                                    adminPercentageCharge: { $ifNull: ["$adminPercentageCharge", 0] },
+                                    adminChargeType: { $ifNull: ["$adminChargeType", 0] },
                                     finalPayout: { $ifNull: ["$finalPayoutAmount", 0] },
                                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
                                     tipAmount: { $ifNull: ["$transactionDetails.tipAmount", 0] },
@@ -4262,8 +4302,9 @@ export const postEarningDetails = async (req, res) => {
                     bookingId: 1,
                     earningAmount: 1,
                     serviceAmount: 1,
+                    totalAdminCharge: 1,
                     adminCharge: 1,
-                    adminPercentageCharge: 1,
+                    adminChargeType: 1,
                     finalPayoutAmount: 1,
                     status: 1,
                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },

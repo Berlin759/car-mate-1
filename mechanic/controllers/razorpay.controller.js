@@ -160,7 +160,7 @@ export const razorpayRefund = async (payload) => {
         const refund = await razorpay.payments.refund(razorpayPaymentId, refundPayload);
 
         if (!refund) {
-            log1(["razorpayRefund Error----->", refund]);
+            log1(["razorpayRefund Error-------------------->", refund]);
             return errorResponse("Failed to process refund.");
         };
 
@@ -182,7 +182,7 @@ export const razorpayRefund = async (payload) => {
                     ownerId: ownerId,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
-                await sendPushNotification(mechanicData.deviceToken, notificationObject);
+                await sendPushNotification(ownerData.deviceToken, notificationObject);
             };
         };
 
@@ -194,7 +194,7 @@ export const razorpayRefund = async (payload) => {
 
         return successResponse("Refund processed successfully.", response);
     } catch (error) {
-        log1(["razorpayRefund Error----->", error.message]);
+        log1(["razorpayRefund Error:----------->", error]);
         return errorResponse(messages.unexpectedDataError);
     };
 };

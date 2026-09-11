@@ -195,7 +195,7 @@ function updatePlatformFeeUI() {
         $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(5);
     } else if (type === 2) {
         // Fixed Amount
-        $label.html('Platform Fee (&#8377;)');
+        $label.html('Platform Fee (₹)');
 
         $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(25);
     };

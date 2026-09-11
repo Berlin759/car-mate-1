@@ -159,31 +159,31 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Consultant Fee</span>
-            <span class="fw-md">&#8377; <%= booking.consultantFee || 0 %></span>
+            <span class="fw-md">₹ <%= booking.consultantFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Discount Amount</span>
-            <span class="fw-md">&#8377; <%= booking.discountAmount || 0 %></span>
+            <span class="fw-md">₹ <%= booking.discountAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Platform Fee ( <%= booking?.platformFeeType === 1 ? "%" : "&#8377;" %>)</span>
-            <span class="fw-md">&#8377; <%= booking.platformFee || 0 %></span>
+            <span class="text-gray fs-14 d-block">Platform Fee ( <%= booking?.platformFeeType === 1 ? "%" : "₹" %>)</span>
+            <span class="fw-md">₹ <%= booking.platformFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Sub Total</span>
-            <span class="fw-md">&#8377; <%= booking.subTotal || 0 %></span>
+            <span class="fw-md">₹ <%= booking.subTotal || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Tax Amount</span>
-            <span class="fw-md">&#8377; <%= booking.taxAmount || 0 %></span>
+            <span class="fw-md">₹ <%= booking.taxAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Cancel Fee</span>
-            <span class="fw-md">&#8377; <%= booking.cancellationFee || 0 %></span>
+            <span class="fw-md">₹ <%= booking.cancellationFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Total Amount</span>
-            <span class="fw-md fs-16 text-success">&#8377; <%= booking.totalAmount || 0 %></span>
+            <span class="fw-md fs-16 text-success">₹ <%= booking.totalAmount || 0 %></span>
         </div>
     </div>
 </div>

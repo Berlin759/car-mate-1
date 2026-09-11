@@ -54,7 +54,7 @@ export const handleRazorpayPayoutWebhook = async (req, res) => {
         };
 
         if (!earning && referenceId) {
-            earning = await Earning.findById(referenceId).populate("mechanicId");
+            earning = await Earning.findOne({ payoutReferenceId: referenceId }).populate("mechanicId");
         };
 
         if (!earning) {
