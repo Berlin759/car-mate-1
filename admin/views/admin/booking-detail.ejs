@@ -16,17 +16,39 @@
         return `${year}-${month}-${day}`;
     };
 
+    function fullDateFormat(date) {
+        if (!date) return "-";
+
+        const d = new Date(date);
+
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+
+        const period = hours >= 12 ? "PM" : "AM";
+
+        hours = hours % 12 || 12;
+        hours = String(hours).padStart(2, "0");
+
+        return `${year}-${month}-${day} ${hours}:${minutes} ${period}`;
+    };
+
     function getStatusBadge(status) {
         const map = {
             1: { text: "Pending", class: "alert-pending" },
-            2: { text: "Cancelled", class: "alert-end" },
-            3: { text: "Accepted", class: "alert-accept" },
+            2: { text: "Accepted", class: "alert-accept" },
+            3: { text: "Rejected", class: "alert-end" },
             4: { text: "En Route", class: "alert-accept" },
             5: { text: "Arrived", class: "alert-accept" },
             6: { text: "In Progress", class: "alert-accept" },
             7: { text: "Completed", class: "alert-success" },
             8: { text: "Paid", class: "alert-success" },
             9: { text: "Closed", class: "alert-success" },
+            10: { text: "Failed", class: "alert-end" },
+            11: { text: "Cancelled", class: "alert-end" },
         };
         return map[status] || { text: "Unknown", class: "alert-gray" };
     };
@@ -158,6 +180,10 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
+            <span class="text-gray fs-14 d-block"><%= booking?.serviceDetails?.fullName || "Service" %> Fee</span>
+            <span class="fw-md">₹ <%= booking.totalServiceFee || 0 %></span>
+        </div>
+        <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Consultant Fee</span>
             <span class="fw-md">₹ <%= booking.consultantFee || 0 %></span>
         </div>
@@ -166,24 +192,24 @@
             <span class="fw-md">₹ <%= booking.discountAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Platform Fee ( <%= booking?.platformFeeType === 1 ? "%" : "₹" %>)</span>
-            <span class="fw-md">₹ <%= booking.platformFee || 0 %></span>
+            <span class="text-gray fs-14 d-block">Platform Fee (<span class="fw-md"><%= booking?.platformFee %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
+            <span class="fw-md">₹ <%= booking.adminCharge || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Sub Total</span>
             <span class="fw-md">₹ <%= booking.subTotal || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Tax Amount</span>
-            <span class="fw-md">₹ <%= booking.taxAmount || 0 %></span>
+            <span class="text-gray fs-14 d-block">Tax Amount (<%= parseInt(booking?.taxPercentage || 0) %>%)</span>
+            <span class="fw-md">₹ <%= booking?.taxAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Cancel Fee</span>
-            <span class="fw-md">₹ <%= booking.cancellationFee || 0 %></span>
+            <span class="text-gray fs-14 d-block">Cancellation Fee <%= booking?.cancellationFee > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
+            <span class="fw-md text-danger">- ₹ <%= booking?.cancellationFee.toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Total Amount</span>
-            <span class="fw-md fs-16 text-success">₹ <%= booking.totalAmount || 0 %></span>
+            <span class="fw-md fs-16 text-success">₹ <%= (booking?.totalAmount - booking?.cancellationFee).toFixed(2) || 0 %></span>
         </div>
     </div>
 </div>
@@ -216,7 +242,7 @@
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block">Cancel Time</span>
-            <span class="fw-md"><%= formatDateFull(booking.cancelTime) || "-" %></span>
+            <span class="fw-md"><%= fullDateFormat(booking.cancelTime) || "-" %></span>
         </div>
     </div>
 </div>

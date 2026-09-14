@@ -117,6 +117,10 @@ const bookingSchema = new Schema(
             type: Number,
             default: 0,
         },
+        taxPercentage: {
+            type: Number,
+            default: Constants.DEFAULT_GST_PERCENTAGE,
+        },
         totalAmount: {
             type: Number,
             default: 0,
@@ -150,6 +154,10 @@ const bookingSchema = new Schema(
         cancellationFee: {
             type: Number,
             default: 0,
+        },
+        cancellationPercentage: {
+            type: Number,
+            default: Constants.DEFAULT_CANCELLATION_FEE,
         },
         canceledBy: {
             type: Schema.Types.ObjectId,

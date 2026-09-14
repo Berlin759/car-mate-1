@@ -1469,6 +1469,7 @@ export const postBookingList = async (req, res) => {
                                 adminCharge: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
+                                taxPercentage: 1,
                                 totalAmount: 1,
                                 quotation: 1,
                                 razorpayOrderId: 1,
@@ -1478,6 +1479,7 @@ export const postBookingList = async (req, res) => {
                                 cancelReason: 1,
                                 cancelTime: 1,
                                 cancellationFee: 1,
+                                cancellationPercentage: 1,
                                 status: 1,
                                 createdAt: 1,
                                 serviceDetails: 1,
@@ -1901,6 +1903,7 @@ export const postBookingDetails = async (req, res) => {
                     adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
+                    taxPercentage: 1,
                     totalAmount: 1,
                     quotation: 1,
                     razorpayOrderId: 1,
@@ -1912,6 +1915,7 @@ export const postBookingDetails = async (req, res) => {
                     canceledBy: 1,
                     canceledByRole: 1,
                     cancellationFee: 1,
+                    cancellationPercentage: 1,
                     status: 1,
                     createdAt: 1,
                     serviceDetails: 1,
@@ -2159,6 +2163,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                 updatePayload.canceledByRole = Constants.USER_ROLE.MECHANIC;
                 updatePayload.cancelReason = reason || "";
                 updatePayload.cancelTime = new Date();
+                updatePayload.cancellationPercentage = cancellationCharge;
                 updatePayload.cancellationFee = cancellationFee;
 
                 notificationTitle = "Booking Cancelled";
@@ -4143,6 +4148,7 @@ export const postEarningList = async (req, res) => {
                                     platformFee: { $ifNull: ["$bookingDetails.platformFee", 0] },
                                     platformFeeType: { $ifNull: ["$bookingDetails.discountAmount", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
                                     taxAmount: { $ifNull: ["$bookingDetails.taxAmount", 0] },
+                                    taxPercentage: { $ifNull: ["$bookingDetails.taxPercentage", 0] },
                                     subTotal: { $ifNull: ["$bookingDetails.subTotal", 0] },
                                     totalAmount: { $ifNull: ["$bookingDetails.totalAmount", 0] },
                                 },

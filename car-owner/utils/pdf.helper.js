@@ -155,7 +155,7 @@ export const generateInvoicePDF = async (booking) => {
 
             drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking.adminCharge || 0).toFixed(2));
             drawSummaryRow("Subtotal:", parseFloat(booking.subTotal || 0).toFixed(2));
-            drawSummaryRow("GST (18%):", parseFloat(booking.taxAmount || 0).toFixed(2));
+            drawSummaryRow(`GST (${booking?.taxPercentage || Constants.DEFAULT_GST_PERCENTAGE}%):`, parseFloat(booking.taxAmount || 0).toFixed(2));
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.primary).lineWidth(2).stroke();
