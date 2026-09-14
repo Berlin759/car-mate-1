@@ -42,6 +42,7 @@
             1: { text: "Pending", class: "alert-pending", textClass: "text-warning" },
             2: { text: "Completed", class: "alert-success", textClass: "text-success" },
             3: { text: "Failed", class: "alert-end", textClass: "text-danger" },
+            4: { text: "Processing", class: "alert-gray", textClass: "text-gray" },
         };
         return map[status] || { text: "Unknown", class: "alert-gray", textClass: "text-gray" };
     };
@@ -194,30 +195,49 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
-            <span class="fw-md fs-16">₹ <%= txn.totalAmount || 0 %></span>
+            <span class="fw-md fs-16">₹ <%= txn?.bookingDetails?.totalAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">
-                Admin Charge (<%= txn?.earningDetails?.adminCharge %><%= txn?.earningDetails?.adminChargeType === 1 ? "%" : "₹" %>)
+                Admin Charge (<span class="fw-md"><%= txn?.bookingDetails?.platformFee %><%= parseInt(txn?.bookingDetails?.platformFeeType) === 1 ? "%" : "₹" %></span>)
             </span>
-            <span class="fw-md">₹ <%= txn?.earningDetails?.totalAdminCharge || 0 %></span>
+            <span class="fw-md">₹ <%= txn?.bookingDetails?.adminCharge || 0 %></span>
         </div>
         <div class="col-md-6">
-            <span class="text-gray fs-14 d-block mb-1">Provider Payout</span>
-            <span class="fw-md fs-16 <%= payoutStatus ? payoutStatus.textClass : 'text-success' %>">
-                ₹ <%= txn?.earningDetails?.finalPayoutAmount || 0 %>
-            </span>
-        </div>
-        <div class="col-md-6">
-            <span class="text-gray fs-14 d-block mb-1">Payout Status</span>
-            <% if (payoutStatus) { %>
-                <span class="bet-status <%= payoutStatus.class %>"><%= payoutStatus.text %></span>
-            <% } else { %>
-                <span class="text-gray">-</span>
-            <% } %>
+            <span class="text-gray fs-14 d-block mb-1">Payment Status</span>
+            <span class="bet-status <%= txnStatus.class %>"><%= txnStatus.text %></span>
         </div>
     </div>
 </div>
+
+<% if (payoutStatus) { %>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">Payout Details</h6>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
+                <span class="fw-md fs-16">₹ <%= txn.totalAmount || 0 %></span>
+            </div>
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">
+                    Admin Charge (<%= txn?.earningDetails?.adminCharge %><%= txn?.earningDetails?.adminChargeType === 1 ? "%" : "₹" %>)
+                </span>
+                <span class="fw-md">₹ <%= txn?.earningDetails?.totalAdminCharge || 0 %></span>
+            </div>
+            <div class="col-md-6">
+                <span class="text-gray fs-14 d-block mb-1">Provider Payout</span>
+                <span class="fw-md fs-16 <%= payoutStatus ? payoutStatus.textClass : 'text-success' %>">
+                    ₹ <%= txn?.earningDetails?.finalPayoutAmount || 0 %>
+                </span>
+            </div>
+            <div class="col-md-6">
+                <span class="text-gray fs-14 d-block mb-1">Payout Status</span>
+                <span class="bet-status <%= payoutStatus.class %>"><%= payoutStatus.text %></span>
+            </div>
+        </div>
+    </div>
+<% } %>
 
 <div class="bg-white rounded-2 bs-border p-4 mt-30">
     <h6 class="mb-3">Other Details</h6>

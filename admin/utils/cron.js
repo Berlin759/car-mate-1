@@ -16,7 +16,6 @@ const razorpay = new Razorpay({
 
 export const triggerRazorpayPayout = async (
     mechanic,
-    bankDetails,
     payoutAmount,
     payoutReferenceId,
     idempotencyKey,
@@ -37,6 +36,13 @@ export const triggerRazorpayPayout = async (
         throw new Error("Payout amount must be at least ₹1.");
     };
 
+    const bankAccountNumber = mechanic.bankAccountNumber?.trim();
+    const bankIfscCode = mechanic.bankIfscCode?.trim()?.toUpperCase();
+    const bankAccountHolderName = mechanic.bankAccountHolderName?.trim();
+
+    if (!bankAccountNumber || !bankIfscCode || !bankAccountHolderName) {
+        throw new Error("Mechanic bank details are incomplete.");
+    };
 
     /**
      * ---------------------------------------------------------
@@ -47,7 +53,8 @@ export const triggerRazorpayPayout = async (
     let contactId = mechanic.razorpayContactId;
 
     if (!contactId) {
-        log1([`Creating Razorpay contact for Mechanic: ${mechanic.fullName || mechanic._id}`]);
+        log1(["Creating Razorpay contact", { mechanicId: mechanic._id.toString(), name: mechanic.fullName }]);
+
         try {
             const contactRes = await razorpay.api.post({
                 url: "/contacts",
@@ -64,7 +71,8 @@ export const triggerRazorpayPayout = async (
             mechanic.razorpayContactId = contactId;
 
             await mechanic.save();
-            log1([`Razorpay contact created: ${contactId}`]);
+
+            log1(["Razorpay contact created", { mechanicId: mechanic._id.toString(), contactId, }]);
         } catch (error) {
             const errData = error.error || error.response?.data?.error || error;
             log1(["Failed to create Razorpay contact:", errData]);
@@ -82,28 +90,33 @@ export const triggerRazorpayPayout = async (
     let fundAccountId = mechanic.razorpayFundAccountId;
 
     if (!fundAccountId) {
-        log1([`Creating Razorpay fund account for contact: ${contactId}`]);
+        log1(["Creating Razorpay fund account",
+            {
+                mechanicId: mechanic._id.toString(),
+                contactId,
+                bankAccountNumber: `******${bankAccountNumber.slice(-4)}`,
+                ifsc: bankIfscCode
+            },
+        ]);
+
         try {
             const fundRes = await razorpay.fundAccount.create({
                 contact_id: contactId,
                 account_type: "bank_account",
                 bank_account: {
-                    name: bankDetails.bankAccountHolderName,
-                    ifsc: bankDetails.bankIfscCode,
-                    account_number: bankDetails.bankAccountNumber,
+                    name: bankAccountHolderName,
+                    ifsc: bankIfscCode,
+                    account_number: bankAccountNumber,
                 },
             });
 
             fundAccountId = fundRes.id;
-            log1([`Razorpay fund account created: ${fundAccountId}`]);
 
-            if (
-                bankDetails.bankAccountNumber === mechanic.bankAccountNumber &&
-                bankDetails.bankIfscCode === mechanic.bankIfscCode
-            ) {
-                mechanic.razorpayFundAccountId = fundAccountId;
-                await mechanic.save();
-            };
+            mechanic.razorpayFundAccountId = fundAccountId;
+
+            await mechanic.save();
+
+            log1(["Razorpay fund account created", { mechanicId: mechanic._id.toString(), fundAccountId }]);
         } catch (error) {
             const errData = error.error || error.response?.data?.error || error;
             log1(["Failed to create Razorpay fund account:", errData]);
@@ -118,12 +131,16 @@ export const triggerRazorpayPayout = async (
      * ---------------------------------------------------------
      */
 
-    log1(
-        `Triggering Razorpay payout. Mechanic: ${mechanic._id}, ` +
-        `Fund Account: ${fundAccountId}, ` +
-        `Amount: ${amountInPaise}, ` +
-        `Reference: ${payoutReferenceId}`,
-    );
+    log1([
+        "Creating Razorpay payout",
+        {
+            mechanicId: mechanic._id.toString(),
+            fundAccountId: fundAccountId,
+            amount: amountInPaise,
+            referenceId: payoutReferenceId,
+            idempotencyKey: idempotencyKey,
+        },
+    ]);
 
     try {
         const payoutRes = await razorpay.api.post({
@@ -144,7 +161,17 @@ export const triggerRazorpayPayout = async (
             },
         });
 
-        log1(["Razorpay payout created successfully", payoutRes]);
+        log1([
+            "Razorpay payout created",
+            {
+                payoutId: payoutRes.id,
+                status: payoutRes.status,
+                amount: payoutRes.amount,
+                fundAccountId: payoutRes.fund_account_id,
+                referenceId: payoutRes.reference_id,
+                statusDetails: payoutRes.status_details || null,
+            },
+        ]);
 
         return payoutRes;
     } catch (error) {
@@ -171,7 +198,15 @@ export const processWeeklyPayouts = async () => {
     const weekStart = startOfRange.format("YYYY-MM-DD");
     const weekEnd = endOfRange.format("YYYY-MM-DD");
 
-    log1([`Payout Date Range: From:- ${startDate.toISOString()}, To:- ${endDate.toISOString()}`]);
+    log1([
+        "Payout Date Range",
+        {
+            weekStart,
+            weekEnd,
+            from: startDate.toISOString(),
+            to: endDate.toISOString(),
+        },
+    ]);
 
     try {
         const earnings = await Earning.find({
@@ -212,16 +247,19 @@ export const processWeeklyPayouts = async () => {
             const mechanic = mechanicData.mechanic;
             const mechanicEarnings = mechanicData.earnings;
 
-            log1([`Processing weekly payout for mechanic: ${mechanicId}. Earning count: ${mechanicEarnings.length}`]);
 
             try {
-                const earningWithBankDetails = mechanicEarnings.find(
-                    (earning) => earning.bankAccountNumber && earning.bankIfscCode && earning.bankAccountHolderName,
-                );
+                log1([
+                    "Processing mechanic payout",
+                    {
+                        mechanicId,
+                        earningCount: mechanicEarnings.length,
+                    },
+                ]);
 
-                const bankAccountNumber = earningWithBankDetails?.bankAccountNumber || mechanic.bankAccountNumber || "";
-                const bankIfscCode = earningWithBankDetails?.bankIfscCode || mechanic.bankIfscCode || "";
-                const bankAccountHolderName = earningWithBankDetails?.bankAccountHolderName || mechanic.bankAccountHolderName || "";
+                const bankAccountNumber = mechanic.bankAccountNumber?.trim() || "";
+                const bankIfscCode = mechanic.bankIfscCode?.trim()?.toUpperCase() || "";
+                const bankAccountHolderName = mechanic.bankAccountHolderName?.trim() || "";
 
                 if (!bankAccountNumber || !bankIfscCode || !bankAccountHolderName) {
                     log1(["Skipping weekly payout for mechanic Bank details are incomplete.", mechanicId]);
@@ -229,37 +267,21 @@ export const processWeeklyPayouts = async () => {
                     continue;
                 };
 
-                for (const earning of mechanicEarnings) {
-                    let changed = false;
-
-                    if (!earning.bankAccountNumber) {
-                        earning.bankAccountNumber = bankAccountNumber;
-                        changed = true;
-                    };
-
-                    if (!earning.bankIfscCode) {
-                        earning.bankIfscCode = bankIfscCode;
-                        changed = true;
-                    };
-
-                    if (!earning.bankAccountHolderName) {
-                        earning.bankAccountHolderName = bankAccountHolderName;
-                        changed = true;
-                    };
-
-                    if (changed) {
-                        await earning.save();
-                    };
-                };
-
                 const finalPayoutAmount = mechanicEarnings.reduce((total, earning) => total + (Number(earning.finalPayoutAmount) || 0), 0);
 
                 const roundedPayoutAmount = Math.round((finalPayoutAmount + Number.EPSILON) * 100) / 100;
 
-                log1([`Weekly payout calculation for mechanic ${mechanicId}:`, { earningCount: mechanicEarnings.length, finalPayoutAmount: roundedPayoutAmount }]);
+                log1([
+                    "Weekly payout calculation",
+                    {
+                        mechanicId: mechanicId,
+                        earningCount: mechanicEarnings.length,
+                        finalPayoutAmount: roundedPayoutAmount,
+                    },
+                ]);
 
                 if (roundedPayoutAmount <= 0) {
-                    log1(`No Razorpay payout required for mechanic ${mechanicId}. Net pending amount: ₹${roundedPayoutAmount}`);
+                    log1(["No Razorpay payout required", { mechanicId: mechanicId, netPendingAmount: roundedPayoutAmount }]);
 
                     continue;
                 };
@@ -269,17 +291,25 @@ export const processWeeklyPayouts = async () => {
 
                 const payoutData = await triggerRazorpayPayout(
                     mechanic,
-                    {
-                        bankAccountNumber,
-                        bankIfscCode,
-                        bankAccountHolderName,
-                    },
                     roundedPayoutAmount,
                     payoutReferenceId,
                     idempotencyKey,
                 );
 
-                log1([`Weekly Razorpay payout created for mechanic:- ${mechanicId}: ${payoutData.id}`]);
+                if (!payoutData?.id) {
+                    throw new Error("Razorpay did not return payout ID.");
+                };
+
+                log1([
+                    "Weekly Razorpay payout created",
+                    {
+                        mechanicId: mechanicId,
+                        payoutId: payoutData.id,
+                        status: payoutData.status,
+                        amount: roundedPayoutAmount,
+                        referenceId: payoutReferenceId,
+                    }
+                ]);
 
                 for (const earning of mechanicEarnings) {
                     earning.razorpayPayoutId = payoutData.id || "";
@@ -287,7 +317,7 @@ export const processWeeklyPayouts = async () => {
                     earning.razorpayContactId = mechanic.razorpayContactId || "";
                     earning.razorpayFundAccountId = mechanic.razorpayFundAccountId || "";
                     earning.status = Constants.EARNING_STATUS.PROCESSING;
-                    earning.processedAt = new Date();
+                    earning.processedAt = null;
 
                     await earning.save();
                 };
@@ -310,7 +340,7 @@ export const processWeeklyPayouts = async () => {
                     },
                 );
 
-                log1([`Weekly payout completed for mechanic ${mechanicId}.`]);
+                log1(["Weekly payout request successfully created", { mechanicId, payoutId: payoutData.id }]);
             } catch (mechanicPayoutError) {
                 log1([`Error processing weekly payout for mechanic ${mechanicId}:`, mechanicPayoutError.message]);
 
@@ -332,7 +362,11 @@ export const initCronJobs = () => {
     cron.schedule("0 0 * * 1", async () => {
         log1(["Cron trigger fired: Weekly Earning Payout"]);
 
-        await processWeeklyPayouts();
+        try {
+            await processWeeklyPayouts();
+        } catch (error) {
+            log1(["Weekly payout cron failed:", error]);
+        };
     }, { timezone: Constants.CURRENT_TIMEZONE });
 
     /**

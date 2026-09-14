@@ -55,10 +55,12 @@
                         </td>
                         <td>
                             <% if(transaction?.earningDetails) { %>
-                                <% if(transaction?.earningDetails?.status === 3) { %>
-                                    <span class="bet-status alert-accept">Failed</span>
+                                <% if(transaction?.earningDetails?.status === 4) { %>
+                                    <span class="bet-status alert-gray">Processing</span>
+                                <% } else if(transaction?.earningDetails?.status === 3) { %>
+                                    <span class="bet-status alert-end">Failed</span>
                                 <% } else if(transaction?.earningDetails?.status === 2) { %>
-                                    <span class="bet-status alert-end">Completed</span>
+                                    <span class="bet-status alert-accept">Completed</span>
                                 <% } else { %>
                                     <span class="bet-status alert-pending">Pending</span>
                                 <% } %>
