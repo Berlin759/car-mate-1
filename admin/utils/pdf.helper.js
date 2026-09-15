@@ -29,13 +29,14 @@ const STATUS_MAP = {
     1: { text: "Pending", color: COLORS.pending },
     2: { text: "Completed", color: COLORS.success },
     3: { text: "Failed", color: COLORS.danger },
-    4: { text: "Refunded", color: COLORS.warning },
+    4: { text: "Refunded", color: COLORS.primary },
 };
 
 const PAYOUT_STATUS_MAP = {
     1: { text: "Pending", color: COLORS.pending },
     2: { text: "Completed", color: COLORS.success },
     3: { text: "Failed", color: COLORS.danger },
+    4: { text: "Processing", color: COLORS.primary },
 };
 
 function formatDate(date) {

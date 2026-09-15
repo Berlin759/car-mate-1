@@ -856,10 +856,10 @@ export const postHomeDetails = async (req, res) => {
         const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
-            gstPercentage: pricingDetails?.gstPercentage ?? Constants.DEFAULT_GST_PERCENTAGE,
-            platformFee: pricingDetails?.platformFee ?? Constants.DEFAULT_PLATFORM_FEE,
-            platformFeeType: pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
-            cancellationFee: pricingDetails?.cancellationFee ?? Constants.DEFAULT_CANCELLATION_FEE,
+            gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
+            platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: parseFloat(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            cancellationFee: parseFloat(pricingDetails?.cancellationFee) ?? Constants.DEFAULT_CANCELLATION_FEE,
             location: locationObject,
             carList: carList,
             serviceCategories: serviceList,
@@ -3425,7 +3425,7 @@ export const postAddBooking = async (req, res) => {
 
         const subTotal = parseFloat(remainingAmount + platformAmount);
 
-        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+        const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
         const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
 
@@ -4723,7 +4723,7 @@ export const postRescheduleBooking = async (req, res) => {
 
         const subTotal = parseFloat(remainingAmount + platformAmount);
 
-        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+        const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
         const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
 
@@ -4841,7 +4841,7 @@ export const postCancelBooking = async (req, res) => {
 
         const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
-        const cancellationCharge = pricingDetails?.cancellationFee || 0;
+        const cancellationCharge = parseFloat(pricingDetails?.cancellationFee) || 0;
         const cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
         const refundAmount = totalBookingAmount - cancellationFee;
 
@@ -5412,7 +5412,7 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
 
             const pricingDetails = await Pricing.findOne({});
 
-            const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+            const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
             const gstAmount = parseFloat((quoteSum * gstPercentage) / 100);
 
@@ -5460,6 +5460,25 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
                 };
 
                 await sendPushNotification(ownerData.deviceToken, notificationObject);
+            };
+
+            const mechanicData = await Mechanic.findById(booking.mechanicId).lean();
+
+            if (
+                mechanicData &&
+                mechanicData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+                mechanicData.deviceToken &&
+                mechanicData.deviceToken !== ""
+            ) {
+                let notificationObject = {
+                    title: "Quotation Payment Completed!",
+                    description: "The owner has successfully completed the quotation payment. The approved services are now ready to be completed.",
+                    mechanicId: mechanicData?._id,
+                    bookingId: booking._id,
+                    type: Constants.NOTIFICATION_TYPE.BOOKING,
+                };
+
+                await sendPushNotification(mechanicData.deviceToken, notificationObject);
             };
         };
 

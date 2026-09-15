@@ -855,10 +855,10 @@ export const postHomeDetails = async (req, res) => {
         const profileCompletionPercentage = (profileCompletionCount / 5) * 100;
 
         const response = {
-            gstPercentage: pricingDetails?.gstPercentage ?? Constants.DEFAULT_GST_PERCENTAGE,
-            platformFee: pricingDetails?.platformFee ?? Constants.DEFAULT_PLATFORM_FEE,
-            platformFeeType: pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
-            cancellationFee: pricingDetails?.cancellationFee ?? Constants.DEFAULT_CANCELLATION_FEE,
+            gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
+            platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            cancellationFee: parseFloat(pricingDetails?.cancellationFee) ?? Constants.DEFAULT_CANCELLATION_FEE,
             totalEarnings,
             pendingPayouts,
             todayJobs: todayJobsCount,
@@ -2107,7 +2107,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
-                const cancellationCharge = pricingDetails?.cancellationFee || 0;
+                const cancellationCharge = parseFloat(pricingDetails?.cancellationFee) || 0;
                 const cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
 
                 if (transactionDetails.trxId) {
@@ -2249,7 +2249,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                 };
 
                 const platformFee = parseFloat(pricingDetails?.platformFee) || 0;
-                const platformFeeType = pricingDetails?.platformFeeType ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+                const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
                 const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
@@ -2415,7 +2415,7 @@ export const postBookingSendQuote = async (req, res) => {
 
         const pricingDetails = await Pricing.findOne({});
 
-        const gstPercentage = pricingDetails?.gstPercentage || Constants.DEFAULT_GST_PERCENTAGE;
+        const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
         const taxAmount = parseFloat((quoteSum * gstPercentage) / 100);
         const totalAmount = quoteSum + taxAmount;
@@ -2435,6 +2435,25 @@ export const postBookingSendQuote = async (req, res) => {
         booking.razorpayQuotationOrderId = razorQuotationBooking.data.order.id;
 
         await booking.save();
+
+        const ownerData = await Mechanic.findById(booking.ownerId).lean();
+
+        if (
+            ownerData &&
+            ownerData.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            ownerData.deviceToken &&
+            ownerData.deviceToken !== ""
+        ) {
+            let notificationObject = {
+                title: "New Quotation Received!",
+                description: "The mechanic has submitted a quotation for your booking. Please review the quotation and complete the payment to proceed with the services.",
+                ownerId: ownerData?._id,
+                bookingId: booking._id,
+                type: Constants.NOTIFICATION_TYPE.BOOKING,
+            };
+
+            await sendPushNotification(ownerData.deviceToken, notificationObject);
+        };
 
         return res.status(200).json(successResponse("Quotation add successfully.", booking));
     } catch (error) {
