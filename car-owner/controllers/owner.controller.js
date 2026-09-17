@@ -5,7 +5,6 @@ import moment from "moment";
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import mongoose from "mongoose";
-import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
 import { io } from "../index.js";
 import { sendMail } from "../utils/mailSend.helper.js";
@@ -68,7 +67,7 @@ export const getPrivacyPolicy = async (req, res) => {
         });
     } catch (error) {
         log1(["Error in getPrivacyPolicy----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     }
 }
 
@@ -85,7 +84,7 @@ export const getTermsCondition = async (req, res) => {
         });
     } catch (error) {
         log1(["Error in getTermsCondition----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     }
 }
 
@@ -102,7 +101,7 @@ export const getFaq = async (req, res) => {
         });
     } catch (error) {
         log1(["Error in getFaq----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     }
 }
 
@@ -119,7 +118,7 @@ export const getRefund = async (req, res) => {
         });
     } catch (error) {
         log1(["Error in getRefund----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -192,7 +191,7 @@ export const getProfileDetails = async (req, res) => {
                     paymentNotification: 1,
                     smsNotification: 1,
                     status: 1,
-                    languageCode: 1,
+                    language: 1,
                     isAutoDetectLanguage: 1,
                     addressDetails: {
                         _id: "$addressDetails._id",
@@ -218,7 +217,7 @@ export const getProfileDetails = async (req, res) => {
         return res.status(200).json(successResponse("Get Profile Details successfully!", response));
     } catch (error) {
         log1(["Error in getProfileDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -248,7 +247,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
         let updateObj = {};
 
         // Simple string/number updates
-        const simpleFields = ["fullName", "phoneCode", "latitude", "longitude", "address", "description", "languageCode", "isAutoDetectLanguage"];
+        const simpleFields = ["fullName", "phoneCode", "latitude", "longitude", "address", "description"];
         simpleFields.forEach(field => {
             if (param[field] !== undefined && param[field] !== null && param[field] !== "") {
                 updateObj[field] = param[field];
@@ -290,7 +289,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
 
         for (const field of filesToUpload) {
             if (req.files?.[field]) {
-                const uploadedFile = await uploadFile(req.files[field]);
+                const uploadedFile = await uploadFile(req, req.files[field]);
                 if (uploadedFile.flag === 0) return res.status(400).json(uploadedFile);
 
                 // Remove old file
@@ -298,7 +297,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
                     let replaceUrl = `${process.env.APP_URL}/${uploadedFile.data.folder}/`;
                     const filename = ownerData[field].replace(replaceUrl, "");
                     if (filename) {
-                        await removeFile(uploadedFile.data.folder, filename);
+                        await removeFile(req, uploadedFile.data.folder, filename);
                     };
                 };
 
@@ -312,7 +311,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
                 let replaceUrl = `${process.env.APP_URL}/upload_images/`;
                 const filename = ownerData["profileImage"].replace(replaceUrl, "");
                 if (filename) {
-                    await removeFile("upload_images", filename);
+                    await removeFile(req, "upload_images", filename);
                 };
             };
             updateObj["profileImage"] = "";
@@ -324,7 +323,7 @@ export const postUpdateOwnerProfile = async (req, res) => {
             let updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true }).select("-password");
 
             if (!updateOwner) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
+                return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
             };
 
             ownerData = updateOwner;
@@ -337,6 +336,38 @@ export const postUpdateOwnerProfile = async (req, res) => {
     };
 };
 
+export const postChangeLanguage = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+        const { language, isAutoDetectLanguage } = req.body;
+
+        log1(["postChangeLanguage req.body------>", req.body]);
+        log1(["postChangeLanguage ownerId------>", ownerId]);
+
+        const checkValidation = await custom_validation(req, req.body, "owner.change_language");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
+        };
+
+        const updateObj = {
+            language: language,
+            isAutoDetectLanguage: isAutoDetectLanguage,
+        };
+
+        let updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });
+        if (!updateOwner) {
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
+        };
+
+        res.cookie('language', language);
+
+        return res.status(200).json(successResponse(req.language?.user?.language_updated));
+    } catch (error) {
+        log1(["Error in postChangeLanguage ----->", error]);
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
+    };
+};
+
 export const postDeviceTokenUpdate = async (req, res) => {
     try {
         const ownerId = req.ownerId;
@@ -345,9 +376,9 @@ export const postDeviceTokenUpdate = async (req, res) => {
         log1(["postDeviceTokenUpdate ownerId ----->", ownerId]);
         log1(["postDeviceTokenUpdate req.body ----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.update_device_token");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.update_device_token");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         let updateObj = {
@@ -358,13 +389,13 @@ export const postDeviceTokenUpdate = async (req, res) => {
         log1(["postDeviceTokenUpdate updateOwner ----->", updateOwner]);
 
         if (!updateOwner) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         return res.status(200).json(successResponse("You have successfully updated your device token."));
     } catch (error) {
         log1(["Error in postDeviceTokenUpdate ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     }
 };
 
@@ -394,14 +425,14 @@ export const postUpdatePreferences = async (req, res) => {
             let updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });
 
             if (!updateOwner) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
+                return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
             };
         };
 
         return res.status(200).json(successResponse("You have successfully updated your Preferences!"));
     } catch (error) {
         log1(["Error in postUpdatePreferences ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     }
 };
 
@@ -423,7 +454,7 @@ export const postUpdateLocation = async (req, res) => {
         return res.status(200).json(successResponse("Location updated successfully."));
     } catch (error) {
         log1(["Error in postUpdateLocation ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -435,9 +466,9 @@ export const postDeleteOwnerAccount = async (req, res) => {
         log1(["postDeleteOwnerAccount ownerId ----->", ownerId]);
         log1(["postDeleteOwnerAccount req.body ----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.delete_account");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.delete_account");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (parseInt(reasonCategory) === Constants.DELETE_ACCOUNT_REASON_STATUS.OTHER) {
@@ -469,7 +500,7 @@ export const postDeleteOwnerAccount = async (req, res) => {
         return res.status(200).json(successResponse("Your account has been deleted successfully."));
     } catch (error) {
         log1(["Error in postDeleteOwnerAccount ----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     }
 };
 
@@ -486,7 +517,7 @@ export const postLogout = async (req, res) => {
 
         const updateOwner = await Owner.findByIdAndUpdate(ownerId, updateObj, { new: true });
         if (!updateOwner) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         io.emit(Constants.SOCKET_EVENTS.OWNER_STATUS_CHANGE, { ownerId: updateOwner._id, status: "offline" });
@@ -494,18 +525,18 @@ export const postLogout = async (req, res) => {
         return res.status(200).json(successResponse("Logout successfully."));
     } catch (error) {
         log1(["Error in postLogout ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
 export const postLanguageList = async (req, res) => {
     try {
-        const languages = await Language.find({ isActive: true }).sort({ createdAt: -1 }).select("_id name nativeName languageCode isActive");
+        const languages = await Language.find({ isActive: true }).sort({ createdAt: -1 }).select("_id name nativeName language isActive");
 
         return res.status(200).json(successResponse("Languages fetched successfully.", languages));
     } catch (error) {
         log1(["Error in postLanguageList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -522,7 +553,7 @@ export const postAppVersion = async (req, res) => {
         return res.status(200).json(successResponse("App version fetched successfully.", response));
     } catch (error) {
         log1(["Error in postAppVersion ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -637,7 +668,7 @@ export const postHomeDetails = async (req, res) => {
         const [updatedOwner, carList] = ownerResult;
 
         if (ownerObjectId && Object.keys(ownerUpdatePayload).length > 0 && !updatedOwner) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         const serviceList = serviceCategories.map((service) => ({
@@ -856,9 +887,10 @@ export const postHomeDetails = async (req, res) => {
         const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
+            evAdminChargeType: parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE,
             gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
             platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
-            platformFeeType: parseFloat(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            platformFeeType: parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
             cancellationFee: parseFloat(pricingDetails?.cancellationFee) ?? Constants.DEFAULT_CANCELLATION_FEE,
             location: locationObject,
             carList: carList,
@@ -867,7 +899,7 @@ export const postHomeDetails = async (req, res) => {
         }));
     } catch (error) {
         log1(["Error in postHomeDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -891,9 +923,9 @@ export const postSearchMechanics = async (req, res) => {
             guestId,
         } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.search_mechanic");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.search_mechanic");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         const defaultRadius = radius !== undefined && radius !== null && radius !== "" ? parseFloat(radius) : Constants.DEFAULT_RADIUS;
@@ -1272,7 +1304,7 @@ export const postSearchMechanics = async (req, res) => {
         return res.status(200).json(successResponse("Search results fetched successfully.", response));
     } catch (error) {
         log1(["Error in postSearchMechanics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1282,14 +1314,19 @@ export const postAddCar = async (req, res) => {
         log1(["postAddCar ownerId----->", ownerId]);
 
         log1(["postAddCar req.body----->", req.body]);
-        const { vehicleNumber } = req.body;
+        const { vehicleNumber, fuelType } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.add_car");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.add_car");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
-        // const vehicle = await getVehicleDetails(vehicleNumber);
+        const validType = Object.values(Constants.CAR_FUEL_TYPE);
+        if (!validType.includes(parseInt(fuelType))) {
+            return res.status(400).json(errorResponse("Invalid fuel type."));
+        };
+
+        // const vehicle = await getVehicleDetails(req, vehicleNumber);
 
         // if (vehicle.flag === 0) {
         //     return res.status(vehicle.status).json(vehicle);
@@ -1338,6 +1375,7 @@ export const postAddCar = async (req, res) => {
             vehicleManufacturerName: "HYUNDAI MOTOR INDIA LTD",
             vehicleColour: "TEAL GREY",
             vehicleType: "PETROL",
+            fuelType: fuelType,
             vehicleOwnerCount: 1,
             ownerPhoneNumber: null,
             rcStatus: "ACTIVE",
@@ -1367,7 +1405,7 @@ export const postAddCar = async (req, res) => {
 
             let uploadedImages = [];
             for (const image of images) {
-                const uploadResp = await uploadFile(image);
+                const uploadResp = await uploadFile(req, image);
                 if (uploadResp.flag !== 1) {
                     return res.status(400).json(uploadResp);
                 };
@@ -1384,7 +1422,7 @@ export const postAddCar = async (req, res) => {
         return res.status(200).json(successResponse("New Car Add Successfully!"));
     } catch (error) {
         log1(["Error in postAddCar----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1452,6 +1490,7 @@ export const postCarList = async (req, res) => {
                     vehicleManufacturerName: 1,
                     vehicleColour: 1,
                     vehicleType: 1,
+                    fuelType: 1,
                     vehicleOwnerCount: 1,
                     ownerPhoneNumber: 1,
                     rcStatus: 1,
@@ -1493,7 +1532,7 @@ export const postCarList = async (req, res) => {
         return res.status(200).json(successResponse("Car List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postCarList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1516,9 +1555,22 @@ export const postUpdateCar = async (req, res) => {
         };
 
         let updatePayload = {};
-        if (vehicleNumber) updatePayload.vehicleNumber = vehicleNumber;
-        if (fuelType) updatePayload.fuelType = fuelType;
-        if (vehicleColour) updatePayload.vehicleColour = vehicleColour;
+        if (vehicleNumber) {
+            updatePayload.vehicleNumber = vehicleNumber;
+        };
+
+        if (fuelType) {
+            const validType = Object.values(Constants.CAR_FUEL_TYPE);
+            if (!validType.includes(parseInt(fuelType))) {
+                return res.status(400).json(errorResponse("Invalid fuel type."));
+            };
+
+            updatePayload.fuelType = fuelType;
+        };
+
+        if (vehicleColour) {
+            updatePayload.vehicleColour = vehicleColour;
+        };
 
         if (req.files && req.files.images) {
             let images = req.files.images;
@@ -1538,14 +1590,14 @@ export const postUpdateCar = async (req, res) => {
                     if (parts.length >= 2) {
                         const folder = parts[1];
                         const fileName = parts[2];
-                        await removeFile(folder, fileName);
+                        await removeFile(req, folder, fileName);
                     };
                 };
             };
 
             let uploadedImages = [];
             for (const image of images) {
-                const uploadResp = await uploadFile(image);
+                const uploadResp = await uploadFile(req, image);
 
                 if (uploadResp.flag !== 1) {
                     return res.status(400).json(uploadResp);
@@ -1565,7 +1617,7 @@ export const postUpdateCar = async (req, res) => {
         return res.status(200).json(successResponse("Car updated successfully."));
     } catch (error) {
         log1(["Error in postUpdateCar ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1604,7 +1656,7 @@ export const postDeleteCar = async (req, res) => {
         return res.status(200).json(successResponse("Car deleted successfully."));
     } catch (error) {
         log1(["Error in postDeleteCar ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1739,7 +1791,7 @@ export const postServiceList = async (req, res) => {
         return res.status(200).json(successResponse("Service List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postServiceList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -1763,7 +1815,7 @@ export const postServiceHistory = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid car id."));
         };
 
-        const carDetails = await Car.findOne({ _id: new ObjectId(carId), status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber registerNumber images model brand year color");
+        const carDetails = await Car.findOne({ _id: new ObjectId(carId), status: Constants.CAR_STATUS.VALID }).select("_id fullName vehicleNumber fuelType registerNumber images model brand year color");
         if (!carDetails) {
             return res.status(400).json(errorResponse("Invalid car id."));
         };
@@ -1893,7 +1945,7 @@ export const postServiceHistory = async (req, res) => {
         return res.status(200).json(successResponse("Service history fetched successfully.", response));
     } catch (error) {
         log1(["Error in postServiceHistory ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2265,7 +2317,7 @@ export const postNearbyMechanics = async (req, res) => {
         return res.status(200).json(successResponse("Nearby mechanics fetched successfully.", mechanicResponse));
     } catch (error) {
         log1(["Error in postNearbyMechanics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2276,9 +2328,9 @@ export const postPopularNearbyMechanics = async (req, res) => {
         log1(["postPopularNearbyMechanics ownerId----->", ownerId]);
         log1(["postPopularNearbyMechanics req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.search_mechanic");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.search_mechanic");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         const {
@@ -2647,7 +2699,7 @@ export const postPopularNearbyMechanics = async (req, res) => {
         return res.status(200).json(successResponse("Popular nearby mechanics list retrieved successfully.", response));
     } catch (error) {
         log1(["Error in postPopularNearbyMechanics ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2662,9 +2714,9 @@ export const postMechanicDetails = async (req, res) => {
             longitude,
         } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.mechanic_details");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.mechanic_details");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(mechanicId)) {
@@ -2795,7 +2847,7 @@ export const postMechanicDetails = async (req, res) => {
         return res.status(200).json(successResponse("Mechanic service details fetched successfully.", responseData));
     } catch (error) {
         log1(["Error in postMechanicDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     }
 };
 
@@ -2807,9 +2859,9 @@ export const postAddAddress = async (req, res) => {
         log1(["postAddAddress ownerId----->", ownerId]);
         log1(["postAddAddress req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.add_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.add_address");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         const isDefaultAddress = isDefault === true || isDefault === "true";
@@ -2850,7 +2902,7 @@ export const postAddAddress = async (req, res) => {
         return res.status(200).json(successResponse("Address added successfully!", newAddress));
     } catch (error) {
         log1(["Error in postAddAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2888,7 +2940,7 @@ export const postAddressList = async (req, res) => {
         return res.status(200).json(successResponse("Address list get successfully.", response));
     } catch (error) {
         log1(["Error in postAddressList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2900,9 +2952,9 @@ export const postUpdateAddress = async (req, res) => {
         log1(["postUpdateAddress ownerId----->", ownerId]);
         log1(["postUpdateAddress req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.update_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.update_address");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(addressId)) {
@@ -2954,7 +3006,7 @@ export const postUpdateAddress = async (req, res) => {
         return res.status(200).json(successResponse("Address updated successfully!", updatedAddress));
     } catch (error) {
         log1(["Error in postUpdateAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -2966,9 +3018,9 @@ export const postDeleteAddress = async (req, res) => {
         log1(["postDeleteAddress ownerId----->", ownerId]);
         log1(["postDeleteAddress req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.delete_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.delete_address");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(addressId)) {
@@ -2989,7 +3041,7 @@ export const postDeleteAddress = async (req, res) => {
         return res.status(200).json(successResponse("Address deleted successfully!"));
     } catch (error) {
         log1(["Error in postDeleteAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -3001,9 +3053,9 @@ export const postSetDefaultAddress = async (req, res) => {
         log1(["postSetDefaultAddress ownerId----->", ownerId]);
         log1(["postSetDefaultAddress req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.set_default_address");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.set_default_address");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(addressId)) {
@@ -3031,7 +3083,7 @@ export const postSetDefaultAddress = async (req, res) => {
         return res.status(200).json(successResponse("Default address set successfully!", updatedAddress));
     } catch (error) {
         log1(["Error in postSetDefaultAddress ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -3081,7 +3133,7 @@ export const postCouponList = async (req, res) => {
         return res.status(200).json(successResponse("Coupon list fetched successfully.", response));
     } catch (error) {
         log1(["Error in postCouponList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -3093,9 +3145,9 @@ export const postApplyCoupon = async (req, res) => {
         log1(["postApplyCoupon ownerId----->", ownerId]);
         log1(["postApplyCoupon req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.apply_coupon");
-        if (validate.flag !== 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.apply_coupon");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         const coupon = await Coupon.findOne({
@@ -3151,7 +3203,7 @@ export const postApplyCoupon = async (req, res) => {
         return res.status(200).json(successResponse("Coupon applied successfully.", response));
     } catch (error) {
         log1(["Error in postApplyCoupon ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -3171,9 +3223,9 @@ export const postAddBooking = async (req, res) => {
     log1(["postAddBooking req.body----->", req.body]);
 
     try {
-        const validate = await custom_validation(req.body, "owner.add_booking");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.add_booking");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(serviceId)) {
@@ -3411,16 +3463,29 @@ export const postAddBooking = async (req, res) => {
         log1(["postAddBooking discountAmount----->", discountAmount]);
 
         const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
+        const evAdminChargeType = parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF;
         const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
         const remainingAmount = parseFloat(totalFee - discountAmount);
 
         let platformAmount = 0;
 
-        if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
-            platformAmount = parseFloat((remainingAmount * platformFee) / 100);
-        } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
-            platformAmount = platformFee;
+        if (carDetails?.fuelType === Constants.CAR_FUEL_TYPE.EV) {
+            if (evAdminChargeType === Constants.EV_ADMIN_CHARGE_TYPE.ON) {
+                if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                    platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+                } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                    platformAmount = platformFee;
+                };
+            } else {
+                platformAmount = 0;
+            };
+        } else {
+            if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+            } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                platformAmount = platformFee;
+            };
         };
 
         const subTotal = parseFloat(remainingAmount + platformAmount);
@@ -3448,6 +3513,7 @@ export const postAddBooking = async (req, res) => {
             adminCharge: platformAmount,
             platformFee: platformFee,
             platformFeeType: platformFeeType,
+            evAdminChargeType: evAdminChargeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
             taxPercentage: gstPercentage,
@@ -3466,10 +3532,10 @@ export const postAddBooking = async (req, res) => {
         const createBooking = await Booking.create(bookingData);
         log1(["postAddBooking createBooking----->", createBooking]);
         if (!createBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
-        const razorBooking = await createOrder({
+        const razorBooking = await createOrder(req, {
             order_id: createBooking._id,
             order_amount: bookingData.totalAmount,
         });
@@ -3477,7 +3543,7 @@ export const postAddBooking = async (req, res) => {
         log1(["postAddBooking placeorder - razorOrder : ", razorBooking]);
         if (razorBooking.flag !== 1) {
             await Booking.deleteOne({ _id: createBooking._id })
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id });
@@ -3494,7 +3560,7 @@ export const postAddBooking = async (req, res) => {
         return res.status(200).json(successResponse("Booking created successfully. Please complete the payment.", responseData));
     } catch (error) {
         log1(["Error in postAddBooking ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -3880,6 +3946,7 @@ export const postBookingList = async (req, res) => {
                                 discountAmount: 1,
                                 platformFee: 1,
                                 platformFeeType: 1,
+                                evAdminChargeType: 1,
                                 adminCharge: 1,
                                 subTotal: 1,
                                 taxAmount: 1,
@@ -3992,7 +4059,7 @@ export const postBookingList = async (req, res) => {
         return res.status(200).json(successResponse("Booking List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postBookingList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -4320,6 +4387,7 @@ export const postBookingDetails = async (req, res) => {
                     discountAmount: 1,
                     platformFee: 1,
                     platformFeeType: 1,
+                    evAdminChargeType: 1,
                     adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
@@ -4483,7 +4551,7 @@ export const postBookingDetails = async (req, res) => {
         return res.status(200).json(successResponse("Booking details get successfully.", response));
     } catch (error) {
         log1(["Error in postBookingDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -4502,9 +4570,9 @@ export const postUpdateBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(req.body, "owner.update_booking");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.update_booking");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(bookingId)) {
@@ -4564,14 +4632,14 @@ export const postUpdateBooking = async (req, res) => {
 
         let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
         if (!updateBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         return res.status(200).json(successResponse("You have successfully updated your booking!"));
     } catch (error) {
         log1(["Error in postUpdateBooking ----->", error]);
         ownerLocks.delete(ownerId);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     } finally {
         ownerLocks.delete(ownerId);
     };
@@ -4592,9 +4660,9 @@ export const postRescheduleBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(req.body, "owner.reschedule_booking");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.reschedule_booking");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(bookingId)) {
@@ -4615,10 +4683,16 @@ export const postRescheduleBooking = async (req, res) => {
             return res.status(400).json(errorResponse("This Booking is not Available."));
         };
 
-        const [serviceDetails, addressDetails, pricingDetails] = await Promise.all([
+        const [serviceDetails, carDetails, addressDetails, pricingDetails] = await Promise.all([
             Service.findOne({
                 _id: new ObjectId(bookingDetails?.serviceId),
                 status: Constants.SERVICE_STATUS.ACTIVE,
+            }).lean(),
+
+            Car.findOne({
+                _id: new ObjectId(bookingDetails?.carId),
+                ownerId: new ObjectId(ownerId),
+                status: Constants.CAR_STATUS.VALID,
             }).lean(),
 
             Address.findOne({
@@ -4631,6 +4705,10 @@ export const postRescheduleBooking = async (req, res) => {
 
         if (!serviceDetails) {
             return res.status(400).json(errorResponse("Invalid selected service. Please choose a different service."));
+        };
+
+        if (!carDetails) {
+            return res.status(400).json(errorResponse("Invalid car."));
         };
 
         if (!addressDetails) {
@@ -4708,6 +4786,7 @@ export const postRescheduleBooking = async (req, res) => {
         };
         log1(["postRescheduleBooking discountAmount----->", discountAmount]);
 
+        const evAdminChargeType = parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF;
         const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
         const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
@@ -4715,10 +4794,22 @@ export const postRescheduleBooking = async (req, res) => {
 
         let platformAmount = 0;
 
-        if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
-            platformAmount = parseFloat((remainingAmount * platformFee) / 100);
-        } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
-            platformAmount = platformFee;
+        if (carDetails?.fuelType === Constants.CAR_FUEL_TYPE.EV) {
+            if (evAdminChargeType === Constants.EV_ADMIN_CHARGE_TYPE.ON) {
+                if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                    platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+                } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                    platformAmount = platformFee;
+                };
+            } else {
+                platformAmount = 0;
+            };
+        } else {
+            if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                platformAmount = parseFloat((remainingAmount * platformFee) / 100);
+            } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                platformAmount = platformFee;
+            };
         };
 
         const subTotal = parseFloat(remainingAmount + platformAmount);
@@ -4746,6 +4837,7 @@ export const postRescheduleBooking = async (req, res) => {
             adminCharge: platformAmount,
             platformFee: platformFee,
             platformFeeType: platformFeeType,
+            evAdminChargeType: evAdminChargeType,
             subTotal: subTotal,
             taxAmount: taxAmount,
             taxPercentage: gstPercentage,
@@ -4764,10 +4856,10 @@ export const postRescheduleBooking = async (req, res) => {
         const createBooking = await Booking.create(bookingData);
         log1(["postRescheduleBooking createBooking----->", createBooking]);
         if (!createBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
-        const razorBooking = await createOrder({
+        const razorBooking = await createOrder(req, {
             order_id: createBooking._id,
             order_amount: bookingData.totalAmount,
         });
@@ -4775,7 +4867,7 @@ export const postRescheduleBooking = async (req, res) => {
         log1(["postRescheduleBooking placeorder - razorOrder : ", razorBooking]);
         if (razorBooking.flag !== 1) {
             await Booking.deleteOne({ _id: createBooking._id })
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         await Booking.updateOne({ _id: createBooking._id }, { razorpayOrderId: razorBooking.data.order.id });
@@ -4792,7 +4884,7 @@ export const postRescheduleBooking = async (req, res) => {
     } catch (error) {
         log1(["Error in postRescheduleBooking ----->", error]);
         ownerLocks.delete(ownerId);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     } finally {
         ownerLocks.delete(ownerId);
     };
@@ -4813,9 +4905,9 @@ export const postCancelBooking = async (req, res) => {
     ownerLocks.set(ownerId, true);
 
     try {
-        const validate = await custom_validation(req.body, "owner.cancel_booking");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.cancel_booking");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         let filter = { _id: new ObjectId(bookingId) };
@@ -4855,7 +4947,7 @@ export const postCancelBooking = async (req, res) => {
             };
             log1(["postCancelBooking refundPayload----->", refundPayload]);
 
-            let paymentRefund = await razorpayRefund(refundPayload);
+            let paymentRefund = await razorpayRefund(req, refundPayload);
             log1(["postCancelBooking paymentRefund----->", paymentRefund]);
             if (paymentRefund.flag === 0) {
                 return res.status(400).json(paymentRefund);
@@ -4890,14 +4982,14 @@ export const postCancelBooking = async (req, res) => {
 
         let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
         if (!updateBooking) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         return res.status(200).json(successResponse("Booking Cancel Successfully."));
     } catch (error) {
         log1(["Error in postCancelBooking ----->", error]);
         ownerLocks.delete(ownerId);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     } finally {
         ownerLocks.delete(ownerId);
     };
@@ -5063,6 +5155,7 @@ export const getBookingInvoice = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -5122,6 +5215,7 @@ export const getBookingInvoice = async (req, res) => {
                     discountAmount: 1,
                     platformFee: 1,
                     platformFeeType: 1,
+                    evAdminChargeType: 1,
                     adminCharge: 1,
                     subTotal: 1,
                     taxAmount: 1,
@@ -5186,9 +5280,9 @@ export const postVerifyRazorPaySignature = async (req, res) => {
 
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.verify_razorpay_signature");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.verify_razorpay_signature");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         const isVerified = verifySignature({
@@ -5365,7 +5459,7 @@ export const postVerifyRazorPaySignature = async (req, res) => {
         return res.status(200).json(successResponse("Success", { is_verifed: isVerified, bookingDetails }));
     } catch (error) {
         log1(["Error in postVerifyRazorPaySignature ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -5377,9 +5471,9 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
         log1(["postQuotationVerifyRazorPaySignature bookingId ----->", bookingId]);
         log1(["postQuotationVerifyRazorPaySignature razorpayOrderId ----->", razorpayOrderId]);
 
-        const validate = await custom_validation(req.body, "owner.verify_quotation_razorpay_signature");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.verify_quotation_razorpay_signature");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(bookingId)) {
@@ -5485,7 +5579,7 @@ export const postQuotationVerifyRazorPaySignature = async (req, res) => {
         return res.status(200).json(successResponse("Success", { is_verifed: isVerified }));
     } catch (error) {
         log1(["Error in postQuotationVerifyRazorPaySignature ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -5549,7 +5643,7 @@ export const postBookingPaymentFail = async (req, res) => {
         return res.status(200).json(successResponse("Booking payment failed successfully!"));
     } catch (error) {
         log1(["Error in postBookingPaymentFail ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -5685,6 +5779,7 @@ export const postTransactionList = async (req, res) => {
                                         $project: {
                                             fullName: 1,
                                             vehicleNumber: 1,
+                                            fuelType: 1,
                                             model: 1,
                                         },
                                     },
@@ -5757,7 +5852,7 @@ export const postTransactionList = async (req, res) => {
         return res.status(200).json(successResponse("Transaction List Get Successfully.", response));
     } catch (error) {
         log1(["Error in postTransactionList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -5847,6 +5942,7 @@ export const postTransactionDetails = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -5903,7 +5999,7 @@ export const postTransactionDetails = async (req, res) => {
         return res.status(200).json(successResponse("Transaction details get successfully.", result));
     } catch (error) {
         log1(["Error in postTransactionDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6163,7 +6259,7 @@ export const postNotificationList = async (req, res) => {
         return res.status(200).json(successResponse("Notification List.", response));
     } catch (error) {
         log1(["Error in postNotificationList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6188,7 +6284,7 @@ export const postUpdateNotification = async (req, res) => {
         return res.status(200).json(successResponse("Notification Read Successfully."));
     } catch (error) {
         log1(["Error in postUpdateNotification ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6200,9 +6296,9 @@ export const postAddRating = async (req, res) => {
         log1(["postAddRating ownerId----->", ownerId]);
         log1(["postAddRating req.body----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.create_rating");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.create_rating");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         let ownerData = await Owner.findById(ownerId);
@@ -6253,7 +6349,7 @@ export const postAddRating = async (req, res) => {
         const createRating = await Rating.create(ratingPayload);
         log1(["postAddRating createRating----->", createRating]);
         if (!createRating) {
-            return res.status(400).json(errorResponse(messages.unexpectedDataError));
+            return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
         };
 
         if (
@@ -6277,7 +6373,7 @@ export const postAddRating = async (req, res) => {
         return res.status(200).json(successResponse("Rating Add Successfully!"));
     } catch (error) {
         log1(["Error in postAddRating ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6402,7 +6498,7 @@ export const postRatingList = async (req, res) => {
         return res.status(200).json(successResponse("Reviews List!", response));
     } catch (error) {
         log1(["Error in postRatingList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6612,7 +6708,7 @@ export const postChatList = async (req, res) => {
         return res.status(200).json(successResponse("Chat list get successfully.", response));
     } catch (error) {
         log1(["Error in postChatList ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6788,7 +6884,7 @@ export const postChatMessagesDetails = async (req, res) => {
         return res.status(200).json(successResponse("Chat Details Get Successfully.", response));
     } catch (error) {
         log1(["Error in postChatMessagesDetails ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -6803,9 +6899,9 @@ export const postSendMessage = async (req, res) => {
 
         const currentTime = moment().utc().toDate();
 
-        const validate = await custom_validation(req.body, "owner.send_message_to_chat");
-        if (validate.flag === 0) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.send_message_to_chat");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(mechanicId)) {
@@ -6879,7 +6975,7 @@ export const postSendMessage = async (req, res) => {
             let allfiles = Array.isArray(req.files["files"]) ? req.files["files"] : [req.files["files"]];
 
             for (const file of allfiles) {
-                const uploadedFile = await uploadFile(file, true);
+                const uploadedFile = await uploadFile(req, file, true);
 
                 if (uploadedFile.flag === 0) {
                     return res.status(400).json(uploadedFile);
@@ -6972,7 +7068,7 @@ export const postSendMessage = async (req, res) => {
 
             chat = await Chat.create(createPayload);
             if (!chat) {
-                return res.status(400).json(errorResponse(messages.unexpectedDataError));
+                return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
             };
         } else {
             let readMessages = chat.readMessages || [];
@@ -7076,7 +7172,7 @@ export const postSendMessage = async (req, res) => {
         return res.status(200).json(successResponse("Message sent successfully.", response));
     } catch (error) {
         log1(["Error in postSendMessage ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7085,9 +7181,9 @@ export const postFileDispute = async (req, res) => {
         const ownerId = req.ownerId;
         const { bookingId, reason, description } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.file_dispute");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.file_dispute");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(bookingId)) {
@@ -7105,7 +7201,7 @@ export const postFileDispute = async (req, res) => {
         return res.status(200).json(successResponse("Dispute filed successfully.", dispute));
     } catch (error) {
         log1(["Error in postFileDispute ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7114,9 +7210,9 @@ export const postGenerateCallCaptcha = async (req, res) => {
         const ownerId = req.ownerId;
         const { mechanicId, guestId } = req.body;
 
-        const validate = await custom_validation(req.body, "owner.generate_call_captcha");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.generate_call_captcha");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(mechanicId)) {
@@ -7216,7 +7312,7 @@ export const postGenerateCallCaptcha = async (req, res) => {
         return res.status(200).json(successResponse("Captcha generated successfully.", response));
     } catch (error) {
         log1(["Error in postGenerateCallCaptcha ----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7228,9 +7324,9 @@ export const postVerifyCallCaptcha = async (req, res) => {
         log1(["postVerifyCallCaptcha ownerId ----->", ownerId]);
         log1(["postVerifyCallCaptcha req.body ----->", req.body]);
 
-        const validate = await custom_validation(req.body, "owner.verify_call_captcha");
-        if (validate.flag != 1) {
-            return res.status(400).json(validate);
+        const checkValidation = await custom_validation(req, req.body, "owner.verify_call_captcha");
+        if (checkValidation.flag !== 1) {
+            return res.status(400).json(checkValidation);
         };
 
         if (!ObjectId.isValid(captchaId)) {
@@ -7307,7 +7403,7 @@ export const postVerifyCallCaptcha = async (req, res) => {
         return res.status(200).json(successResponse("Captcha verified successfully.", response));
     } catch (error) {
         log1(["Error in postVerifyCallCaptcha ----->", error]);
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7375,7 +7471,7 @@ export const postBlockMechanic = async (req, res) => {
         };
     } catch (error) {
         log1(["Error in postBlockMechanic ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7413,7 +7509,7 @@ export const postClearChat = async (req, res) => {
         return res.status(200).json(successResponse("Chat cleared successfully."));
     } catch (error) {
         log1(["Error in postClearChat ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -7474,7 +7570,7 @@ export const postReportMessage = async (req, res) => {
         return res.status(200).json(successResponse("Message reported successfully.", report));
     } catch (error) {
         log1(["Error in postReportMessage ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 

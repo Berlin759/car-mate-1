@@ -14,7 +14,7 @@ $(document).on("click", "#add_new_language_btn", function () {
 $(document).on("click", "#save_language", function () {
     const name = $("#language_name").val().trim();
     const nativeName = $("#language_native_name").val().trim();
-    const languageCode = $("#language_code").val().trim();
+    const language = $("#language_code").val().trim();
 
     const nameRegex = /^[a-zA-Z\s]+$/;
     const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
@@ -28,9 +28,9 @@ $(document).on("click", "#save_language", function () {
         validationMessage = "Language native name is required.";
     } else if (!nativeNameRegex.test(nativeName)) {
         validationMessage = "Language native name must contain only alphabetic characters and spaces.";
-    } else if (!languageCode) {
+    } else if (!language) {
         validationMessage = "Language language code is required.";
-    } else if (!nameRegex.test(languageCode)) {
+    } else if (!nameRegex.test(language)) {
         validationMessage = "Language language code must contain only alphabetic characters and spaces.";
     };
 
@@ -42,7 +42,7 @@ $(document).on("click", "#save_language", function () {
     const payload = {
         name: name,
         nativeName: nativeName,
-        languageCode: languageCode,
+        language: language,
     };
 
     postAjaxCall("/add-language", payload, function (response) {
@@ -79,7 +79,7 @@ $(document).on("click", ".edit-language", function () {
         $("#language_id").val(lang._id);
         $("#language_name").val(lang.name);
         $("#language_native_name").val(lang.nativeName);
-        $("#language_code").val(lang.languageCode);
+        $("#language_code").val(lang.language);
 
         $("#languageModal").modal("show");
     });
@@ -89,7 +89,7 @@ $(document).on("click", "#update_language", function () {
     const languageId = $("#language_id").val();
     const name = $("#language_name").val().trim();
     const nativeName = $("#language_native_name").val().trim();
-    const languageCode = $("#language_code").val().trim();
+    const language = $("#language_code").val().trim();
 
     const nameRegex = /^[a-zA-Z\s]+$/;
     const nativeNameRegex = /^[\p{L}\p{M}\s]+$/u;
@@ -105,9 +105,9 @@ $(document).on("click", "#update_language", function () {
         validationMessage = "Language native name is required.";
     } else if (!nativeNameRegex.test(nativeName)) {
         validationMessage = "Language native name must contain only alphabetic characters and spaces.";
-    } else if (!languageCode) {
+    } else if (!language) {
         validationMessage = "Language language code is required.";
-    } else if (!nameRegex.test(languageCode)) {
+    } else if (!nameRegex.test(language)) {
         validationMessage = "Language language code must contain only alphabetic characters and spaces.";
     };
 
@@ -120,7 +120,7 @@ $(document).on("click", "#update_language", function () {
         languageId: languageId,
         name: name,
         nativeName: nativeName,
-        languageCode: languageCode,
+        language: language,
     };
 
     postAjaxCall("/update-language", payload, function (response) {

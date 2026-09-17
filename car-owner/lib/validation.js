@@ -32,6 +32,7 @@ const validate_rules = {
         },
         add_car: {
             vehicleNumber: "required",
+            fuelType: "required",
         },
         update_device_token: {
             deviceToken: "required",
@@ -138,16 +139,48 @@ const validate_rules = {
     },
 };
 
-export const custom_validation = async (data, rules, customMessages = {}) => {
-    let validation = new Validator(data, get_rules(rules), customMessages);
+export const custom_validation = async (req, data, rules, customMessages = {}) => {
+    Validator.useLang(req.locale);
+
+    let validation;
+
+    if (typeof rules === 'object') {
+        validation = new Validator(data, rules, customMessages);
+    } else {
+        validation = new Validator(data, get_rules(rules), customMessages);
+    };
+
+    if (req.language?.validation?.attributes) {
+        validation.setAttributeNames(req.language.validation.attributes);
+    } else {
+        validation.setAttributeNames({});
+    };
 
     if (validation.fails()) {
         let error = "";
+        let failingKey = "";
         for (let key in validation.errors.errors) {
+            failingKey = key;
             error = validation.errors.errors[key][0];
+            if (req.language.validation.messages[error]) {
+                error = req.language.validation.messages[error];
+            };
         };
+
+        // Replace :values placeholder with actual allowed values from the 'in' rule
+        if (error.includes(':values') && failingKey) {
+            const activeRules = typeof rules === 'object' ? rules : get_rules(rules);
+            const fieldRule = activeRules?.[failingKey] || '';
+            const inMatch = fieldRule.match(/(?:^|\|)in:([^|]+)/);
+
+            if (inMatch) {
+                error = error.replace(':values', inMatch[1]);
+            };
+        };
+
         return errorResponse(error);
     };
+
     return successResponse("Success");
 };
 

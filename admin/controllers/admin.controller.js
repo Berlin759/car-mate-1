@@ -6022,12 +6022,18 @@ export const postUpdatePricing = async (req, res) => {
     try {
         const {
             platformFee,
+            evAdminChargeType,
             platformFeeType,
             gstPercentage,
             cancellationFee,
         } = req.body;
 
+        const adminChargeEvType = Number(evAdminChargeType);
         const type = Number(platformFeeType);
+
+        if (!Object.values(Constants.ADMIN_CHARGE_AVAILABLE).includes(adminChargeEvType)) {
+            return res.status(400).json(errorResponse("Invalid admin charge value."));
+        };
 
         if (!Object.values(Constants.PLATFORM_FEE_TYPE).includes(type)) {
             return res.status(400).json(errorResponse("Invalid platform fee type."));
@@ -6078,6 +6084,7 @@ export const postUpdatePricing = async (req, res) => {
                 platformFee: Number(platformFee),
             }),
 
+            evAdminChargeType: adminChargeEvType,
             platformFeeType: type,
 
             ...(gstPercentage !== undefined && {
@@ -6549,7 +6556,7 @@ export const getLanguagePage = async (req, res) => {
 
 export const postAddLanguage = async (req, res) => {
     try {
-        const { name, nativeName, languageCode } = req.body;
+        const { name, nativeName, language } = req.body;
 
         if (!name || name.trim() === "") {
             return res.status(400).json(errorResponse("Language Name is required."));
@@ -6567,15 +6574,15 @@ export const postAddLanguage = async (req, res) => {
             return res.status(400).json(errorResponse("Language native name must contain only letters and spaces."));
         };
 
-        if (!languageCode || languageCode.trim() === "") {
+        if (!language || language.trim() === "") {
             return res.status(400).json(errorResponse("Language Code is required."));
         };
-        if (!nameRegex.test(languageCode.trim())) {
+        if (!nameRegex.test(language.trim())) {
             return res.status(400).json(errorResponse("Language code must contain only alphabetic characters and spaces."));
         };
 
         // Check if language code already exists
-        const existing = await Language.findOne({ languageCode: languageCode.trim() });
+        const existing = await Language.findOne({ language: language.trim() });
         if (existing) {
             return res.status(400).json(errorResponse("Language Code already exists."));
         };
@@ -6583,13 +6590,13 @@ export const postAddLanguage = async (req, res) => {
         const payload = {
             name: name.trim(),
             nativeName: nativeName.trim(),
-            languageCode: languageCode.trim(),
+            language: language.trim(),
             isActive: true,
         };
 
-        const language = await Language.create(payload);
+        const languageRes = await Language.create(payload);
 
-        return res.status(200).json(successResponse("Language created successfully.", language));
+        return res.status(200).json(successResponse("Language created successfully.", languageRes));
     } catch (error) {
         log1(["Error in postAddLanguage ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));
@@ -6653,7 +6660,7 @@ export const postLanguageDetails = async (req, res) => {
 
 export const postUpdateLanguage = async (req, res) => {
     try {
-        const { languageId, name, nativeName, languageCode } = req.body;
+        const { languageId, name, nativeName, language } = req.body;
 
         if (!languageId || !ObjectId.isValid(languageId)) {
             return res.status(400).json(errorResponse("Invalid Language ID."));
@@ -6674,16 +6681,16 @@ export const postUpdateLanguage = async (req, res) => {
             return res.status(400).json(errorResponse("Language native name must contain only letters and spaces."));
         };
 
-        if (!languageCode || languageCode.trim() === "") {
+        if (!language || language.trim() === "") {
             return res.status(400).json(errorResponse("Language Code is required."));
         };
-        if (!nameRegex.test(languageCode.trim())) {
+        if (!nameRegex.test(language.trim())) {
             return res.status(400).json(errorResponse("Language code must contain only alphabetic characters and spaces."));
         };
 
         // Check if language code already exists for another record
         const existing = await Language.findOne({
-            languageCode: languageCode.trim(),
+            language: language.trim(),
             _id: { $ne: new ObjectId(languageId) }
         });
         if (existing) {
@@ -6693,15 +6700,15 @@ export const postUpdateLanguage = async (req, res) => {
         const updateObj = {
             name: name.trim(),
             nativeName: nativeName.trim(),
-            languageCode: languageCode.trim(),
+            language: language.trim(),
         };
 
-        const language = await Language.findByIdAndUpdate(languageId, updateObj, { new: true });
-        if (!language) {
+        const languageUpdate = await Language.findByIdAndUpdate(languageId, updateObj, { new: true });
+        if (!languageUpdate) {
             return res.status(400).json(errorResponse("Language not found."));
         };
 
-        return res.status(200).json(successResponse("Language updated successfully.", language));
+        return res.status(200).json(successResponse("Language updated successfully.", languageUpdate));
     } catch (error) {
         log1(["Error in postUpdateLanguage ----->", error]);
         return res.status(400).json(errorResponse(messages.unexpectedDataError));

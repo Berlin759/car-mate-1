@@ -226,6 +226,16 @@ const Constants = {
         TECHNICAL_ISSUES: 7,
         OTHER: 8,
     },
+    EV_ADMIN_CHARGE_TYPE: {
+        OFF: 1,
+        ON: 2,
+    },
+    CAR_FUEL_TYPE: {
+        PETROL: 1,
+        DIESEL: 2,
+        EV: 3,
+        CNG: 4,
+    },
 };
 
 export default Constants;

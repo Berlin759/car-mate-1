@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
 import Constants from "../config/constant.js";
-import messages from "../utils/messages.js";
+import error from "../lang/en/error.js";
 import { errorResponse, log1, successResponse, } from "../lib/general.js";
 import Notification from "../models/notification.model.js";
 
@@ -40,7 +40,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
             addNotification = await Notification.create(objectPayload);
             if (!addNotification) {
-                return errorResponse(messages.unexpectedDataError);
+                return errorResponse(error.something_went_wrong);
             };
         };
 
@@ -100,8 +100,8 @@ export const sendPushNotification = async (registrationToken, payload) => {
         };
 
         return addNotification ? addNotification : "";
-    } catch (error) {
-        log1(["sendPushNotification Error----->", error.message]);
-        return errorResponse(messages.unexpectedDataError);
+    } catch (err) {
+        log1(["sendPushNotification Error----->", err.message]);
+        return errorResponse(error.something_went_wrong);
     };
 };

@@ -1,0 +1,9 @@
+const error = {
+    unexpectedError: "An unexpected network error occurred, please try again later.",
+    invalidEndpointOrMethod: "Please enter valid endpoint.",
+    something_went_wrong: "Something went Wrong, please try again later.",
+    maintenanceError: "Service is currently unavailable due to maintenance. Please try again later.",
+    invalidToken: "Invalid or expired token. Please request a new one.",
+};
+
+export default error;

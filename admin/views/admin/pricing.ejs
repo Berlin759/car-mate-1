@@ -9,6 +9,16 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
+                                <label class="form-label text-dark">Enable EV Admin Charge</label>
+                                <select class="form-select" id="evAdminChargeType" name="evAdminChargeType" required>
+                                    <option value="1" <%= body?.pricing?.evAdminChargeType === 1 ? "selected" : "" %>>OFF</option>
+                                    <option value="2" <%= body?.pricing?.evAdminChargeType === 2 ? "selected" : "" %>>ON</option>
+                                </select>
+                                <small class="text-muted">
+                                    When enabled, admin charge will be deducted from the owner's payment.
+                                </small>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label text-dark">Platform Fee Type</label>
                                 <select class="form-select" id="platformFeeType" name="platformFeeType" required>
                                     <option value="1" <%= body?.pricing?.platformFeeType === 1 ? "selected" : "" %>>Percentage (%)</option>

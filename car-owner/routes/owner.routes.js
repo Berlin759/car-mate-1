@@ -13,6 +13,7 @@ import {
     getRefund,
     getProfileDetails,
     postUpdateOwnerProfile,
+    postChangeLanguage,
     postDeviceTokenUpdate,
     postUpdatePreferences,
     postUpdateLocation,
@@ -82,6 +83,7 @@ router.get("/refund", getRefund);
 // Owner profile API
 router.get("/profile-details", authMiddleware, getProfileDetails);
 router.post("/update-profile", authMiddleware, postUpdateOwnerProfile);
+router.post('/change-language', authMiddleware, postChangeLanguage);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
 router.post("/update-location", authMiddleware, postUpdateLocation);

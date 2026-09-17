@@ -1,4 +1,3 @@
-import messages from "../utils/messages.js";
 import { log1, errorResponse, authErrorResponse } from "../lib/general.js";
 import jwt from "jsonwebtoken";
 import Owner from "../models/owner.model.js";
@@ -6,7 +5,6 @@ import Constants from "../config/constant.js";
 
 const authMiddleware = async (req, res, next) => {
     try {
-
         let authorization = req.header('authorization');
         if (!authorization) return res.status(401).json(authErrorResponse());
 
@@ -17,7 +15,7 @@ const authMiddleware = async (req, res, next) => {
         if (!decoded) {
             return res.status(401).json(authErrorResponse());
         };
-        
+
         let ownerData = await Owner.findOne({ phoneNumber: decoded.phoneNumber, loginToken: token });
         if (!ownerData || ownerData.status !== Constants.OWNER_STATUS.ACTIVE) {
             return res.status(401).json(authErrorResponse());
@@ -34,7 +32,7 @@ const authMiddleware = async (req, res, next) => {
             return res.status(401).json(authErrorResponse());
         };
 
-        return res.status(500).json(errorResponse(messages.unexpectedDataError));
+        return res.status(500).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 

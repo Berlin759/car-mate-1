@@ -2,7 +2,6 @@ import ejs from "ejs";
 import path from "path";
 import moment from "moment";
 import mongoose from "mongoose";
-import messages from "../utils/messages.js";
 import Constants from "../config/constant.js";
 import { custom_validation } from "../lib/validation.js";
 import { sendPushNotification } from "./pushNotification.js";
@@ -31,7 +30,7 @@ export const postLogin = async (req, res) => {
         const { phone_code, phone_number, channel } = req.body;
         const otpChannel = channel || Constants.OTP_CHANNEL.SMS;
 
-        const validate = await custom_validation(req.body, "mechanic.login");
+        const validate = await custom_validation(req, req.body, "mechanic.login");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -122,7 +121,7 @@ export const postLogin = async (req, res) => {
         return res.status(200).json(successResponse(`OTP sent via ${channelMessage}. Please verify your number.`, response));
     } catch (error) {
         log1(["Error in postLogin ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -132,7 +131,7 @@ export const postVerifyOtp = async (req, res) => {
 
         const { phone_number, otp } = req.body;
 
-        const validate = await custom_validation(req.body, "mechanic.verify_otp");
+        const validate = await custom_validation(req, req.body, "mechanic.verify_otp");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -189,14 +188,14 @@ export const postVerifyOtp = async (req, res) => {
             fullName: mechanicData.fullName,
             phoneNumber: mechanicData.phoneNumber,
             loginToken: jwtToken,
-            languageCode: mechanicData.languageCode,
+            language: mechanicData.language,
             isAutoDetectLanguage: mechanicData.isAutoDetectLanguage,
         };
 
         return res.status(200).json(successResponse("Account verified successfully! Signing you in...", response));
     } catch (error) {
         log1(["Error in postVerifyOtp ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };
 
@@ -207,7 +206,7 @@ export const postResendOtp = async (req, res) => {
         const { phone_number, type, channel } = req.body;
         const otpChannel = channel || Constants.OTP_CHANNEL.SMS;
 
-        const validate = await custom_validation(req.body, "mechanic.resend_otp");
+        const validate = await custom_validation(req, req.body, "mechanic.resend_otp");
         if (validate.flag === 0) {
             return res.status(400).json(validate);
         };
@@ -276,6 +275,6 @@ export const postResendOtp = async (req, res) => {
         return res.status(200).json(successResponse(`OTP resent via ${channelMessage}. Please check your ${channelMessage}.`, response));
     } catch (error) {
         log1(["Error in postResendOtp ----->", error]);
-        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+        return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
     };
 };

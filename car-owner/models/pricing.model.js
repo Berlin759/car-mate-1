@@ -4,6 +4,11 @@ import Constants from "../config/constant.js";
 
 const pricingSchema = new Schema(
     {
+        evAdminChargeType: {
+            type: Number,
+            default: Constants.EV_ADMIN_CHARGE_TYPE.OFF,
+            description: "EV Admin Charge Type",
+        },
         platformFee: {
             type: Number,
             default: Constants.DEFAULT_PLATFORM_FEE,

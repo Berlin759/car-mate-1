@@ -56,6 +56,7 @@ const validate_rules = {
             serviceId: "required",
         },
         update_pricing: {
+            evAdminChargeType: "required",
             platformFee: "required",
             platformFeeType: "required",
             gstPercentage: "required",

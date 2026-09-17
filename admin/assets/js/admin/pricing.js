@@ -74,10 +74,16 @@ $(document).on('input', '.amount-input, .percentage-input', function () {
 $(document).on("submit", "#pricing-form", function (e) {
     e.preventDefault();
 
+    const evAdminChargeType = parseInt($("#evAdminChargeType").val(), 10);
     const platformFeeType = parseInt($("#platformFeeType").val(), 10);
     const platformFeeValue = $("#platformFee").val().trim();
     const gstValue = $("#gstPercentage").val().trim();
     const cancellationValue = $("#cancellationFee").val().trim();
+
+    if (![1, 2].includes(evAdminChargeType)) {
+        showToast(0, "Invalid admin charge available.");
+        return;
+    };
 
     if (![1, 2].includes(platformFeeType)) {
         showToast(0, "Invalid platform fee type.");
@@ -152,6 +158,7 @@ $(document).on("submit", "#pricing-form", function (e) {
 
     const payload = {
         platformFee: platformFee,
+        evAdminChargeType: evAdminChargeType,
         platformFeeType: platformFeeType,
         gstPercentage: gstPercentage,
         cancellationFee: cancellationFee,
@@ -173,6 +180,7 @@ function loadPricingDetails() {
             const p = response.data;
 
             $("#platformFee").val(p.platformFee ?? 5);
+            $("#evAdminChargeType").val(p.evAdminChargeType ?? 1);
             $("#platformFeeType").val(p.platformFeeType ?? 1);
             $("#gstPercentage").val(p.gstPercentage ?? 18);
             $("#cancellationFee").val(p.cancellationFee ?? 3);

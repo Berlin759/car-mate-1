@@ -9,7 +9,6 @@ import currencyCodes from "currency-codes";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import Constants from "../config/constant.js";
-import messages from "../utils/messages.js";
 import Mechanic from "../models/mechanic.model.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -324,7 +323,7 @@ export const generateThumbnailFileName = () => {
     return timestamp + "_" + randomString + ".jpg";
 };
 
-export const getAddressFromLatLng = async (lat, lng) => {
+export const getAddressFromLatLng = async (req, lat, lng) => {
     const apiKey = process.env.GOOGLE_API_KEY;
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
     try {
@@ -338,7 +337,7 @@ export const getAddressFromLatLng = async (lat, lng) => {
         }
     } catch (error) {
         log1(["Error in getAddressFromLatLng ----->", error]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };
 
@@ -349,7 +348,7 @@ export const getAddressFromLatLng = async (lat, lng) => {
  * @param {Object} file - Uploaded file object (from express-fileupload)
  * @param {Object} options
  */
-export const uploadFile = async (file, isThumbnail = false) => {
+export const uploadFile = async (req, file, isThumbnail = false) => {
     try {
         if (!file) return errorResponse("No file provided.");
 
@@ -484,7 +483,7 @@ export const uploadFile = async (file, isThumbnail = false) => {
         });
     } catch (error) {
         log1(["Error in uploadFile ----->", error]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };
 
@@ -530,7 +529,7 @@ const formatDuration = (duration) => {
  * @param {string} folder - Subfolder name (e.g. "videos", "images")
  * @param {string} fileName - File name to delete
  */
-export const removeFile = async (folder, fileName) => {
+export const removeFile = async (req, folder, fileName) => {
     try {
         if (!folder || !fileName) return;
 
@@ -547,7 +546,7 @@ export const removeFile = async (folder, fileName) => {
         };
 
         log1(["Error in removeFile ----->", error]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };
 

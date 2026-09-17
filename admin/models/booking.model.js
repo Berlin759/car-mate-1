@@ -97,6 +97,11 @@ const bookingSchema = new Schema(
             enum: Object.values(Constants.PLATFORM_FEE_TYPE),
             default: null,
         },
+        evAdminChargeType: {
+            type: String,
+            enum: Object.values(Constants.EV_ADMIN_CHARGE_TYPE),
+            default: null,
+        },
         adminCharge: {
             type: Number,
             default: 0,

@@ -11,7 +11,7 @@ const languageSchema = new Schema(
             type: String,
             default: "",
         },
-        languageCode: {
+        language: {
             type: String,
             default: "",
             unique: true,

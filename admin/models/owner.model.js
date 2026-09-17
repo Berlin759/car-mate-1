@@ -109,7 +109,7 @@ const ownerSchema = new Schema(
             enum: Object.values(Constants.ONLINE_STATUS),
             default: Constants.ONLINE_STATUS.FALSE,
         },
-        languageCode: {
+        language: {
             type: String,
             default: "en",
         },

@@ -1,0 +1,26 @@
+const auth = {
+    invalid_otp: 'Invalid OTP',
+    invalid_phone_no: 'Invalid phone no.',
+    unregistered_phone_no: 'Phone no. not registered with us.',
+    phone_no_already_registered: 'Phone no. already registered with us.',
+    login_success: 'User Login Successfully',
+    otp_sent_success: 'OTP send successfully.',
+    register_success: 'User register successfully',
+    logout_success: 'User logout successfully',
+    otp_verify_success: 'OTP verified successfully.',
+    failed_to_send_otp: 'Failed to send OTP.',
+    account_inactive: "Your account is under verification by the admin. You will be notified once it's approved.",
+    session_expired_or_invalid: "Session expired or invalid. Please Signup again.",
+    account_not_active_verify: "Your account is not active yet. Please verify your account first.",
+    chef_id_not_registered: "Entered credentials is not registered with us.",
+    something_went_wrong: "Something went Wrong, please try again later.",
+    account_suspended: "Your account has been suspended by the admin. Please contact support.",
+    otp_verification_required: "User already exists, first login and then verify OTP.",
+    user_exists_login: "User already exists, please login.",
+    complete_profile_first: "Your profile is incomplete, Please complete your profile and upload required documents.",
+    deleted_account_signup: "Something went wrong, please contact admin",
+    failed_to_create_contact: "Failed to create contact on Razorpay.",
+    failed_to_create_fund_account: "Failed to create fund account on Razorpay.",
+};
+
+export default auth;

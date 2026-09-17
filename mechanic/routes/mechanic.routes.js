@@ -12,6 +12,7 @@ import {
     getFaq,
     getProfileDetails,
     postUpdateMechanicProfile,
+    postChangeLanguage,
     postUpdatePreferences,
     postDeviceTokenUpdate,
     postLogout,
@@ -65,6 +66,7 @@ router.get("/faq", getFaq);
 // Mechanic profile API
 router.get("/profile-details", authMiddleware, getProfileDetails);
 router.post("/update-profile", authMiddleware, postUpdateMechanicProfile);
+router.post('/change-language', authMiddleware, postChangeLanguage);
 router.post("/update-device-token", authMiddleware, postDeviceTokenUpdate);
 router.post("/update-preferences", authMiddleware, postUpdatePreferences);
 router.post("/update-location", authMiddleware, postUpdateLocation);

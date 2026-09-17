@@ -112,7 +112,7 @@ const mechanicSchema = new Schema(
             type: Number,
             default: 0,
         },
-        languageCode: {
+        language: {
             type: String,
             default: "en",
         },

@@ -7,7 +7,6 @@ import {
     successResponse,
     convertToPaise,
 } from "../lib/general.js";
-import messages from "../utils/messages.js";
 import Owner from "../models/owner.model.js";
 import Booking from "../models/booking.model.js";
 import Transaction from "../models/transaction.model.js";
@@ -18,7 +17,7 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_SECRET,
 });
 
-export const createOrder = async (payload) => {
+export const createOrder = async (req, payload) => {
     try {
         const { order_id, order_amount } = payload;
 
@@ -40,7 +39,7 @@ export const createOrder = async (payload) => {
         return successResponse("Order created successfully.", { order: createOrderResponse });
     } catch (error) {
         log1(["createOrder Error----->", error.message]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };
 
@@ -64,7 +63,7 @@ export const verifySignature = async (payload) => {
     };
 };
 
-export const verifyRazorpayPayment = async (payload) => {
+export const verifyRazorpayPayment = async (req, payload) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, bookingId, ownerId } = payload;
 
@@ -137,11 +136,11 @@ export const verifyRazorpayPayment = async (payload) => {
         return successResponse("Payment verified successfully.", response);
     } catch (error) {
         log1(["verifyRazorpayPayment Error----->", error.message]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };
 
-export const razorpayRefund = async (payload) => {
+export const razorpayRefund = async (req, payload) => {
     try {
         const { razorpayPaymentId, amount, ownerId } = payload;
 
@@ -195,6 +194,6 @@ export const razorpayRefund = async (payload) => {
         return successResponse("Refund processed successfully.", response);
     } catch (error) {
         log1(["razorpayRefund Error----->", error]);
-        return errorResponse(messages.unexpectedDataError);
+        return errorResponse(req.language.error.something_went_wrong);
     };
 };

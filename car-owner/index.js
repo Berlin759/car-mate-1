@@ -4,6 +4,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import http from "http";
+import cookieParser from "cookie-parser";
 import moment from "moment";
 import fileUpload from "express-fileupload";
 import { Server } from "socket.io";
@@ -16,12 +17,15 @@ import ownerRouter from "./routes/owner.routes.js";
 import { log1 } from "./lib/general.js";
 import Constants from "./config/constant.js";
 import maintenanceMiddleware from "./middleware/maintenance.middleware.js";
+import languageMiddleware from "./middleware/language.middleware.js";
+import refiner from "./middleware/refiner.middleware.js";
 import Owner from "./models/owner.model.js";
 import Mechanic from "./models/mechanic.model.js";
 import Chat from "./models/chat.model.js";
 
 const app = express();
 const PORT = process.env.PORT || 7878;
+
 const httpServer = http.createServer(app);
 const __dirname = path.resolve();
 
@@ -29,6 +33,76 @@ const rootDir = path.join(__dirname, "..");
 const uploadsPath = path.join(rootDir, "uploads");
 const assetsPath = path.join(__dirname, "assets");
 const viewsPath = path.join(__dirname, "views");
+
+app.use(cors({ origin: true, credentials: true }));
+
+global.moment = moment;
+
+const originalFormat = global.moment.fn.format;
+global.moment.fn.format = function (formatStr) {
+    if (this._isFormattingTZ) {
+        return originalFormat.call(this, formatStr);
+    };
+
+    if (!this.isValid()) return originalFormat.call(this, formatStr);
+
+    this._isFormattingTZ = true;
+    const tz = Constants.CURRENT_TIMEZONE || "Asia/Kolkata";
+    try {
+        const date = this.toDate();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            timeZoneName: 'longOffset',
+        });
+
+        const parts = formatter.formatToParts(date);
+        const tzPart = parts.find(part => part.type === 'timeZoneName');
+
+        if (tzPart) {
+            let offset = tzPart.value.replace('GMT', '').trim();
+
+            if (!offset) {
+                offset = '+00:00';
+            };
+
+            this.utcOffset(offset);
+        };
+    } catch (e) {
+        this.utcOffset("+05:30");
+    } finally {
+        delete this._isFormattingTZ;
+    };
+
+    return originalFormat.call(this, formatStr);
+};
+
+app.set("views", viewsPath);
+app.set("view engine", "ejs");
+
+app.use("/public", express.static(assetsPath + "/public"));
+app.use("/css", express.static(assetsPath + "/css"));
+app.use("/js", express.static(assetsPath + "/js"));
+app.use("/img", express.static(assetsPath + "/image"));
+
+// Upload Path
+app.use("/upload_images", express.static(uploadsPath + "/upload_images"));
+app.use("/upload_videos", express.static(uploadsPath + "/upload_videos"));
+app.use("/upload_thumbnails", express.static(uploadsPath + "/upload_thumbnails"));
+app.use("/upload_documents", express.static(uploadsPath + "/upload_documents"));
+app.use("/upload_audio", express.static(uploadsPath + "/upload_audio"));
+app.use("/upload_invoice", express.static(uploadsPath + "/upload_invoice"));
+
+app.use(express.json());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+app.use(refiner);
+app.use(fileUpload({
+    useTempFiles: false,
+    tempFileDir: "/tmp/",
+}));
+app.disable('x-powered-by');
+app.use(languageMiddleware);
+app.use(maintenanceMiddleware);
 
 export const io = new Server(httpServer, {
     cors: {
@@ -42,13 +116,17 @@ const setupRedisAdapter = async () => {
     try {
         const pubClient = createClient({ url: process.env.REDIS_URL });
         const subClient = pubClient.duplicate();
+
         await Promise.all([pubClient.connect(), subClient.connect()]);
+
         io.adapter(createAdapter(pubClient, subClient));
+
         log1(["Socket.IO Redis adapter connected successfully"]);
     } catch (error) {
         log1(["Redis adapter setup failed, using default adapter:", error.message]);
-    }
+    };
 };
+
 setupRedisAdapter();
 
 io.on("connection", async (socket) => {
@@ -145,32 +223,25 @@ io.on("connection", async (socket) => {
     });
 });
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload({ createParentPath: true }));
-
-app.use("/public", express.static(assetsPath + "/public"));
-app.use("/css", express.static(assetsPath + "/css"));
-app.use("/js", express.static(assetsPath + "/js"));
-app.use("/img", express.static(assetsPath + "/image"));
-
-// Upload Path
-app.use("/upload_images", express.static(uploadsPath + "/upload_images"));
-app.use("/upload_videos", express.static(uploadsPath + "/upload_videos"));
-app.use("/upload_thumbnails", express.static(uploadsPath + "/upload_thumbnails"));
-app.use("/upload_documents", express.static(uploadsPath + "/upload_documents"));
-app.use("/upload_audio", express.static(uploadsPath + "/upload_audio"));
-app.use("/upload_invoice", express.static(uploadsPath + "/upload_invoice"));
-
-app.set("view engine", "ejs");
-app.set("views", viewsPath);
-
-app.use(maintenanceMiddleware);
-
 app.use("/owner", ownerRouter);
 
 errorHandler(app);
+
+process.on('unhandledRejection', (reason, p) => {
+    log1(["unhandledRejection --> ", p]);
+
+    const errorMessage = `${new Date()} ${reason.stack} Unhandled Rejection at Promise ${p}\n`;
+    log1(["unhandledRejection Error:", errorMessage]);
+    // process.exit(1)
+});
+
+process.on('uncaughtException', (err) => {
+    log1(["errorMessage", err]);
+
+    const errorMessage = `${new Date()} ${err.stack} Uncaught Exception thrown\n`;
+    log1(["uncaughtException Error:", errorMessage]);
+    // process.exit(1);
+});
 
 connectDB().then(async () => {
     try {
