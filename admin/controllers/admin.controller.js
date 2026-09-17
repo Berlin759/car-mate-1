@@ -6031,7 +6031,7 @@ export const postUpdatePricing = async (req, res) => {
         const adminChargeEvType = Number(evAdminChargeType);
         const type = Number(platformFeeType);
 
-        if (!Object.values(Constants.ADMIN_CHARGE_AVAILABLE).includes(adminChargeEvType)) {
+        if (!Object.values(Constants.EV_ADMIN_CHARGE_TYPE).includes(adminChargeEvType)) {
             return res.status(400).json(errorResponse("Invalid admin charge value."));
         };
 
