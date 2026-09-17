@@ -1,6 +1,11 @@
 <%- include('../header.ejs') %>
 
 <%
+    function capitalizeFirstLetter(str) {
+        if (!str) return "";
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
     function formatDateFull(date) {
         if (!date) return "-";
 
@@ -95,7 +100,7 @@
                     <i class="fa-solid fa-user text-success"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Car Owner</span>
+                    <span class="fs-14 text-gray d-block mb-1">Car Owner</span>
                     <span class="fw-md"><%= booking.ownerDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -108,7 +113,7 @@
                     <i class="fa-solid fa-wrench text-warning"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Mechanic</span>
+                    <span class="fs-14 text-gray d-block mb-1">Mechanic</span>
                     <span class="fw-md"><%= booking.mechanicDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -121,7 +126,7 @@
                     <i class="fa-solid fa-cog text-purple"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Service</span>
+                    <span class="fs-14 text-gray d-block mb-1">Service</span>
                     <span class="fw-md"><%= booking.serviceDetails?.fullName || "-" %></span>
                 </div>
             </div>
@@ -134,7 +139,7 @@
                     <i class="fa-solid fa-car text-primary"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Vehicle</span>
+                    <span class="fs-14 text-gray d-block mb-1">Vehicle</span>
                     <span class="fw-md"><%= booking.carDetails?.vehicleNumber || "-" %></span>
                     <span class="text-gray fs-12 d-block"><%= booking.carDetails?.model || "" %> <%= booking.carDetails?.vehicleManufacturerName ? "- " + booking.carDetails.vehicleManufacturerName : "" %></span>
                 </div>
@@ -148,7 +153,7 @@
                     <i class="fa-solid fa-calendar text-success"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Date & Slot</span>
+                    <span class="fs-14 text-gray d-block mb-1">Date & Slot</span>
                     <span class="fw-md"><%= formatDateFull(booking.date) || "-" %></span>
                     <span class="text-gray fs-12 d-block"><%= booking.slot || "" %></span>
                 </div>
@@ -165,11 +170,11 @@
             <span class="fw-md"><%= booking.address || "-" %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Latitude</span>
+            <span class="text-gray fs-14 d-block mb-1">Latitude</span>
             <span class="fw-md"><%= booking.latitude || "-" %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Longitude</span>
+            <span class="text-gray fs-14 d-block mb-1">Longitude</span>
             <span class="fw-md"><%= booking.longitude || "-" %></span>
         </div>
     </div>
@@ -180,100 +185,109 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block"><%= booking?.serviceDetails?.fullName || "Service" %> Fee</span>
+            <span class="text-gray fs-14 d-block mb-1"><%= booking?.serviceDetails?.fullName || "Service" %> Fee</span>
             <span class="fw-md">₹ <%= booking.totalServiceFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Consultant Fee</span>
+            <span class="text-gray fs-14 d-block mb-1">Consultant Fee</span>
             <span class="fw-md">₹ <%= booking.consultantFee || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Discount Amount</span>
+            <span class="text-gray fs-14 d-block mb-1">Discount Amount</span>
             <span class="fw-md">₹ <%= booking.discountAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Platform Fee (<span class="fw-md"><%= booking?.platformFee %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
+            <span class="text-gray fs-14 d-block mb-1">Platform Fee (<span class="fw-md"><%= booking?.platformFee %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
             <span class="fw-md">₹ <%= booking.adminCharge || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Sub Total</span>
+            <span class="text-gray fs-14 d-block mb-1">Sub Total</span>
             <span class="fw-md">₹ <%= booking.subTotal || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Tax Amount (<%= parseInt(booking?.taxPercentage || 0) %>%)</span>
+            <span class="text-gray fs-14 d-block mb-1">Tax Amount (<%= parseInt(booking?.taxPercentage || 0) %>%)</span>
             <span class="fw-md">₹ <%= booking?.taxAmount || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Cancellation Fee <%= booking?.cancellationFee > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
+            <span class="text-gray fs-14 d-block mb-1">Cancellation Fee <%= booking?.cancellationFee > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
             <span class="fw-md text-danger">- ₹ <%= booking?.cancellationFee.toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Total Amount</span>
+            <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
             <span class="fw-md fs-16 text-success">₹ <%= (booking?.totalAmount - booking?.cancellationFee).toFixed(2) || 0 %></span>
         </div>
     </div>
 </div>
 
 <% if (booking.startTime || booking.endTime) { %>
-<div class="bg-white rounded-2 bs-border p-4 mt-30">
-    <h6 class="mb-3">Service Timeline</h6>
-    <hr>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Start Time</span>
-            <span class="fw-md"><%= formatDateFull(booking.startTime) || "-" %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">End Time</span>
-            <span class="fw-md"><%= formatDateFull(booking.endTime) || "-" %></span>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">Service Timeline</h6>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">Start Time</span>
+                <span class="fw-md"><%= formatDateFull(booking.startTime) || "-" %></span>
+            </div>
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">End Time</span>
+                <span class="fw-md"><%= formatDateFull(booking.endTime) || "-" %></span>
+            </div>
         </div>
     </div>
-</div>
 <% } %>
 
 <% if (booking.cancelReason || booking.cancelTime) { %>
-<div class="bg-white rounded-2 bs-border p-4 mt-30">
-    <h6 class="mb-3">Cancellation Details</h6>
-    <hr>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Cancel Reason</span>
-            <span class="fw-md"><%= booking.cancelReason || "-" %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Cancel Time</span>
-            <span class="fw-md"><%= fullDateFormat(booking.cancelTime) || "-" %></span>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">Cancellation Details</h6>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">Cancel Reason</span>
+                <span class="fw-md"><%= booking.cancelReason || "-" %></span>
+            </div>
+            <div class="col-md-6 mb-3">
+                <span class="text-gray fs-14 d-block mb-1">Cancel Time</span>
+                <span class="fw-md"><%= fullDateFormat(booking.cancelTime) || "-" %></span>
+            </div>
+
+            <% if (booking?.canceledByDetails) { %>
+                <div class="col-md-6 mb-3">
+                    <span class="text-gray fs-14 d-block mb-1">Canceled By</span>
+                    <span class="fw-md">
+                        <%= booking?.canceledByDetails?.fullName || "-" %> (<%= capitalizeFirstLetter(booking?.canceledByRole) %>)
+                    </span>
+                </div>
+            <% } %>
         </div>
     </div>
-</div>
 <% } %>
 
 <% if (booking.beforePhotos && booking.beforePhotos.length > 0) { %>
-<div class="bg-white rounded-2 bs-border p-4 mt-30">
-    <h6 class="mb-3">Before Photos</h6>
-    <hr>
-    <div class="d-flex flex-wrap gap-3">
-        <% booking.beforePhotos.forEach(function(photo) { %>
-            <div>
-                <img src="<%= photo %>" alt="Before Photo" class="rounded" style="max-width: 150px; max-height: 150px; object-fit: cover;">
-            </div>
-        <% }); %>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">Before Photos</h6>
+        <hr>
+        <div class="d-flex flex-wrap gap-3">
+            <% booking.beforePhotos.forEach(function(photo) { %>
+                <div>
+                    <img src="<%= photo %>" alt="Before Photo" class="rounded" style="max-width: 150px; max-height: 150px; object-fit: cover;">
+                </div>
+            <% }); %>
+        </div>
     </div>
-</div>
 <% } %>
 
 <% if (booking.afterPhotos && booking.afterPhotos.length > 0) { %>
-<div class="bg-white rounded-2 bs-border p-4 mt-30">
-    <h6 class="mb-3">After Photos</h6>
-    <hr>
-    <div class="d-flex flex-wrap gap-3">
-        <% booking.afterPhotos.forEach(function(photo) { %>
-            <div>
-                <img src="<%= photo %>" alt="After Photo" class="rounded" style="max-width: 150px; max-height: 150px; object-fit: cover;">
-            </div>
-        <% }); %>
+    <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <h6 class="mb-3">After Photos</h6>
+        <hr>
+        <div class="d-flex flex-wrap gap-3">
+            <% booking.afterPhotos.forEach(function(photo) { %>
+                <div>
+                    <img src="<%= photo %>" alt="After Photo" class="rounded" style="max-width: 150px; max-height: 150px; object-fit: cover;">
+                </div>
+            <% }); %>
+        </div>
     </div>
-</div>
 <% } %>
 
 <div class="bg-white rounded-2 bs-border p-4 mt-30">
@@ -281,11 +295,11 @@
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Created Date</span>
+            <span class="text-gray fs-14 d-block mb-1">Created Date</span>
             <span class="fw-md"><%= formatDateFull(booking.createdAt) || "-" %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Last Updated</span>
+            <span class="text-gray fs-14 d-block mb-1">Last Updated</span>
             <span class="fw-md"><%= formatDateFull(booking.updatedAt) || "-" %></span>
         </div>
     </div>

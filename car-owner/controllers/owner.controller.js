@@ -3488,11 +3488,11 @@ export const postAddBooking = async (req, res) => {
             };
         };
 
-        const subTotal = parseFloat(remainingAmount + platformAmount);
+        const subTotal = parseFloat(remainingAmount);
 
         const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
-        const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
+        const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
         let totalPayAmount = parseFloat(subTotal + taxAmount);
 
@@ -4812,11 +4812,11 @@ export const postRescheduleBooking = async (req, res) => {
             };
         };
 
-        const subTotal = parseFloat(remainingAmount + platformAmount);
+        const subTotal = parseFloat(remainingAmount);
 
         const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
-        const taxAmount = parseFloat((subTotal * gstPercentage) / 100);
+        const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
         let totalPayAmount = parseFloat(subTotal + taxAmount);
 

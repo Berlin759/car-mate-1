@@ -3506,6 +3506,53 @@ export const getBookingDetailPage = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "owners",
+                    localField: "canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByOwnerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByMechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $set: {
+                    canceledByDetails: {
+                        $cond: [
+                            { $eq: ["$canceledByRole", Constants.USER_ROLE.OWNER] },
+                            { $arrayElemAt: ["$canceledByOwnerDetails", 0] },
+                            { $arrayElemAt: ["$canceledByMechanicDetails", 0] },
+                        ],
+                    },
+                },
+            },
+            {
                 $project: {
                     ownerId: 1,
                     mechanicId: 1,
@@ -3554,6 +3601,7 @@ export const getBookingDetailPage = async (req, res) => {
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
+                    canceledByDetails: 1,
                 },
             },
         ];
@@ -3712,6 +3760,10 @@ export const getTransactionDetailPage = async (req, res) => {
                                 taxPercentage: 1,
                                 cancellationFee: 1,
                                 cancellationPercentage: 1,
+                                canceledBy: 1,
+                                canceledByRole: 1,
+                                cancelReason: 1,
+                                cancelTime: 1,
                                 totalAmount: 1,
                                 status: 1,
                             },
@@ -3723,6 +3775,53 @@ export const getTransactionDetailPage = async (req, res) => {
                 $unwind: {
                     path: "$bookingDetails",
                     preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "bookingDetails.canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByOwnerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "bookingDetails.canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByMechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $set: {
+                    "bookingDetails.canceledByDetails": {
+                        $cond: [
+                            { $eq: ["$bookingDetails.canceledByRole", Constants.USER_ROLE.OWNER] },
+                            { $arrayElemAt: ["$canceledByOwnerDetails", 0] },
+                            { $arrayElemAt: ["$canceledByMechanicDetails", 0] },
+                        ],
+                    },
                 },
             },
             {

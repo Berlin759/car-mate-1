@@ -1,6 +1,11 @@
 <%- include('../header.ejs') %>
 
 <%
+    function capitalizeFirstLetter(str) {
+        if (!str) return "";
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
     function formatDateFull(date) {
         if (!date) return "-";
         let d = new Date(date);
@@ -184,6 +189,14 @@
                     <span class="text-gray">-</span>
                 <% } %>
             </div>
+            <% if (txn?.bookingDetails?.canceledByDetails) { %>
+                <div class="col-md-6 mt-3">
+                    <span class="text-gray fs-14 d-block mb-1">Canceled By</span>
+                    <span class="fw-md">
+                        <%= txn?.bookingDetails?.canceledByDetails?.fullName || "-" %> (<%= capitalizeFirstLetter(txn?.bookingDetails?.canceledByRole) %>)
+                    </span>
+                </div>
+            <% } %>
         </div>
     </div>
 <% } %>
