@@ -2164,7 +2164,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                         carId: new ObjectId(bookingDetails.carId),
                         bookingId: bookingDetails._id,
                         totalAmount: totalBookingAmount,
-                        description: "Refund for mechanic has cancelled your booking.",
+                        description: "Refund amount for owner due to booking cancellation by mechanic.",
                         status: Constants.TRANSACTION_STATUS.REFUND,
                     };
 

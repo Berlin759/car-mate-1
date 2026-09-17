@@ -655,7 +655,7 @@ export const postHomeDetails = async (req, res) => {
                 Car.find({
                     ownerId: ownerObjectId,
                     status: Constants.CAR_STATUS.VALID,
-                }).select("_id fullName vehicleNumber registerNumber images model").lean(),
+                }).select("_id fullName vehicleNumber fuelType registerNumber images model").lean(),
             ])
             : Promise.resolve([null, [],]);
 
@@ -3470,7 +3470,7 @@ export const postAddBooking = async (req, res) => {
 
         let platformAmount = 0;
 
-        if (carDetails?.fuelType === Constants.CAR_FUEL_TYPE.EV) {
+        if (parseInt(carDetails?.fuelType) === Constants.CAR_FUEL_TYPE.EV) {
             if (evAdminChargeType === Constants.EV_ADMIN_CHARGE_TYPE.ON) {
                 if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
                     platformAmount = parseFloat((remainingAmount * platformFee) / 100);
@@ -3986,6 +3986,7 @@ export const postBookingList = async (req, res) => {
                                     _id: "$carDetails._id",
                                     fullName: "$carDetails.fullName",
                                     vehicleNumber: "$carDetails.vehicleNumber",
+                                    fuelType: "$carDetails.fuelType",
                                     model: "$carDetails.model",
                                 },
                                 ownerAddressDetails: {
@@ -4424,6 +4425,7 @@ export const postBookingDetails = async (req, res) => {
                         _id: "$carDetails._id",
                         fullName: "$carDetails.fullName",
                         vehicleNumber: "$carDetails.vehicleNumber",
+                        fuelType: "$carDetails.fuelType",
                         model: "$carDetails.model",
                     },
                     ownerAddressDetails: {
@@ -4794,7 +4796,7 @@ export const postRescheduleBooking = async (req, res) => {
 
         let platformAmount = 0;
 
-        if (carDetails?.fuelType === Constants.CAR_FUEL_TYPE.EV) {
+        if (parseInt(carDetails?.fuelType) === Constants.CAR_FUEL_TYPE.EV) {
             if (evAdminChargeType === Constants.EV_ADMIN_CHARGE_TYPE.ON) {
                 if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
                     platformAmount = parseFloat((remainingAmount * platformFee) / 100);
@@ -4962,7 +4964,7 @@ export const postCancelBooking = async (req, res) => {
                 carId: new ObjectId(bookingDetails.carId),
                 bookingId: bookingDetails._id,
                 totalAmount: refundAmount,
-                description: "Refund For Cancelled Booking",
+                description: "Refund amount for owner due to booking cancellation by owner.",
                 status: Constants.TRANSACTION_STATUS.REFUND,
             };
 

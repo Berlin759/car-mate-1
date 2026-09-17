@@ -14,19 +14,6 @@ const notificationSchema = new Schema(
             ref: "Mechanic",
             required: false,
         },
-        title: {
-            type: String,
-            default: "",
-        },
-        description: {
-            type: String,
-            default: "",
-        },
-        type: {
-            type: Number,
-            enum: Object.values(Constants.NOTIFICATION_TYPE),
-            default: Constants.NOTIFICATION_TYPE.DEFAULT,
-        },
         bookingId: {
             type: Schema.Types.ObjectId,
             default: null
@@ -35,10 +22,27 @@ const notificationSchema = new Schema(
             type: Schema.Types.ObjectId,
             default: null
         },
+        kycId: {
+            type: Schema.Types.ObjectId,
+            default: null
+        },
+        title: {
+            type: String,
+            default: "",
+        },
+        description: {
+            type: String,
+            default: "",
+        },
         isRead: {
             type: Boolean,
             default: false,
-        }
+        },
+        type: {
+            type: Number,
+            enum: Object.values(Constants.NOTIFICATION_TYPE),
+            default: Constants.NOTIFICATION_TYPE.DEFAULT,
+        },
     },
     {
         versionKey: false,

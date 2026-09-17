@@ -33,6 +33,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 mechanicId: payload.mechanicId ? payload.mechanicId : null,
                 bookingId: payload.bookingId ? payload.bookingId : null,
                 transactionId: payload.transactionId ? payload.transactionId : null,
+                kycId: payload.kycId ? payload.kycId : null,
                 type: payload.type || Constants.NOTIFICATION_TYPE.DEFAULT,
                 title: payload.title,
                 description: payload.description,
@@ -63,6 +64,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 bookingId: payload.bookingId ? payload.bookingId.toString() : "",
                 transactionId: payload.transactionId ? payload.transactionId.toString() : "",
                 chatId: payload.chatId ? payload.chatId.toString() : "",
+                kycStatus: payload.kycStatus ? payload.kycStatus : null,
 
                 // Owner Details
                 ownerId: payload.ownerId ? payload.ownerId.toString() : "",

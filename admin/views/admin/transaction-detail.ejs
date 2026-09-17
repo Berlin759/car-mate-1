@@ -74,7 +74,7 @@
                     <i class="fa-solid fa-money-bill-transfer text-success fs-5"></i>
                 </div>
                 <div>
-                    <h5 class="mb-1"><%= txn.invoiceId || "-" %></h5>
+                    <h5 class="mb-1"><%= txn?.bookingDetails?.invoiceNo || "-" %></h5>
                     <span class="text-gray">Transaction ID: <%= txn._id || "-" %></span>
                 </div>
             </div>
@@ -236,7 +236,7 @@
         <% if(parseFloat(txn?.bookingDetails?.cancellationFee) > 0) { %>
             <div class="col-md-6 mb-3">
                 <span class="text-gray fs-14 d-block">
-                    Cancellation Fee (<%= parseInt(txn?.bookingDetails?.cancellationPercentage || 0) %>)
+                    Cancellation Fee (<%= parseInt(txn?.bookingDetails?.cancellationPercentage || 0) %>%)
                 </span>
                 <span class="fw-md text-danger">- ₹ <%= txn?.bookingDetails?.cancellationFee.toFixed(2) || 0 %></span>
             </div>
@@ -264,14 +264,14 @@
             <% if(parseFloat(txn?.bookingDetails?.cancellationFee) > 0) { %>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block mb-1">
-                        Cancellation Fee (<span class="fw-md"><%= txn?.earningDetails?.adminCharge %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %></span>)
+                        Cancellation Fee (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %>%)
                     </span>
                     <span class="fw-md text-danger">- ₹ <%= txn?.earningDetails?.totalAdminCharge.toFixed(2) || 0 %></span>
                 </div>
             <% } else { %>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block mb-1">
-                        Admin Charge (<span class="fw-md"><%= txn?.earningDetails?.adminCharge %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %></span>)
+                        Admin Charge (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %></span>)
                     </span>
                     <span class="fw-md text-danger">- ₹ <%= txn?.earningDetails?.totalAdminCharge.toFixed(2) || 0 %></span>
                 </div>

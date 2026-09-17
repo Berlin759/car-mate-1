@@ -32,6 +32,7 @@ import ChatMessage from "../models/chatMessage.model.js";
 import Block from "../models/block.model.js";
 import { generateTransactionPDF, generateAllTransactionsPDF } from "../utils/pdf.helper.js";
 import Earning from "../models/earning.model.js";
+import { sendPushNotification } from "./pushNotification.js";
 
 const __dirname = path.resolve();
 
@@ -46,10 +47,12 @@ export const getDashboardPage = async (req, res) => {
             totalOwners,
             totalMechanics,
             totalCars,
-            activeBookings,
-            completedBookings,
-            cancelledBookings,
             totalBookings,
+            pendingBookings,
+            activeBookings,
+            rejectedBookings,
+            cancelledBookings,
+            completedBookings,
             revenueResult,
             monthRevenueResult,
             pendingKYC,
@@ -63,10 +66,15 @@ export const getDashboardPage = async (req, res) => {
 
             Car.countDocuments({}),
 
+            Booking.countDocuments({}),
+
+            Booking.countDocuments({
+                status: Constants.BOOKING_STATUS.PENDING,
+            }),
+
             Booking.countDocuments({
                 status: {
                     $in: [
-                        Constants.BOOKING_STATUS.PENDING,
                         Constants.BOOKING_STATUS.ACCEPTED,
                         Constants.BOOKING_STATUS.PROVIDER_EN_ROUTE,
                         Constants.BOOKING_STATUS.ARRIVED,
@@ -76,14 +84,21 @@ export const getDashboardPage = async (req, res) => {
             }),
 
             Booking.countDocuments({
-                status: Constants.BOOKING_STATUS.CLOSED,
+                status: Constants.BOOKING_STATUS.REJECTED,
             }),
 
             Booking.countDocuments({
                 status: Constants.BOOKING_STATUS.CANCELLED,
             }),
 
-            Booking.countDocuments({}),
+            Booking.countDocuments({
+                status: {
+                    $in: [
+                        Constants.BOOKING_STATUS.SERVICE_COMPLETED,
+                        Constants.BOOKING_STATUS.CLOSED,
+                    ],
+                },
+            }),
 
             Transaction.aggregate([
                 {
@@ -144,10 +159,12 @@ export const getDashboardPage = async (req, res) => {
                 totalOwners,
                 totalMechanics,
                 totalCars,
-                activeBookings,
-                completedBookings,
-                cancelledBookings,
                 totalBookings,
+                pendingBookings,
+                activeBookings,
+                rejectedBookings,
+                cancelledBookings,
+                completedBookings,
                 totalRevenue: revenueResult[0]?.totalRevenue || 0,
                 monthRevenue: monthRevenueResult[0]?.monthRevenue || 0,
                 pendingKYC,
@@ -1211,6 +1228,7 @@ export const postAllCarsList = async (req, res) => {
                     _id: 1,
                     fullName: 1,
                     vehicleNumber: 1,
+                    fuelType: 1,
                     puccNumber: 1,
                     model: 1,
                     registerNumber: 1,
@@ -1292,6 +1310,7 @@ export const postCarDetails = async (req, res) => {
                     _id: 1,
                     fullName: 1,
                     vehicleNumber: 1,
+                    fuelType: 1,
                     puccNumber: 1,
                     model: 1,
                     registerNumber: 1,
@@ -1465,6 +1484,7 @@ export const getCarDetailPage = async (req, res) => {
                     _id: 1,
                     fullName: 1,
                     vehicleNumber: 1,
+                    fuelType: 1,
                     puccNumber: 1,
                     model: 1,
                     registerNumber: 1,
@@ -2669,6 +2689,7 @@ export const postAllTransactionList = async (req, res) => {
                                         $project: {
                                             fullName: 1,
                                             vehicleNumber: 1,
+                                            fuelType: 1,
                                             model: 1,
                                         },
                                     },
@@ -2880,6 +2901,7 @@ export const postTransactionDetails = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -3062,6 +3084,7 @@ export const getTransactionDownload = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -3086,9 +3109,24 @@ export const getTransactionDownload = async (req, res) => {
                                 invoiceNo: 1,
                                 date: 1,
                                 slot: 1,
-                                status: 1,
                                 address: 1,
+                                totalServiceFee: 1,
+                                consultantFee: 1,
+                                platformFee: 1,
+                                platformFeeType: 1,
+                                adminCharge: 1,
+                                discountAmount: 1,
+                                subTotal: 1,
+                                taxAmount: 1,
+                                taxPercentage: 1,
+                                cancellationFee: 1,
+                                cancellationPercentage: 1,
+                                canceledBy: 1,
+                                canceledByRole: 1,
+                                cancelReason: 1,
+                                cancelTime: 1,
                                 totalAmount: 1,
+                                status: 1,
                             },
                         },
                     ],
@@ -3098,6 +3136,53 @@ export const getTransactionDownload = async (req, res) => {
                 $unwind: {
                     path: "$bookingDetails",
                     preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: "owners",
+                    localField: "bookingDetails.canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByOwnerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: "mechanics",
+                    localField: "bookingDetails.canceledBy",
+                    foreignField: "_id",
+                    as: "canceledByMechanicDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                phoneNumber: 1,
+                                profileImage: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $set: {
+                    "bookingDetails.canceledByDetails": {
+                        $cond: [
+                            { $eq: ["$bookingDetails.canceledByRole", Constants.USER_ROLE.OWNER] },
+                            { $arrayElemAt: ["$canceledByOwnerDetails", 0] },
+                            { $arrayElemAt: ["$canceledByMechanicDetails", 0] },
+                        ],
+                    },
                 },
             },
             {
@@ -3256,6 +3341,7 @@ export const getAllTransactionsDownload = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -3492,6 +3578,7 @@ export const getBookingDetailPage = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                                 vehicleManufacturerName: 1,
                             },
@@ -3725,6 +3812,7 @@ export const getTransactionDetailPage = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -3827,15 +3915,32 @@ export const getTransactionDetailPage = async (req, res) => {
             {
                 $lookup: {
                     from: "earnings",
-                    localField: "_id",
-                    foreignField: "transactionId",
+                    let: {
+                        transactionId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$transactionId", "$$transactionId"],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                status: 1,
+                                earningAmount: 1,
+                                serviceAmount: 1,
+                                totalAdminCharge: 1,
+                                adminCharge: 1,
+                                adminChargeType: 1,
+                                finalPayoutAmount: 1,
+                                processedAt: 1,
+                            },
+                        },
+                    ],
                     as: "earningDetails",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$earningDetails",
-                    preserveNullAndEmptyArrays: true,
                 },
             },
             {
@@ -3858,7 +3963,9 @@ export const getTransactionDetailPage = async (req, res) => {
                     mechanicDetails: 1,
                     carDetails: 1,
                     bookingDetails: 1,
-                    earningDetails: 1,
+                    earningDetails: {
+                        $arrayElemAt: ["$earningDetails", 0],
+                    },
                 },
             },
         ];
@@ -4861,32 +4968,75 @@ export const postApproveKYC = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid mechanic id."));
         };
 
-        let filter = {
+        const mechanicObjectId = new ObjectId(mechanicId);
+
+        const mechanicDetails = await Mechanic.findOne({
+            _id: mechanicObjectId,
+        }).select("_id fullName deviceToken paymentNotification kycStatus").lean();
+
+        if (!mechanicDetails) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        const filter = {
             mechanicId: new ObjectId(mechanicId),
         };
 
-        let kycDetails = await KYC.findOne(filter);
+        const kycDetails = await KYC.findOne({
+            mechanicId: mechanicObjectId,
+        }).select("_id mechanicId status").lean();
+
         if (!kycDetails) {
-            return res.json(errorResponse("KYC details not found."));
+            return res.status(404).json(errorResponse("KYC details not found."));
         };
 
         if (kycDetails.status === Constants.KYC_STATUS.APPROVED) {
             return res.status(400).json(errorResponse("KYC is already approved."));
         };
 
-        let payload = {
+        const payload = {
             status: Constants.KYC_STATUS.APPROVED,
+            rejectReason: "",
             reviewedAt: new Date(),
         };
 
-        const updateKYC = await KYC.findOneAndUpdate(filter, payload);
-        if (!updateKYC) {
+        const updatedKYC = await KYC.findOneAndUpdate(
+            {
+                mechanicId: mechanicObjectId,
+                status: { $ne: Constants.KYC_STATUS.APPROVED },
+            },
+            {
+                $set: payload,
+            },
+            {
+                new: true,
+                runValidators: true,
+            },
+        );
+        if (!updatedKYC) {
             return res.status(400).json(errorResponse("Failed to approve KYC."));
         };
 
         await Mechanic.updateOne(
-            { _id: new ObjectId(mechanicId), },
-            { kycStatus: Constants.KYC_STATUS.APPROVED, }
+            { _id: mechanicObjectId, },
+            {
+                $set: {
+                    kycStatus: Constants.KYC_STATUS.APPROVED,
+                },
+            },
+        );
+
+        const deviceToken = mechanicDetails.deviceToken || null;
+        const isPushEnabled = mechanicDetails.paymentNotification !== Constants.NOTIFICATION_PREFERENCES_STATUS.FALSE;
+
+        await sendPushNotification(isPushEnabled ? deviceToken : null,
+            {
+                mechanicId: mechanicDetails._id,
+                type: Constants.NOTIFICATION_TYPE.KYC,
+                kycStatus: Constants.KYC_STATUS.APPROVED,
+                title: "KYC Verification Approved",
+                description: "Your KYC verification has been successfully approved. You can now access mechanic services."
+            },
         );
 
         return res.status(200).json(successResponse("KYC approved successfully!"));
@@ -4907,37 +5057,80 @@ export const postRejectKYC = async (req, res) => {
             return res.status(400).json(errorResponse("Invalid mechanic id."));
         };
 
-        if (!rejectReason || rejectReason.trim() === "") {
-            return res.status(400).json(errorResponse("Reject reason is required."));
+        const trimmedRejectReason = typeof rejectReason === "string" ? rejectReason.trim() : "";
+        if (!trimmedRejectReason) {
+            return res.status(400).json(errorResponse("Rejection reason is required."));
         };
 
-        let filter = {
-            mechanicId: new ObjectId(mechanicId),
+        if (trimmedRejectReason.length > 500) {
+            return res.status(400).json(errorResponse("Rejection reason must not exceed 500 characters.",));
         };
 
-        let kycDetails = await KYC.findOne(filter);
+        const mechanicObjectId = new ObjectId(mechanicId);
+
+        const mechanicDetails = await Mechanic.findOne({
+            _id: mechanicObjectId,
+        }).select("_id fullName deviceToken paymentNotification kycStatus").lean();
+
+        if (!mechanicDetails) {
+            return res.status(404).json(errorResponse("Mechanic not found."));
+        };
+
+        const kycDetails = await KYC.findOne({
+            mechanicId: mechanicObjectId,
+        }).select("_id mechanicId status").lean();
+
         if (!kycDetails) {
-            return res.json(errorResponse("KYC details not found."));
+            return res.status(404).json(errorResponse("KYC details not found."));
         };
 
         if (kycDetails.status === Constants.KYC_STATUS.REJECTED) {
             return res.status(400).json(errorResponse("KYC is already rejected."));
         };
 
-        let payload = {
+        const payload = {
             status: Constants.KYC_STATUS.REJECTED,
-            rejectReason: rejectReason.trim(),
+            rejectReason: trimmedRejectReason,
             reviewedAt: new Date(),
         };
 
-        const updateKYC = await KYC.findOneAndUpdate(filter, payload);
-        if (!updateKYC) {
+        const updatedKYC = await KYC.findOneAndUpdate(
+            {
+                mechanicId: mechanicObjectId,
+                status: { $ne: Constants.KYC_STATUS.REJECTED },
+            },
+            {
+                $set: payload,
+            },
+            {
+                new: true,
+                runValidators: true,
+            },
+        );
+        if (!updatedKYC) {
             return res.status(400).json(errorResponse("Failed to reject KYC."));
         };
 
         await Mechanic.updateOne(
-            { _id: new ObjectId(mechanicId), },
-            { kycStatus: Constants.KYC_STATUS.REJECTED, }
+            { _id: mechanicObjectId, },
+            {
+                $set: {
+                    kycStatus: Constants.KYC_STATUS.REJECTED,
+                },
+            },
+        );
+
+        const deviceToken = mechanicDetails.deviceToken || null;
+        const isPushEnabled = mechanicDetails.paymentNotification !== Constants.NOTIFICATION_PREFERENCES_STATUS.FALSE;
+
+        await sendPushNotification(isPushEnabled ? deviceToken : null,
+            {
+                mechanicId: mechanicDetails._id,
+                type: Constants.NOTIFICATION_TYPE.KYC,
+                kycStatus: Constants.KYC_STATUS.REJECTED,
+                title: "KYC Verification Rejected",
+                description: "Your KYC documents were rejected. Please review the rejection reason and resubmit the required documents."
+            },
         );
 
         return res.status(200).json(successResponse("KYC rejected successfully!"));

@@ -32,6 +32,27 @@ const STATUS_MAP = {
     4: { text: "Refunded", color: COLORS.primary },
 };
 
+const CAR_FUEL_MAP = {
+    1: { text: "Petrol", color: COLORS.success },
+    2: { text: "Diesel", color: COLORS.success },
+    3: { text: "EV", color: COLORS.success },
+    4: { text: "CNG", color: COLORS.success },
+};
+
+const BOOKING_STATUS_MAP = {
+    1: { text: "Pending", color: COLORS.pending },
+    2: { text: "Accepted", color: COLORS.success },
+    3: { text: "Rejected", color: COLORS.danger },
+    4: { text: "En Route", color: COLORS.primary },
+    5: { text: "Arrived", color: COLORS.dark },
+    6: { text: "In Progress", color: COLORS.gray },
+    7: { text: "Completed", color: COLORS.success },
+    8: { text: "Paid", color: COLORS.lightGray },
+    9: { text: "Closed", color: COLORS.success },
+    10: { text: "Failed", color: COLORS.warning },
+    11: { text: "Cancelled", color: COLORS.danger },
+};
+
 const PAYOUT_STATUS_MAP = {
     1: { text: "Pending", color: COLORS.pending },
     2: { text: "Completed", color: COLORS.success },
@@ -48,6 +69,32 @@ function formatDate(date) {
     const year = d.getFullYear();
 
     return `${year}-${month}-${day}`;
+};
+
+function capitalizeFirstLetter(str) {
+    if (!str) return "User";
+
+    return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+function fullDateFormat(date) {
+    if (!date) return "-";
+
+    const d = new Date(date);
+
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+
+    const period = hours >= 12 ? "PM" : "AM";
+
+    hours = hours % 12 || 12;
+    hours = String(hours).padStart(2, "0");
+
+    return `${year}-${month}-${day} ${hours}:${minutes} ${period}`;
 };
 
 function drawField(doc, label, value, x, y, valueColor = COLORS.dark) {
@@ -69,19 +116,12 @@ export function generateTransactionPDF(transaction, res) {
     const ML = 50;
     const MR = 50;
     const CW = doc.page.width - ML - MR;
-    const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
-    const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
 
-    const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
-    const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
-    const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
-    const adminChargeType = parseFloat(transaction?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
-    const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
-
-    let feeTypeVal = `${adminCharge}%`;
-    if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
-        feeTypeVal = "Fixed ₹";
-    };
+    // Status
+    const status = STATUS_MAP[transaction?.status] || "-";
+    const carFuelType = CAR_FUEL_MAP[transaction?.carDetails?.fuelType] || "-";
+    const bookingStatus = BOOKING_STATUS_MAP[transaction?.bookingDetails?.status] || "-";
+    const payoutStatus = transaction?.earningDetails ? PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] : null;
 
     // Header background
     doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
@@ -102,20 +142,35 @@ export function generateTransactionPDF(transaction, res) {
 
     // Transaction Info
     section("Transaction Information", () => {
-        drawField(doc, "TRX ID:", transaction?.trxId, ML, y);
-        drawField(doc, "Invoice ID:", transaction?.invoiceId, 320, y);
+        drawField(doc, "Transaction Id:", transaction?._id, ML, y);
+        drawField(doc, "TRX ID:", transaction?.trxId, 320, y);
         y += 38;
 
-        drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
-        drawField(doc, `Admin Charge (${feeTypeVal}):`, `₹${totalAdminCharge}`, 320, y);
+        drawField(doc, `${transaction?.serviceDetails?.fullName} Fee:`, "₹" + transaction?.bookingDetails?.totalServiceFee, ML, y);
+        drawField(doc, "Consultant Fee:", "₹" + parseFloat(transaction?.bookingDetails?.consultantFee).toFixed(2), 320, y);
         y += 38;
 
-        drawField(doc, "Total Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
-        drawField(doc, "Payout Status:", payoutStatus.text, 320, y, payoutStatus.color);
+        drawField(doc, "Discount Amount:", "₹" + parseFloat(transaction?.bookingDetails?.discountAmount).toFixed(2), ML, y);
+
+        const platformFeeIcon = parseInt(transaction?.bookingDetails?.platformFeeType) === Constants.PLATFORM_FEE_TYPE.PERCENTAGE ? "%" : "₹";
+        drawField(doc, `Platform Fee (${parseFloat(transaction?.bookingDetails?.platformFee || 0)}${platformFeeIcon}):`, "₹" + transaction?.bookingDetails?.adminCharge, 320, y);
+        y += 38;
+
+        drawField(doc, "Sub Total:", "₹" + parseFloat(transaction?.bookingDetails?.subTotal).toFixed(2), ML, y);
+        drawField(doc, `Tax Amount (${parseInt(transaction?.bookingDetails?.taxPercentage || 0)}%):`, "₹" + parseFloat(transaction?.bookingDetails?.taxAmount).toFixed(2) || 0, 320, y);
+        y += 38;
+
+        const cancellationFeeAmount = parseFloat(transaction?.bookingDetails?.cancellationFee || 0);
+        const totalAmount = parseFloat(transaction?.bookingDetails?.totalAmount - cancellationFeeAmount);
+
+        if (parseFloat(cancellationFeeAmount) > 0) {
+            drawField(doc, `Cancellation Fee (${parseInt(transaction?.bookingDetails?.cancellationPercentage || 0)}%):`, "- ₹" + cancellationFeeAmount.toFixed(2), ML, y, COLORS.danger);
+        };
+        drawField(doc, "Total Amount:", "₹" + totalAmount.toFixed(2), 320, y);
         y += 38;
 
         drawField(doc, "TRX Created Date:", formatDate(transaction?.createdAt), ML, y);
-        drawField(doc, "Payout Transfer Date:", formatDate(transaction?.earningDetails?.processedAt), 320, y);
+        drawField(doc, "Payment Status:", status.text, 320, y, status.color);
         y += 38;
     });
 
@@ -128,7 +183,25 @@ export function generateTransactionPDF(transaction, res) {
         drawField(doc, "Booking Date:", formatDate(transaction?.bookingDetails?.date), ML, y);
         drawField(doc, "Booking Slot:", transaction?.bookingDetails?.slot || "-", 320, y);
         y += 38;
+
+        drawField(doc, "Booking Status:", bookingStatus.text, ML, y, bookingStatus.color);
+        y += 38;
     });
+
+    // Booking Cancellation Info
+    if (transaction?.bookingDetails?.cancelReason || transaction?.bookingDetails?.cancelTime) {
+        section("Cancellation Information", () => {
+            drawField(doc, "Cancel Reason:", transaction?.bookingDetails?.cancelReason, ML, y);
+            drawField(doc, "Canceled Date:", fullDateFormat(transaction?.bookingDetails?.cancelTime) || "-", 320, y);
+            y += 38;
+
+            if (transaction?.bookingDetails?.canceledByDetails) {
+                const canceledUserName = `${transaction?.bookingDetails?.canceledByDetails?.fullName || "-"} (${capitalizeFirstLetter(transaction?.bookingDetails?.canceledByRole || "User")})`;
+                drawField(doc, "Canceled By:", canceledUserName, ML, y);
+                y += 38;
+            };
+        });
+    };
 
     // Car Owner
     section("Car Owner Details", () => {
@@ -151,17 +224,51 @@ export function generateTransactionPDF(transaction, res) {
         y += 38;
 
         drawField(doc, "Vehicle Number:", transaction?.carDetails?.vehicleNumber, ML, y);
+        drawField(doc, "Fuel Type:", carFuelType.text, 320, y, carFuelType.color);
         y += 38;
     });
 
-    // Amount Summary Box
-    y += 4;
-    doc.roundedRect(ML, y, CW, 85, 4).fill("#f0f4ff");
-    doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
-    y += 20;
-    doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
-    doc.text(`Admin Charge (${feeTypeVal}): ₹${totalAdminCharge}`, ML + 180, y + 28);
-    doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
+    // Mechanic Payout Info
+    if (payoutStatus) {
+        // Payout Data
+        const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
+        const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
+        const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
+        const adminChargeType = parseFloat(transaction?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
+        const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+
+        let feeTypeVal = `${adminCharge}%`;
+        if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+            feeTypeVal = "Fixed ₹";
+        };
+
+        section("Mechanic Payout Information", () => {
+            drawField(doc, "Earning Id:", transaction?.earningDetails?._id, ML, y);
+            drawField(doc, "Payout TRX ID:", transaction?.earningDetails?.razorpayPayoutId || "-", 320, y);
+            y += 38;
+
+            drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
+            drawField(doc, `Admin Charge (${feeTypeVal}):`, `₹${totalAdminCharge}`, 320, y);
+            y += 38;
+
+            drawField(doc, "Final Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
+            drawField(doc, "Payout Status:", payoutStatus.text, 320, y, payoutStatus.color);
+            y += 38;
+
+            drawField(doc, "Payout Transfer Date:", formatDate(transaction?.earningDetails?.processedAt), ML, y);
+            y += 38;
+        });
+
+        // Amount Summary Box
+        y += 4;
+        doc.roundedRect(ML, y, CW, 85, 4).fill("#f0f4ff");
+        doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
+
+        y += 20;
+        doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
+        doc.text(`Admin Charge (${feeTypeVal}): ₹${totalAdminCharge}`, ML + 180, y + 28);
+        doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
+    };
 
     // Footer line
     doc.moveTo(ML, doc.page.height - 35).lineTo(doc.page.width - MR, doc.page.height - 35).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
@@ -284,8 +391,8 @@ export function generateAllTransactionsPDF(transactionData, res) {
         // Draw cell borders
         doc.save().moveTo(ML, y).lineTo(ML + USABLE_W, y).strokeColor(COLORS.lightGray).lineWidth(0.3).stroke().restore();
 
-        const status = STATUS_MAP[transaction?.status] || STATUS_MAP[1];
-        const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || PAYOUT_STATUS_MAP[1];
+        const status = STATUS_MAP[transaction?.status] || "-";
+        const payoutStatus = PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || "-";
 
         const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
         const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
@@ -302,7 +409,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
             `₹${serviceAmount}`,
             `₹${totalAdminCharge}`,
             `₹${finalPayoutAmount}`,
-            payoutStatus.text,
+            payoutStatus ? payoutStatus.text : "-",
             formatDate(transaction?.createdAt),
         ];
 

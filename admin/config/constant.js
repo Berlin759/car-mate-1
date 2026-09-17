@@ -112,6 +112,7 @@ const Constants = {
         TRANSACTION: 3,
         CHAT: 4,
         REVIEWS: 5,
+        KYC: 6,
     },
     SECURITY_SETTING_STATUS: {
         FALSE: 1,

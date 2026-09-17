@@ -1,7 +1,10 @@
 <%
     function formatCurrency(amount) {
         if(!amount && amount !== 0) return "₹0";
-        return "₹" + Number(amount).toLocaleString("en-IN");
+
+        let amountStr = amount.toFixed(2);
+
+        return "₹" + Number(amountStr).toLocaleString("en-IN");
     };
 %>
 
@@ -66,6 +69,19 @@
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Pending Bookings</span>
+                            <span class="sd-data"><%= body.pendingBookings || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-spinner"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
                             <span class="sd-title fs-14 d-block">Active Bookings</span>
                             <span class="sd-data"><%= body.activeBookings || 0 %></span>
                         </div>
@@ -79,11 +95,11 @@
                 <div class="static-card bg-white mt-20">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="static-data">
-                            <span class="sd-title fs-14 d-block">Completed Bookings</span>
-                            <span class="sd-data"><%= body.completedBookings || 0 %></span>
+                            <span class="sd-title fs-14 d-block">Rejected Bookings</span>
+                            <span class="sd-data"><%= body.rejectedBookings || 0 %></span>
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
-                            <i class="fa-solid fa-circle-check"></i>
+                            <i class="fa-solid fa-circle-xmark"></i>
                         </div>
                     </div>
                 </div>
@@ -97,6 +113,19 @@
                         </div>
                         <div class="sc-img d-flex align-items-center justify-content-center">
                             <i class="fa-solid fa-circle-xmark"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 col-sm-6 col-12 custom-space user-managment">
+                <div class="static-card bg-white mt-20">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="static-data">
+                            <span class="sd-title fs-14 d-block">Completed Bookings</span>
+                            <span class="sd-data"><%= body.completedBookings || 0 %></span>
+                        </div>
+                        <div class="sc-img d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-circle-check"></i>
                         </div>
                     </div>
                 </div>

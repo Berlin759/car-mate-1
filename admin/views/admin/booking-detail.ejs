@@ -186,35 +186,35 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1"><%= booking?.serviceDetails?.fullName || "Service" %> Fee</span>
-            <span class="fw-md">₹ <%= booking.totalServiceFee || 0 %></span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.totalServiceFee).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Consultant Fee</span>
-            <span class="fw-md">₹ <%= booking.consultantFee || 0 %></span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.consultantFee).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Discount Amount</span>
-            <span class="fw-md">₹ <%= booking.discountAmount || 0 %></span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.discountAmount).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Platform Fee (<span class="fw-md"><%= booking?.platformFee %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
-            <span class="fw-md">₹ <%= booking.adminCharge || 0 %></span>
+            <span class="text-gray fs-14 d-block mb-1">Platform Fee (<span class="fw-md"><%= parseFloat(booking?.platformFee || 0) %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.adminCharge).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Sub Total</span>
-            <span class="fw-md">₹ <%= booking.subTotal || 0 %></span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.subTotal).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Tax Amount (<%= parseInt(booking?.taxPercentage || 0) %>%)</span>
-            <span class="fw-md">₹ <%= booking?.taxAmount || 0 %></span>
+            <span class="fw-md">₹ <%= parseFloat(booking?.taxAmount).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Cancellation Fee <%= booking?.cancellationFee > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
-            <span class="fw-md text-danger">- ₹ <%= booking?.cancellationFee.toFixed(2) || 0 %></span>
+            <span class="text-gray fs-14 d-block mb-1">Cancellation Fee <%= parseFloat(booking?.cancellationFee) > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
+            <span class="fw-md text-danger">- ₹ <%= parseFloat(booking?.cancellationFee).toFixed(2) || 0 %></span>
         </div>
         <div class="col-md-6 mb-3">
             <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
-            <span class="fw-md fs-16 text-success">₹ <%= (booking?.totalAmount - booking?.cancellationFee).toFixed(2) || 0 %></span>
+            <span class="fw-md fs-16 text-success">₹ <%= (parseFloat(booking?.totalAmount - booking?.cancellationFee)).toFixed(2) || 0 %></span>
         </div>
     </div>
 </div>
