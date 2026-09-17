@@ -3494,7 +3494,7 @@ export const postAddBooking = async (req, res) => {
 
         const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
-        let totalPayAmount = parseFloat(subTotal + taxAmount);
+        let totalPayAmount = parseFloat(subTotal + platformAmount + taxAmount);
 
         let bookingData = {
             ownerId: new ObjectId(ownerId),
@@ -4820,7 +4820,7 @@ export const postRescheduleBooking = async (req, res) => {
 
         const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
-        let totalPayAmount = parseFloat(subTotal + taxAmount);
+        let totalPayAmount = parseFloat(subTotal + platformAmount + taxAmount);
 
         let bookingData = {
             ownerId: new ObjectId(ownerId),
