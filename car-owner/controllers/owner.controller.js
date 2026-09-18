@@ -887,7 +887,7 @@ export const postHomeDetails = async (req, res) => {
         const locationObject = hasValidLocation ? { latitude: nearbyLatitude, longitude: nearbyLongitude, } : null;
 
         return res.status(200).json(successResponse("Home details success", {
-            evAdminChargeType: parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE,
+            evAdminChargeType: parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF,
             gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
             platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
             platformFeeType: parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
