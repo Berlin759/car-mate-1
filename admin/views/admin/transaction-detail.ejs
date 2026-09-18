@@ -271,7 +271,7 @@
             <% } else { %>
                 <div class="col-md-6 mb-3">
                     <span class="text-gray fs-14 d-block mb-1">
-                        Admin Charge (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %></span>)
+                        Admin Charge (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %>)
                     </span>
                     <span class="fw-md text-danger">- ₹ <%= txn?.earningDetails?.totalAdminCharge.toFixed(2) || 0 %></span>
                 </div>

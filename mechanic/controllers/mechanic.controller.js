@@ -2242,10 +2242,12 @@ export const postBookingUpdateStatus = async (req, res) => {
                 const slotStart = momentTz(`${bookingDateIST} ${selectedSlot.start}`, "YYYY-MM-DD hh:mm A", currentTimezone);
                 const slotEnd = momentTz(`${bookingDateIST} ${selectedSlot.end}`, "YYYY-MM-DD hh:mm A", currentTimezone);
 
-                const isWithinSlot = bookingDetails.slot === "Evening" ? nowIST.isBetween(slotStart, slotEnd, undefined, "[]") : nowIST.isBetween(slotStart, slotEnd, undefined, "[)");
-                if (!isWithinSlot) {
-                    // return res.status(400).json(errorResponse("Service cannot be started before the scheduled date and time. Please try again at the scheduled time."));
-                    return res.status(400).json(errorResponse("Service can only be started during the scheduled booking slot."));
+                // until 24 hours after slot end.
+                const serviceStartDeadline = slotEnd.clone().add(24, "hours");
+
+                const canStartService = nowIST.isBetween(slotStart, serviceStartDeadline, undefined, "[]");
+                if (!canStartService) {
+                    return res.status(400).json(errorResponse("Service can only be started from the scheduled slot start time until 24 hours after the scheduled slot ends."));
                 };
 
                 updatePayload.startTime = new Date();
