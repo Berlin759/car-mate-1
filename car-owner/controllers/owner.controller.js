@@ -5443,7 +5443,12 @@ export const postVerifyRazorPaySignature = async (req, res) => {
                 $project: {
                     date: 1,
                     slot: 1,
-                    totalAmount: 1,
+                    totalAmount: {
+                        $subtract: [
+                            { $ifNull: ["$totalAmount", 0] },
+                            { $ifNull: ["$discountAmount", 0] },
+                        ],
+                    },
                     status: 1,
                     createdAt: 1,
                     serviceDetails: {

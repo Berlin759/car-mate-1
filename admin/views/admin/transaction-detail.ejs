@@ -19,12 +19,12 @@
 
     function getTransactionStatusBadge(status) {
         const map = {
-            1: { text: "Pending", class: "alert-pending" },
-            2: { text: "Paid", class: "alert-success" },
-            3: { text: "Failed", class: "alert-end" },
-            4: { text: "Refunded", class: "alert-gray" },
+            1: { text: "Pending", class: "text-warning" },
+            2: { text: "Paid", class: "text-success" },
+            3: { text: "Failed", class: "text-danger" },
+            4: { text: "Refunded", class: "text-gray" },
         };
-        return map[status] || { text: "Unknown", class: "alert-gray" };
+        return map[status] || { text: "Unknown", class: "text-gray" };
     };
 
     function getBookingStatusBadge(status) {
@@ -54,10 +54,23 @@
         return map[status] || { text: "Unknown", class: "alert-gray", textClass: "text-gray" };
     };
 
+    function getCarFuelTypeText(type) {
+        const map = {
+            1: { text: "Petrol", class: "text-success" },
+            2: { text: "Diesel", class: "text-success" },
+            3: { text: "EV", class: "text-success" },
+            4: { text: "CNG", class: "text-success" },
+        };
+
+        return map[type] || { text: "Unknown", class: "text-gray" };
+    };
+
     let txn = body?.transaction || {};
+
     let txnStatus = getTransactionStatusBadge(txn.status);
     let bookStatus = txn.bookingDetails ? getBookingStatusBadge(txn.bookingDetails.status) : null;
     let payoutStatus = txn.earningDetails ? getPayoutStatusBadge(txn.earningDetails.status) : null;
+    let carFuelInfo = txn.carDetails ? getCarFuelTypeText(parseInt(txn.carDetails?.fuelType)) : null;
 %>
 
 <div class="d-flex align-items-center justify-content-between mb-30">
@@ -143,8 +156,12 @@
                 </div>
                 <div>
                     <span class="fs-14 text-gray d-block mb-1">Vehicle</span>
-                    <span class="fw-md"><%= txn.carDetails?.vehicleNumber || "-" %></span>
-                    <span class="text-gray fs-12 d-block"><%= txn.carDetails?.model || "" %></span>
+                    <span class="fw-md">
+                        <%= txn?.carDetails?.vehicleNumber || "-" %> <span class="fw-bold fs-16 <%= carFuelInfo.class %>">(<%= carFuelInfo.text %>)</span>
+                    </span>
+                    <span class="text-gray fs-12 d-block">
+                        <%= txn?.carDetails?.model || "" %> <%= txn?.carDetails?.vehicleManufacturerName ? "- " + txn?.carDetails?.vehicleManufacturerName : "" %>
+                    </span>
                 </div>
             </div>
         </div>
@@ -203,51 +220,92 @@
 
 <div class="bg-white rounded-2 bs-border p-4 mt-30">
     <h6 class="mb-3">Payment Details</h6>
-    <hr>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1"><%= txn?.serviceDetails?.fullName || "Service" %> Fee</span>
-            <span class="fw-md fs-16">₹ <%= txn?.bookingDetails?.totalServiceFee || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Consultant Fee</span>
-            <span class="fw-md fs-16">₹ <%= txn?.bookingDetails?.consultantFee || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Discount Amount</span>
-            <span class="fw-md fs-16">₹ <%= txn?.bookingDetails?.discountAmount || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">
-                Platform Fee (<span class="fw-md"><%= txn?.bookingDetails?.platformFee %><%= parseInt(txn?.bookingDetails?.platformFeeType) === 1 ? "%" : "₹" %></span>)
+
+    <!-- Service Details -->
+    <div class="price-breakdown mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                <%= txn?.serviceDetails?.fullName || "Service" %>
             </span>
-            <span class="fw-md">₹ <%= txn?.bookingDetails?.adminCharge || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">Sub Total</span>
-            <span class="fw-md">₹ <%= txn?.bookingDetails?.subTotal || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block">
-                Tax Amount (<%= parseInt(txn?.bookingDetails?.taxPercentage || 0) %>%)
+            <span class="fw-md">
+                ₹ <%= Number(txn?.bookingDetails?.totalServiceFee || 0).toFixed(2) %>
             </span>
-            <span class="fw-md">₹ <%= txn?.bookingDetails?.taxAmount || 0 %></span>
         </div>
-        <% if(parseFloat(txn?.bookingDetails?.cancellationFee) > 0) { %>
-            <div class="col-md-6 mb-3">
-                <span class="text-gray fs-14 d-block">
-                    Cancellation Fee (<%= parseInt(txn?.bookingDetails?.cancellationPercentage || 0) %>%)
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">Consultant Fee</span>
+            <span class="fw-md">
+                ₹ <%= Number(txn?.bookingDetails?.consultantFee || 0).toFixed(2) %>
+            </span>
+        </div>
+        <% if(txn?.bookingDetails?.discountAmount > 0) { %>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Discount</span>
+                <span class="fw-md text-danger">
+                    - ₹ <%= Number(txn?.bookingDetails?.discountAmount || 0).toFixed(2) %>
                 </span>
-                <span class="fw-md text-danger">- ₹ <%= txn?.bookingDetails?.cancellationFee.toFixed(2) || 0 %></span>
             </div>
         <% } %>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
-            <span class="fw-md fs-16 text-success">₹ <%= (txn?.bookingDetails?.totalAmount - txn?.bookingDetails?.cancellationFee).toFixed(2) || 0 %></span>
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                Platform Fee (<%= Number(txn?.bookingDetails?.platformFee || 0) %><%=  parseInt(txn?.bookingDetails?.platformFeeType) === 1 ? "%" : "₹" %>)
+            </span>
+            <span class="fw-md">
+                ₹ <%= Number(txn?.bookingDetails?.adminCharge || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6">
-            <span class="text-gray fs-14 d-block mb-1">Payment Status</span>
-            <span class="bet-status <%= txnStatus.class %>"><%= txnStatus.text %></span>
+    </div>
+
+    <!-- Quotation -->
+    <% if (txn?.bookingDetails?.quotation?.length) { %>
+        <div class="mt-3 pt-3 border-top">
+            <h6 class="fs-14 fw-semibold mb-2">Quotation</h6>
+            <% txn?.bookingDetails?.quotation.forEach((item) => { %>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-gray fs-14">
+                        <%= item?.serviceName || "Service" %>
+                    </span>
+                    <span class="fw-md">
+                        ₹ <%= Number(item?.price || 0).toFixed(2) %>
+                    </span>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+
+    <!-- Summary -->
+    <div class="mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">Sub Total</span>
+            <span class="fw-md">
+                ₹ <%= Number(txn?.bookingDetails?.subTotal || 0).toFixed(2) %>
+            </span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                GST <%= Number(txn?.bookingDetails?.taxPercentage || 0) %>%
+                <span class="fs-12">(Platform + Quotation)</span>
+            </span>
+            <span class="fw-md">
+                ₹ <%= Number(txn?.bookingDetails?.taxAmount || 0).toFixed(2) %>
+            </span>
+        </div>
+        <% if(txn?.bookingDetails?.cancellationFee > 0) { %>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">
+                    Cancellation Fee (<%= Number(txn?.bookingDetails?.cancellationPercentage || 0) %>%)
+                </span>
+                <span class="fw-md text-danger">
+                    - ₹ <%= Number(txn?.bookingDetails?.cancellationFee || 0).toFixed(2) %>
+                </span>
+            </div>
+        <% } %>
+    </div>
+    <div class="mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-semibold fs-15">Total Amount</span>
+            <span class="fw-bold fs-16 <%= txnStatus.class %>">
+                <%= txnStatus.text %> ₹ <%= Number((txn?.bookingDetails?.totalAmount || 0) - (txn?.bookingDetails?.cancellationFee || 0)).toFixed(2) %>
+            </span>
         </div>
     </div>
 </div>

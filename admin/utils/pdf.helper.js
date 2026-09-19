@@ -27,7 +27,7 @@ const COLORS = {
 
 const STATUS_MAP = {
     1: { text: "Pending", color: COLORS.pending },
-    2: { text: "Completed", color: COLORS.success },
+    2: { text: "Paid", color: COLORS.success },
     3: { text: "Failed", color: COLORS.danger },
     4: { text: "Refunded", color: COLORS.primary },
 };
@@ -103,7 +103,11 @@ function drawField(doc, label, value, x, y, valueColor = COLORS.dark) {
 };
 
 export function generateTransactionPDF(transaction, res) {
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
+    const doc = new PDFDocument({
+        size: "A4",
+        margin: 0,
+        autoFirstPage: true,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -115,169 +119,454 @@ export function generateTransactionPDF(transaction, res) {
 
     const ML = 50;
     const MR = 50;
-    const CW = doc.page.width - ML - MR;
+    const TOP = 50;
+    const BOTTOM = 55;
 
-    // Status
-    const status = STATUS_MAP[transaction?.status] || "-";
-    const carFuelType = CAR_FUEL_MAP[transaction?.carDetails?.fuelType] || "-";
-    const bookingStatus = BOOKING_STATUS_MAP[transaction?.bookingDetails?.status] || "-";
-    const payoutStatus = transaction?.earningDetails ? PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] : null;
-
-    // Header background
-    doc.rect(0, 0, doc.page.width, 70).fill(COLORS.primary);
-    doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("Transaction Receipt", ML, 18, { width: CW, align: "center" });
-    doc.fontSize(9).fillColor(COLORS.white).font(FONT_REGULAR).text(`Generated on ${formatDate(new Date())}`, ML, 38, { width: CW, align: "center" });
+    const PAGE_WIDTH = doc.page.width;
+    const PAGE_HEIGHT = doc.page.height;
+    const CW = PAGE_WIDTH - ML - MR;
 
     let y = 85;
 
-    // Helper: draw a section with title and content callback
-    function section(title, drawFn) {
-        doc.fontSize(10).fillColor(COLORS.primary).font(FONT_BOLD).text(title, ML, y);
-        y += 14;
-        doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
-        y += 8;
-        drawFn();
-        y += 6;
+    const amount = (value) => {
+        const number = Number(value);
+
+        return Number.isFinite(number) ? number.toFixed(2) : "0.00";
     };
 
-    // Transaction Info
-    section("Transaction Information", () => {
-        drawField(doc, "Transaction Id:", transaction?._id, ML, y);
-        drawField(doc, "TRX ID:", transaction?.trxId, 320, y);
-        y += 38;
+    const numberValue = (value) => {
+        const number = Number(value);
 
-        drawField(doc, `${transaction?.serviceDetails?.fullName} Fee:`, "₹" + transaction?.bookingDetails?.totalServiceFee, ML, y);
-        drawField(doc, "Consultant Fee:", "₹" + parseFloat(transaction?.bookingDetails?.consultantFee).toFixed(2), 320, y);
-        y += 38;
+        return Number.isFinite(number) ? number : 0;
+    };
 
-        drawField(doc, "Discount Amount:", "₹" + parseFloat(transaction?.bookingDetails?.discountAmount).toFixed(2), ML, y);
-
-        const platformFeeIcon = parseInt(transaction?.bookingDetails?.platformFeeType) === Constants.PLATFORM_FEE_TYPE.PERCENTAGE ? "%" : "₹";
-        drawField(doc, `Platform Fee (${parseFloat(transaction?.bookingDetails?.platformFee || 0)}${platformFeeIcon}):`, "₹" + transaction?.bookingDetails?.adminCharge, 320, y);
-        y += 38;
-
-        drawField(doc, "Sub Total:", "₹" + parseFloat(transaction?.bookingDetails?.subTotal).toFixed(2), ML, y);
-        drawField(doc, `Tax Amount (${parseInt(transaction?.bookingDetails?.taxPercentage || 0)}%):`, "₹" + parseFloat(transaction?.bookingDetails?.taxAmount).toFixed(2) || 0, 320, y);
-        y += 38;
-
-        const cancellationFeeAmount = parseFloat(transaction?.bookingDetails?.cancellationFee || 0);
-        const totalAmount = parseFloat(transaction?.bookingDetails?.totalAmount - cancellationFeeAmount);
-
-        if (parseFloat(cancellationFeeAmount) > 0) {
-            drawField(doc, `Cancellation Fee (${parseInt(transaction?.bookingDetails?.cancellationPercentage || 0)}%):`, "- ₹" + cancellationFeeAmount.toFixed(2), ML, y, COLORS.danger);
+    const getText = (value, fallback = "-") => {
+        if (value === undefined || value === null || value === "") {
+            return fallback;
         };
-        drawField(doc, "Total Amount:", "₹" + totalAmount.toFixed(2), 320, y);
-        y += 38;
 
-        drawField(doc, "TRX Created Date:", formatDate(transaction?.createdAt), ML, y);
-        drawField(doc, "Payment Status:", status.text, 320, y, status.color);
-        y += 38;
-    });
-
-    // Booking Info
-    section("Booking Information", () => {
-        drawField(doc, "Booking ID:", transaction?.bookingDetails?._id, ML, y);
-        drawField(doc, "Invoice No:", transaction?.bookingDetails?.invoiceNo, 320, y);
-        y += 38;
-
-        drawField(doc, "Booking Date:", formatDate(transaction?.bookingDetails?.date), ML, y);
-        drawField(doc, "Booking Slot:", transaction?.bookingDetails?.slot || "-", 320, y);
-        y += 38;
-
-        drawField(doc, "Booking Status:", bookingStatus.text, ML, y, bookingStatus.color);
-        y += 38;
-    });
-
-    // Booking Cancellation Info
-    if (transaction?.bookingDetails?.cancelReason || transaction?.bookingDetails?.cancelTime) {
-        section("Cancellation Information", () => {
-            drawField(doc, "Cancel Reason:", transaction?.bookingDetails?.cancelReason, ML, y);
-            drawField(doc, "Canceled Date:", fullDateFormat(transaction?.bookingDetails?.cancelTime) || "-", 320, y);
-            y += 38;
-
-            if (transaction?.bookingDetails?.canceledByDetails) {
-                const canceledUserName = `${transaction?.bookingDetails?.canceledByDetails?.fullName || "-"} (${capitalizeFirstLetter(transaction?.bookingDetails?.canceledByRole || "User")})`;
-                drawField(doc, "Canceled By:", canceledUserName, ML, y);
-                y += 38;
-            };
-        });
+        return String(value);
     };
 
-    // Car Owner
-    section("Car Owner Details", () => {
-        drawField(doc, "Owner Name:", transaction?.ownerDetails?.fullName, ML, y);
-        drawField(doc, "Phone:", transaction?.ownerDetails?.phoneNumber, 320, y);
-        y += 38;
-    });
+    const status = STATUS_MAP[transaction?.status] || { text: "-", color: COLORS.gray, };
+    const carFuelType = CAR_FUEL_MAP[transaction?.carDetails?.fuelType] || { text: "-", color: COLORS.gray, };
+    const bookingStatus = BOOKING_STATUS_MAP[transaction?.bookingDetails?.status] || { text: "-", color: COLORS.gray, };
+    const payoutStatus = transaction?.earningDetails ? (PAYOUT_STATUS_MAP[transaction?.earningDetails?.status] || { text: "-", color: COLORS.gray, }) : null;
 
-    // Mechanic
-    section("Mechanic Details", () => {
-        drawField(doc, "Mechanic Name:", transaction?.mechanicDetails?.fullName, ML, y);
-        drawField(doc, "Phone:", transaction?.mechanicDetails?.phoneNumber, 320, y);
-        y += 38;
-    });
+    // ---------------------------------------------------------
+    // Page Header
+    // ---------------------------------------------------------
 
-    // Service & Vehicle
-    section("Service & Vehicle Details", () => {
-        drawField(doc, "Service Name:", transaction?.serviceDetails?.fullName, ML, y);
-        drawField(doc, "Car Name:", transaction?.carDetails?.fullName, 320, y);
-        y += 38;
+    function drawHeader() {
+        doc.rect(0, 0, PAGE_WIDTH, 70).fill(COLORS.primary);
+        doc.fontSize(18).fillColor(COLORS.white).font(FONT_BOLD).text("Transaction Receipt", ML, 18, { width: CW, align: "center", });
+        doc.fontSize(9).fillColor(COLORS.white).font(FONT_REGULAR).text(`Generated on ${formatDate(new Date())}`, ML, 38, { width: CW, align: "center", });
+    };
 
-        drawField(doc, "Vehicle Number:", transaction?.carDetails?.vehicleNumber, ML, y);
-        drawField(doc, "Fuel Type:", carFuelType.text, 320, y, carFuelType.color);
-        y += 38;
-    });
+    function drawFooter() {
+        const footerY = PAGE_HEIGHT - 35;
+        doc.moveTo(ML, footerY).lineTo(PAGE_WIDTH - MR, footerY).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
+        doc.fontSize(7).fillColor(COLORS.gray).font(FONT_REGULAR).text(`Generated on ${formatDate(new Date())} | Car-Mate Admin`, ML, PAGE_HEIGHT - 28, { width: CW, align: "center", });
+    };
 
-    // Mechanic Payout Info
-    if (payoutStatus) {
-        // Payout Data
-        const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
-        const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
-        const adminCharge = parseFloat(transaction?.earningDetails?.adminCharge || 0).toFixed(2);
-        const adminChargeType = parseFloat(transaction?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
-        const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+    function availableHeight() {
+        return PAGE_HEIGHT - BOTTOM - y;
+    };
+
+    function addPage() {
+        drawFooter();
+
+        doc.addPage();
+
+        y = TOP;
+
+        doc.rect(0, 0, PAGE_WIDTH, 45).fill(COLORS.primary);
+        doc.fontSize(12).fillColor(COLORS.white).font(FONT_BOLD).text("Transaction Receipt", ML, 14, { width: CW, align: "center", });
+
+        y = 65;
+    };
+
+    function ensureSpace(height = 50) {
+        if (availableHeight() < height) {
+            addPage();
+        };
+    };
+
+    function sectionHeader(title) {
+        ensureSpace(55);
+
+        doc.fontSize(10).fillColor(COLORS.primary).font(FONT_BOLD).text(title, ML, y);
+
+        y += 14;
+
+        doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
+
+        y += 10;
+    };
+
+    function fieldRow(label, value, options = {}) {
+        const rowHeight = options.height || 34;
+
+        ensureSpace(rowHeight);
+
+        drawField(doc, label, getText(value), options.x || ML, y, options.color);
+
+        y += rowHeight;
+    };
+
+    function twoColumnRow(leftLabel, leftValue, rightLabel, rightValue, options = {}) {
+        const rowHeight = options.height || 34;
+
+        ensureSpace(rowHeight);
+
+        drawField(doc, leftLabel, getText(leftValue), ML, y, options.leftColor);
+
+        if (rightLabel && rightValue) {
+            drawField(doc, rightLabel, getText(rightValue), 320, y, options.rightColor);
+        };
+
+        y += rowHeight;
+    };
+
+    function priceRow(label, value, options = {}) {
+        const rowHeight = options.height || 24;
+
+        ensureSpace(rowHeight);
+
+        doc.fontSize(options.labelSize || 9).font(options.labelFont || FONT_REGULAR).fillColor(options.labelColor || COLORS.gray).text(label, ML, y, { width: CW * 0.65, align: "left", });
+        doc.fontSize(options.valueSize || 9).font(options.valueFont || FONT_BOLD).fillColor(options.valueColor || COLORS.dark).text(value, ML + CW * 0.65, y, { width: CW * 0.35, align: "right", });
+
+        y += rowHeight;
+    };
+
+    function separator(marginTop = 3, marginBottom = 3) {
+        ensureSpace(marginTop + marginBottom + 2);
+
+        y += marginTop;
+
+        doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
+
+        y += marginBottom;
+    };
+
+    function drawTransactionPriceBreakdown() {
+        sectionHeader("Booking Transaction Information");
+
+        twoColumnRow(
+            "Transaction Id:",
+            transaction?._id,
+            "TRX ID:",
+            transaction?.trxId,
+        );
+
+        separator(3, 8);
+
+        fieldRow(
+            "TRX Created Date:",
+            formatDate(transaction?.createdAt),
+        );
+
+        separator(3, 8);
+
+        const booking = transaction?.bookingDetails || {};
+        const serviceName = transaction?.serviceDetails?.fullName || "Service";
+
+        priceRow(
+            `${serviceName} Fee`,
+            `₹${amount(booking?.totalServiceFee)}`,
+        );
+
+        priceRow(
+            "Consultant Fee",
+            `₹${amount(booking?.consultantFee)}`,
+        );
+
+        if (booking?.discountAmount) {
+            priceRow(
+                "Discount",
+                `- ₹${amount(booking?.discountAmount)}`,
+                {
+                    valueColor: COLORS.danger,
+                },
+            );
+        };
+
+        const platformFeeType = parseInt(booking?.platformFeeType) === Constants.PLATFORM_FEE_TYPE.PERCENTAGE ? "%" : "₹";
+
+        priceRow(
+            `Platform Fee (${numberValue(booking?.platformFee)}${platformFeeType})`,
+            `₹${amount(booking?.adminCharge)}`,
+        );
+
+        // -----------------------------------------------------
+        // Quotation
+        // -----------------------------------------------------
+
+        const quotation = Array.isArray(booking?.quotation) ? booking.quotation : [];
+
+        if (quotation.length > 0) {
+            separator(4, 8);
+
+            ensureSpace(25);
+
+            doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text("Quotation", ML, y);
+
+            y += 20;
+
+            quotation.forEach((item) => {
+                priceRow(
+                    item?.serviceName || "Service",
+                    `₹${amount(item?.price)}`,
+                    {
+                        labelColor: COLORS.gray,
+                        valueFont: FONT_REGULAR,
+                    },
+                );
+            });
+        };
+
+        separator(5, 8);
+
+        priceRow(
+            "Sub Total",
+            `₹${amount(booking?.subTotal)}`,
+            {
+                labelFont: FONT_BOLD,
+                labelColor: COLORS.dark,
+                valueFont: FONT_BOLD,
+            },
+        );
+
+        priceRow(
+            `GST ${numberValue(booking?.taxPercentage)}% (Platform + Quotation)`,
+            `₹${amount(booking?.taxAmount)}`,
+        );
+
+        separator(5, 8);
+
+        const cancellationFee = numberValue(booking?.cancellationFee);
+
+        if (cancellationFee > 0) {
+            priceRow(
+                `Cancellation Fee (${numberValue(booking?.cancellationPercentage)}%)`,
+                `- ₹${amount(cancellationFee)}`,
+                {
+                    labelColor: COLORS.danger,
+                    valueColor: COLORS.danger,
+                },
+            );
+
+            separator(3, 8);
+        };
+
+        const totalAmount = numberValue(booking?.totalAmount) - cancellationFee;
+
+        ensureSpace(35);
+
+        doc.fontSize(10).font(FONT_BOLD).fillColor(COLORS.dark).text("Total Amount", ML, y);
+        doc.fontSize(11).font(FONT_BOLD).fillColor(status.color || "#198754").text(`${status.text}  ₹${amount(totalAmount)}`, ML + CW * 0.55, y, { width: CW * 0.45, align: "right", });
+
+        y += 30;
+    };
+
+    function drawBookingInformation() {
+        sectionHeader("Booking Information");
+
+        twoColumnRow(
+            "Booking ID:",
+            transaction?.bookingDetails?._id,
+            "Invoice No:",
+            transaction?.bookingDetails?.invoiceNo
+        );
+
+        twoColumnRow(
+            "Booking Date:",
+            formatDate(transaction?.bookingDetails?.date),
+            "Booking Slot:",
+            transaction?.bookingDetails?.slot,
+        );
+
+        fieldRow(
+            "Booking Status:",
+            bookingStatus.text,
+            {
+                color: bookingStatus.color,
+            },
+        );
+    };
+
+    function drawCancellationInformation() {
+        const booking = transaction?.bookingDetails || {};
+
+        if (!booking?.cancelReason && !booking?.cancelTime) {
+            return;
+        };
+
+        sectionHeader("Cancellation Information");
+
+        twoColumnRow(
+            "Cancel Reason:",
+            booking?.cancelReason,
+            "Canceled Date:",
+            booking?.cancelTime ? fullDateFormat(booking?.cancelTime) : "-",
+        );
+
+        if (booking?.canceledByDetails) {
+            const canceledUserName =
+                `${booking?.canceledByDetails?.fullName || "-"} ` +
+                `(${capitalizeFirstLetter(
+                    booking?.canceledByRole || "User"
+                )})`;
+
+            fieldRow(
+                "Canceled By:",
+                canceledUserName,
+            );
+        };
+    };
+
+    function drawOwnerInformation() {
+        sectionHeader("Car Owner Details");
+
+        twoColumnRow(
+            "Owner Name:",
+            transaction?.ownerDetails?.fullName,
+            "Phone:",
+            transaction?.ownerDetails?.phoneNumber,
+        );
+    };
+
+    function drawMechanicInformation() {
+        sectionHeader("Mechanic Details");
+
+        twoColumnRow(
+            "Mechanic Name:",
+            transaction?.mechanicDetails?.fullName,
+            "Phone:",
+            transaction?.mechanicDetails?.phoneNumber,
+        );
+    };
+
+    function drawServiceVehicleInformation() {
+        sectionHeader("Service & Vehicle Details");
+
+        twoColumnRow(
+            "Service Name:",
+            transaction?.serviceDetails?.fullName,
+            "Car Name:",
+            transaction?.carDetails?.fullName,
+        );
+
+        twoColumnRow(
+            "Vehicle Number:",
+            transaction?.carDetails?.vehicleNumber,
+            "Fuel Type:",
+            carFuelType.text,
+            {
+                rightColor: carFuelType.color,
+            },
+        );
+    };
+
+    function drawMechanicPayoutInformation() {
+        if (!payoutStatus) {
+            return;
+        };
+
+        const earning = transaction?.earningDetails || {};
+        const serviceAmount = numberValue(earning?.serviceAmount);
+        const totalAdminCharge = numberValue(earning?.totalAdminCharge);
+        const adminCharge = numberValue(earning?.adminCharge);
+        const adminChargeType = parseInt(earning?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
+
+        const finalPayoutAmount = numberValue(earning?.finalPayoutAmount);
 
         let feeTypeVal = `${adminCharge}%`;
+
         if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
             feeTypeVal = "Fixed ₹";
         };
 
-        section("Mechanic Payout Information", () => {
-            drawField(doc, "Earning Id:", transaction?.earningDetails?._id, ML, y);
-            drawField(doc, "Payout TRX ID:", transaction?.earningDetails?.razorpayPayoutId || "-", 320, y);
-            y += 38;
+        sectionHeader("Mechanic Payout Information");
 
-            drawField(doc, "Service Amount:", `₹${serviceAmount}`, ML, y);
-            drawField(doc, `Admin Charge (${feeTypeVal}):`, `₹${totalAdminCharge}`, 320, y);
-            y += 38;
+        twoColumnRow(
+            "Earning Id:",
+            earning?._id,
+            "Payout TRX ID:",
+            earning?.razorpayPayoutId || "-",
+        );
 
-            drawField(doc, "Final Payout Amount:", `₹${finalPayoutAmount}`, ML, y);
-            drawField(doc, "Payout Status:", payoutStatus.text, 320, y, payoutStatus.color);
-            y += 38;
+        separator(3, 8);
 
-            drawField(doc, "Payout Transfer Date:", formatDate(transaction?.earningDetails?.processedAt), ML, y);
-            y += 38;
-        });
+        priceRow(
+            "Service Amount:",
+            `₹${amount(serviceAmount)}`,
+        );
 
-        // Amount Summary Box
-        y += 4;
-        doc.roundedRect(ML, y, CW, 85, 4).fill("#f0f4ff");
-        doc.fontSize(11).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 20);
+        priceRow(
+            `Admin Charge (${feeTypeVal}):`,
+            `- ₹${amount(totalAdminCharge)}`,
+            {
+                valueColor: COLORS.danger,
+            },
+        );
 
-        y += 20;
-        doc.fontSize(10).fillColor(COLORS.dark).font(FONT_REGULAR).text(`Total: ₹${serviceAmount}`, ML + 15, y + 28);
-        doc.text(`Admin Charge (${feeTypeVal}): ₹${totalAdminCharge}`, ML + 180, y + 28);
-        doc.fontSize(11).fillColor(payoutStatus.color).font(FONT_BOLD).text(`Payout: ₹${(finalPayoutAmount)}`, ML + 360, y + 28);
+        priceRow(
+            "Final Payout Amount:",
+            `₹${amount(finalPayoutAmount)}`,
+            {
+                valueColor: payoutStatus.color,
+            },
+        );
+
+        priceRow(
+            "Payout Status:",
+            payoutStatus.text,
+            {
+                valueColor: payoutStatus.color,
+            },
+        );
+
+        priceRow(
+            "Payout Transfer Date:",
+            earning?.processedAt ? formatDate(earning?.processedAt) : "-",
+        );
+
+        ensureSpace(105);
+
+        y += 5;
+
+        const summaryHeight = 85;
+
+        doc.roundedRect(ML, y, CW, summaryHeight, 4).fill("#f0f4ff");
+        doc.fontSize(10).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 14);
+        doc.fontSize(9).fillColor(COLORS.dark).font(FONT_REGULAR).text("Total", ML + 15, y + 38);
+        doc.font(FONT_BOLD).text(`₹${amount(serviceAmount)}`, ML + 15, y + 53);
+        doc.font(FONT_REGULAR).text(`Admin Charge (${feeTypeVal})`, ML + 180, y + 38);
+        doc.fillColor(COLORS.danger).font(FONT_BOLD).text(`- ₹${amount(totalAdminCharge)}`, ML + 180, y + 53);
+        doc.fillColor(payoutStatus.color || COLORS.primary).font(FONT_REGULAR).text("Payout", ML + 360, y + 38);
+        doc.font(FONT_BOLD).text(`₹${amount(finalPayoutAmount)}`, ML + 360, y + 53);
+
+        y += summaryHeight + 10;
     };
 
-    // Footer line
-    doc.moveTo(ML, doc.page.height - 35).lineTo(doc.page.width - MR, doc.page.height - 35).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
-    doc.fontSize(7).fillColor(COLORS.gray).font(FONT_REGULAR).text(
-        `Generated on ${formatDate(new Date())} | Car-Mate Admin`,
-        ML,
-        doc.page.height - 28,
-        { width: CW, align: "center" },
-    );
+    drawHeader();
+
+    drawTransactionPriceBreakdown();
+
+    drawBookingInformation();
+
+    drawCancellationInformation();
+
+    drawOwnerInformation();
+
+    drawMechanicInformation();
+
+    drawServiceVehicleInformation();
+
+    drawMechanicPayoutInformation();
+
+    drawFooter();
 
     doc.end();
 };

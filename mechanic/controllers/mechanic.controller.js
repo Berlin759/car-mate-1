@@ -2290,7 +2290,7 @@ export const postBookingUpdateStatus = async (req, res) => {
 
                 if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
                     totalAdminCharge = parseFloat((totalBookingAmount * parseFloat(platformFee)) / 100) || 0;
-                } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE) {
+                } else if (platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
                     totalAdminCharge = platformFee;
                 };
 

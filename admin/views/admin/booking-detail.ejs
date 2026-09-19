@@ -41,7 +41,7 @@
         return `${year}-${month}-${day} ${hours}:${minutes} ${period}`;
     };
 
-    function getStatusBadge(status) {
+    function getBookingStatusBadge(status) {
         const map = {
             1: { text: "Pending", class: "alert-pending" },
             2: { text: "Accepted", class: "alert-accept" },
@@ -55,16 +55,37 @@
             10: { text: "Failed", class: "alert-end" },
             11: { text: "Cancelled", class: "alert-end" },
         };
+
         return map[status] || { text: "Unknown", class: "alert-gray" };
     };
 
-    function getPaymentMethodText(method) {
-        const map = { 1: "Cash", 2: "Wallet", 3: "Card", 4: "UPI", 5: "Net Banking" };
-        return map[method] || "-";
+    function getPaymentStatusBadge(status) {
+        const map = {
+            1: { text: "Pending", class: "text-warning" },
+            2: { text: "In Progress", class: "text-gray" },
+            3: { text: "Paid", class: "text-success" },
+            4: { text: "Failed", class: "text-danger" },
+        };
+
+        return map[status] || { text: "Unknown", class: "text-gray" };
+    };
+
+    function getCarFuelTypeText(type) {
+        const map = {
+            1: { text: "Petrol", class: "text-success" },
+            2: { text: "Diesel", class: "text-success" },
+            3: { text: "EV", class: "text-success" },
+            4: { text: "CNG", class: "text-success" },
+        };
+
+        return map[type] || { text: "Unknown", class: "text-gray" };
     };
 
     let booking = body?.booking || {};
-    let statusInfo = getStatusBadge(booking.status);
+
+    let bookingStatusInfo = getBookingStatusBadge(booking?.status);
+    let paymentStatusInfo = getPaymentStatusBadge(booking?.bookingPaymentStatus);
+    let carFuelInfo = getCarFuelTypeText(parseInt(booking?.carDetails?.fuelType));
 %>
 
 <div class="d-flex align-items-center justify-content-between mb-30">
@@ -72,7 +93,7 @@
         <i class="fa-solid fa-arrow-left"></i> Back to List
     </a>
     <div class="d-flex align-items-center gap-2">
-        <span class="bet-status <%= statusInfo.class %>"><%= statusInfo.text %></span>
+        <span class="bet-status <%= bookingStatusInfo.class %>"><%= bookingStatusInfo.text %></span>
     </div>
 </div>
 
@@ -140,8 +161,12 @@
                 </div>
                 <div>
                     <span class="fs-14 text-gray d-block mb-1">Vehicle</span>
-                    <span class="fw-md"><%= booking.carDetails?.vehicleNumber || "-" %></span>
-                    <span class="text-gray fs-12 d-block"><%= booking.carDetails?.model || "" %> <%= booking.carDetails?.vehicleManufacturerName ? "- " + booking.carDetails.vehicleManufacturerName : "" %></span>
+                    <span class="fw-md">
+                        <%= booking.carDetails?.vehicleNumber || "-" %> <span class="fw-bold fs-16 <%= carFuelInfo.class %>">(<%= carFuelInfo.text %>)</span>
+                    </span>
+                    <span class="text-gray fs-12 d-block">
+                        <%= booking.carDetails?.model || "" %> <%= booking?.carDetails?.vehicleManufacturerName ? "- " + booking?.carDetails?.vehicleManufacturerName : "" %>
+                    </span>
                 </div>
             </div>
         </div>
@@ -182,39 +207,90 @@
 
 <div class="bg-white rounded-2 bs-border p-4 mt-30">
     <h6 class="mb-3">Price Breakdown</h6>
-    <hr>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1"><%= booking?.serviceDetails?.fullName || "Service" %> Fee</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.totalServiceFee).toFixed(2) || 0 %></span>
+
+    <!-- Service Details -->
+    <div class="price-breakdown mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                <%= booking?.serviceDetails?.fullName || "Service" %>
+            </span>
+            <span class="fw-md">
+                ₹ <%= Number(booking?.totalServiceFee || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Consultant Fee</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.consultantFee).toFixed(2) || 0 %></span>
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">Consultant Fee</span>
+            <span class="fw-md">
+                ₹ <%= Number(booking?.consultantFee || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Discount Amount</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.discountAmount).toFixed(2) || 0 %></span>
+        <% if(booking?.discountAmount > 0) { %>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Discount</span>
+                <span class="fw-md text-danger">
+                    - ₹ <%= Number(booking?.discountAmount || 0).toFixed(2) %>
+                </span>
+            </div>
+        <% } %>
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                Platform Fee (<%= Number(booking?.platformFee || 0) %><%=  parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %>)
+            </span>
+            <span class="fw-md">
+                ₹ <%= Number(booking?.adminCharge || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Platform Fee (<span class="fw-md"><%= parseFloat(booking?.platformFee || 0) %><%= parseInt(booking?.platformFeeType) === 1 ? "%" : "₹" %></span>)</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.adminCharge).toFixed(2) || 0 %></span>
+    </div>
+
+    <!-- Quotation -->
+    <% if (booking?.quotation?.length) { %>
+        <div class="mt-3 pt-3 border-top">
+            <h6 class="fs-14 fw-semibold mb-2">Quotation</h6>
+            <% booking.quotation.forEach((item) => { %>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-gray fs-14">
+                        <%= item?.serviceName || "Service" %>
+                    </span>
+                    <span class="fw-md">
+                        ₹ <%= Number(item?.price || 0).toFixed(2) %>
+                    </span>
+                </div>
+            <% }) %>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Sub Total</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.subTotal).toFixed(2) || 0 %></span>
+    <% } %>
+
+    <!-- Summary -->
+    <div class="mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">Sub Total</span>
+            <span class="fw-md">
+                ₹ <%= Number(booking?.subTotal || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Tax Amount (<%= parseInt(booking?.taxPercentage || 0) %>%)</span>
-            <span class="fw-md">₹ <%= parseFloat(booking?.taxAmount).toFixed(2) || 0 %></span>
+        <div class="d-flex justify-content-between align-items-center py-2">
+            <span class="text-gray fs-14">
+                GST <%= Number(booking?.taxPercentage || 0) %>%
+                <span class="fs-12">(Platform + Quotation)</span>
+            </span>
+            <span class="fw-md">
+                ₹ <%= Number(booking?.taxAmount || 0).toFixed(2) %>
+            </span>
         </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Cancellation Fee <%= parseFloat(booking?.cancellationFee) > 0 ? `(${parseInt(booking?.cancellationPercentage || 0)}%)` : '' %></span>
-            <span class="fw-md text-danger">- ₹ <%= parseFloat(booking?.cancellationFee).toFixed(2) || 0 %></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
-            <span class="fw-md fs-16 text-success">₹ <%= (parseFloat(booking?.totalAmount - booking?.cancellationFee)).toFixed(2) || 0 %></span>
+        <% if(booking?.cancellationFee > 0) { %>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Cancellation Fee (<%= Number(booking?.cancellationPercentage || 0) %>%)</span>
+                <span class="fw-md text-danger">
+                    - ₹ <%= Number(booking?.cancellationFee || 0).toFixed(2) %>
+                </span>
+            </div>
+        <% } %>
+    </div>
+    <div class="mt-3 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-semibold fs-15">Total Amount</span>
+            <span class="fw-bold fs-16 <%= paymentStatusInfo.class %>">
+                <%= paymentStatusInfo.text %> ₹ <%= Number((booking?.totalAmount || 0) - (booking?.cancellationFee || 0)).toFixed(2) %>
+            </span>
         </div>
     </div>
 </div>
