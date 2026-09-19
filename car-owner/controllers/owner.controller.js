@@ -3488,13 +3488,13 @@ export const postAddBooking = async (req, res) => {
             };
         };
 
-        const subTotal = parseFloat(remainingAmount);
+        const subTotal = parseFloat(remainingAmount + platformAmount);
 
         const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
         const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
-        let totalPayAmount = parseFloat(subTotal + platformAmount + taxAmount);
+        let totalPayAmount = parseFloat(subTotal + taxAmount);
 
         let bookingData = {
             ownerId: new ObjectId(ownerId),
@@ -4814,13 +4814,13 @@ export const postRescheduleBooking = async (req, res) => {
             };
         };
 
-        const subTotal = parseFloat(remainingAmount);
+        const subTotal = parseFloat(remainingAmount + platformAmount);
 
         const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
 
         const taxAmount = parseFloat((platformAmount * gstPercentage) / 100);
 
-        let totalPayAmount = parseFloat(subTotal + platformAmount + taxAmount);
+        let totalPayAmount = parseFloat(subTotal + taxAmount);
 
         let bookingData = {
             ownerId: new ObjectId(ownerId),
