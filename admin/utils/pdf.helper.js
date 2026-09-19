@@ -616,7 +616,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
     const completePayoutAmount = earningSummary.totalCompletePayout || 0;
     const pendingPayoutAmount = earningSummary.totalPendingPayouts || 0;
 
-    const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
+    const serviceAmount = parseFloat(transactions?.earningDetails?.serviceAmount || 0).toFixed(2);
 
     doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`1. Total Transaction: ${transactions.length}`, ML, y, { width: USABLE_W, lineBreak: false });
     y += 18;

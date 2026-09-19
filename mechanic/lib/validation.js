@@ -82,6 +82,10 @@ const validate_rules = {
             bankAccountNumber: "required",
             bankName: "required",
         },
+        change_language: {
+            language: "required",
+            isAutoDetectLanguage: "required",
+        },
     },
 };
 

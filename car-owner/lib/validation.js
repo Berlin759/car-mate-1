@@ -136,6 +136,10 @@ const validate_rules = {
         delete_account: {
             reasonCategory: "required",
         },
+        change_language: {
+            language: "required",
+            isAutoDetectLanguage: "required",
+        },
     },
 };
 

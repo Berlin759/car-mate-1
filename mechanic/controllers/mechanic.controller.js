@@ -356,7 +356,7 @@ export const postChangeLanguage = async (req, res) => {
         log1(["postChangeLanguage req.body------>", req.body]);
         log1(["postChangeLanguage mechanicId------>", mechanicId]);
 
-        const checkValidation = custom_validation(req, req.body, get_rules('change_language'))
+        const checkValidation = await custom_validation(req, req.body, "mechanic.change_language");
         if (checkValidation.flag != 1) {
             return res.status(400).json(errorResponse(checkValidation.msg));
         };
