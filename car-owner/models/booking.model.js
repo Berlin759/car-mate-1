@@ -189,6 +189,18 @@ const bookingSchema = new Schema(
             type: String,
             default: "",
         },
+        acceptedAt: {
+            type: Date,
+            default: null,
+        },
+        autoCancelledAt: {
+            type: Date,
+            default: null,
+        },
+        autoCancelProcessingAt: {
+            type: Date,
+            default: null,
+        },
         bookingPaymentStatus: {
             type: Number,
             enum: Object.values(Constants.BOOKING_PAYMENT_STATUS),

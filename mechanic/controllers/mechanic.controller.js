@@ -2069,6 +2069,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("You have already accepted another booking for this slot."));
                 };
 
+                updatePayload.acceptedAt = new Date();
+
                 notificationTitle = "Booking Accepted";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has accepted your booking.`;
 
@@ -2182,6 +2184,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                         totalAdminCharge: cancellationFee,
                         adminCharge: cancellationCharge,
                         adminChargeType: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+                        taxAmount: 0,
+                        taxPercentage: 0,
                         finalPayoutAmount: -Math.abs(cancellationFee),
                         bankAccountNumber: mechanicDetails.bankAccountNumber || "",
                         bankIfscCode: mechanicDetails.bankIfscCode || "",
@@ -2294,8 +2298,13 @@ export const postBookingUpdateStatus = async (req, res) => {
                     totalAdminCharge = platformFee;
                 };
 
+                const gstPercentage = parseFloat(pricingDetails?.gstPercentage) || Constants.DEFAULT_GST_PERCENTAGE;
+                const taxAmount = parseFloat((totalAdminCharge * gstPercentage) / 100);
+
+                const totalCharge = totalAdminCharge + taxAmount;
+
                 const earningAmount = totalBookingAmount - bookingDetails?.consultantFee;
-                const finalAmount = totalBookingAmount - totalAdminCharge;
+                const finalAmount = totalBookingAmount - totalCharge;
 
                 const createEarning = await Earning.create({
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
@@ -2307,6 +2316,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                     totalAdminCharge: totalAdminCharge || 0,
                     adminCharge: platformFee,
                     adminChargeType: platformFeeType,
+                    taxAmount: taxAmount,
+                    taxPercentage: gstPercentage,
                     finalPayoutAmount: finalAmount || 0,
                     bankAccountNumber: mechanicDetails?.bankAccountNumber,
                     bankIfscCode: mechanicDetails?.bankIfscCode,
@@ -2691,6 +2702,8 @@ export const getBookingInvoice = async (req, res) => {
                                 totalAdminCharge: 1,
                                 adminCharge: 1,
                                 adminChargeType: 1,
+                                taxAmount: 1,
+                                taxPercentage: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },
@@ -3445,6 +3458,29 @@ export const postChatMessagesDetails = async (req, res) => {
             isBlockedByOther = true;
         };
 
+        const sockets = await io.fetchSockets();
+
+        let isChatUserOnline = false;
+
+        if (chat.ownerId) {
+            const ownerId = chat.ownerId.toString();
+
+            const ownerDetails = await Owner.findOne({ _id: new ObjectId(ownerId) }).select("_id isOnline").lean();
+
+            isChatUserOnline = parseInt(ownerDetails.isOnline) === Constants.ONLINE_STATUS.TRUE;
+        } else if (chat.guestId) {
+            const guestId = chat.guestId.toString();
+
+            if (sockets.length > 0) {
+                isChatUserOnline = sockets.some((socket) => socket?.handshake?.auth?.guestId?.toString() === guestId);
+            };
+        };
+
+        let isOwnerOnline = Constants.ONLINE_STATUS.FALSE;
+        if (isChatUserOnline) {
+            isOwnerOnline = Constants.ONLINE_STATUS.TRUE;
+        };
+
         const response = {
             page: Number(currentPage),
             limit: Number(itemPerPage),
@@ -3454,6 +3490,7 @@ export const postChatMessagesDetails = async (req, res) => {
             isBlockedByMe,
             isBlockedByOther,
             blockedByRole,
+            isOwnerOnline: Number(isOwnerOnline),
         };
 
         return res.status(200).json(successResponse("Chat Details Get Successfully.", response));
@@ -4004,7 +4041,9 @@ export const postEarningOverview = async (req, res) => {
                         serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                         totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                         adminCharge: { $ifNull: ["$adminCharge", 0] },
-                        adminChargeType: { $ifNull: ["$adminChargeType", 0] },
+                        adminChargeType: { $ifNull: ["$adminChargeType", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
+                        taxAmount: { $ifNull: ["$taxAmount", 0] },
+                        taxPercentage: { $ifNull: ["$taxPercentage", 0] },
                         finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                         status: 1,
                         processedAt: 1,
@@ -4177,7 +4216,9 @@ export const postEarningList = async (req, res) => {
                                 serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                                 totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                                 adminCharge: { $ifNull: ["$adminCharge", 0] },
-                                adminChargeType: { $ifNull: ["$adminChargeType", 0] },
+                                adminChargeType: { $ifNull: ["$adminChargeType", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
+                                taxAmount: { $ifNull: ["$taxAmount", 0] },
+                                taxPercentage: { $ifNull: ["$taxPercentage", 0] },
                                 finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
                                 status: 1,
                                 processedAt: 1,
@@ -4215,7 +4256,9 @@ export const postEarningList = async (req, res) => {
                                     serviceAmount: { $ifNull: ["$serviceAmount", 0] },
                                     totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                                     adminCharge: { $ifNull: ["$adminCharge", 0] },
-                                    adminChargeType: { $ifNull: ["$adminChargeType", 0] },
+                                    adminChargeType: { $ifNull: ["$adminChargeType", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
+                                    taxAmount: { $ifNull: ["$taxAmount", 0] },
+                                    taxPercentage: { $ifNull: ["$taxPercentage", 0] },
                                     finalPayout: { $ifNull: ["$finalPayoutAmount", 0] },
                                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
                                     tipAmount: { $ifNull: ["$transactionDetails.tipAmount", 0] },
@@ -4363,6 +4406,8 @@ export const postEarningDetails = async (req, res) => {
                     totalAdminCharge: 1,
                     adminCharge: 1,
                     adminChargeType: 1,
+                    taxAmount: 1,
+                    taxPercentage: 1,
                     finalPayoutAmount: 1,
                     status: 1,
                     consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },

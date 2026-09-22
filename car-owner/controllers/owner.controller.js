@@ -5193,6 +5193,8 @@ export const getBookingInvoice = async (req, res) => {
                                 totalAdminCharge: 1,
                                 adminCharge: 1,
                                 adminChargeType: 1,
+                                taxAmount: 1,
+                                taxPercentage: 1,
                                 finalPayoutAmount: 1,
                                 processedAt: 1,
                             },
@@ -6852,13 +6854,19 @@ export const postChatMessagesDetails = async (req, res) => {
             return message;
         });
 
-        const blockDoc = await Block.findOne({
-            $or: [
-                { ownerId: ownerId ? new ObjectId(ownerId) : null },
-                { guestId: guestId || null }
-            ],
-            mechanicId: new ObjectId(mechanicId)
-        });
+        const [blockDoc, mechanicDetails] = await Promise.all([
+            Block.findOne({
+                mechanicId: new ObjectId(mechanicId),
+                $or: [
+                    { ownerId: ownerId ? new ObjectId(ownerId) : null },
+                    { guestId: guestId || null },
+                ],
+            }).lean(),
+
+            Mechanic.findById(mechanicId).select("_id isOnline").lean(),
+        ]);
+
+        const isMechanicOnline = Number(mechanicDetails?.isOnline) || Constants.ONLINE_STATUS.FALSE;
 
         const isBlockedByOwner = chat.isBlockedByOwner || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.OWNER);
         const isBlockedByMechanic = chat.isBlockedByMechanic || (blockDoc && blockDoc.blockedByRole === Constants.USER_ROLE.MECHANIC);
@@ -6887,6 +6895,7 @@ export const postChatMessagesDetails = async (req, res) => {
             isBlockedByMe,
             isBlockedByOther,
             blockedByRole,
+            isMechanicOnline,
         };
 
         return res.status(200).json(successResponse("Chat Details Get Successfully.", response));

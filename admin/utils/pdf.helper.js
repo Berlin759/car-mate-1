@@ -201,7 +201,7 @@ export function generateTransactionPDF(transaction, res) {
 
         doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
 
-        y += 10;
+        y += 15;
     };
 
     function fieldRow(label, value, options = {}) {
@@ -239,12 +239,14 @@ export function generateTransactionPDF(transaction, res) {
         y += rowHeight;
     };
 
-    function separator(marginTop = 3, marginBottom = 3) {
+    function separator(marginTop = 3, marginBottom = 3, borderShow = true) {
         ensureSpace(marginTop + marginBottom + 2);
 
         y += marginTop;
 
-        doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
+        if (borderShow) {
+            doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).strokeColor(COLORS.lightGray).lineWidth(0.5).stroke();
+        };
 
         y += marginBottom;
     };
@@ -478,6 +480,8 @@ export function generateTransactionPDF(transaction, res) {
         const totalAdminCharge = numberValue(earning?.totalAdminCharge);
         const adminCharge = numberValue(earning?.adminCharge);
         const adminChargeType = parseInt(earning?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
+        const taxAmount = numberValue(earning?.taxAmount);
+        const taxPercentage = numberValue(earning?.taxPercentage);
 
         const finalPayoutAmount = numberValue(earning?.finalPayoutAmount);
 
@@ -486,6 +490,8 @@ export function generateTransactionPDF(transaction, res) {
         if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
             feeTypeVal = "Fixed ₹";
         };
+
+        separator(15, 10, false);
 
         sectionHeader("Mechanic Payout Information");
 
@@ -506,6 +512,14 @@ export function generateTransactionPDF(transaction, res) {
         priceRow(
             `Admin Charge (${feeTypeVal}):`,
             `- ₹${amount(totalAdminCharge)}`,
+            {
+                valueColor: COLORS.danger,
+            },
+        );
+
+        priceRow(
+            `GST Charge (${taxPercentage}%):`,
+            `- ₹${amount(taxAmount)}`,
             {
                 valueColor: COLORS.danger,
             },
@@ -540,12 +554,18 @@ export function generateTransactionPDF(transaction, res) {
 
         doc.roundedRect(ML, y, CW, summaryHeight, 4).fill("#f0f4ff");
         doc.fontSize(10).fillColor(COLORS.primary).font(FONT_BOLD).text("Amount Summary", ML + 15, y + 14);
+
         doc.fontSize(9).fillColor(COLORS.dark).font(FONT_REGULAR).text("Total", ML + 15, y + 38);
         doc.font(FONT_BOLD).text(`₹${amount(serviceAmount)}`, ML + 15, y + 53);
-        doc.font(FONT_REGULAR).text(`Admin Charge (${feeTypeVal})`, ML + 180, y + 38);
-        doc.fillColor(COLORS.danger).font(FONT_BOLD).text(`- ₹${amount(totalAdminCharge)}`, ML + 180, y + 53);
-        doc.fillColor(payoutStatus.color || COLORS.primary).font(FONT_REGULAR).text("Payout", ML + 360, y + 38);
-        doc.font(FONT_BOLD).text(`₹${amount(finalPayoutAmount)}`, ML + 360, y + 53);
+
+        doc.font(FONT_REGULAR).text(`Admin Charge (${feeTypeVal})`, ML + 120, y + 38);
+        doc.fillColor(COLORS.danger).font(FONT_BOLD).text(`- ₹${amount(totalAdminCharge)}`, ML + 120, y + 53);
+
+        doc.fillColor(COLORS.dark).font(FONT_REGULAR).text(`GST Charge (${taxPercentage}%)`, ML + 280, y + 38);
+        doc.fillColor(COLORS.danger).font(FONT_BOLD).text(`- ₹${amount(taxAmount)}`, ML + 280, y + 53);
+
+        doc.fillColor(payoutStatus.color || COLORS.primary).font(FONT_REGULAR).text("Payout", ML + 420, y + 38);
+        doc.font(FONT_BOLD).text(`₹${amount(finalPayoutAmount)}`, ML + 420, y + 53);
 
         y += summaryHeight + 10;
     };
@@ -685,6 +705,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
 
         const serviceAmount = parseFloat(transaction?.earningDetails?.serviceAmount || 0).toFixed(2);
         const totalAdminCharge = parseFloat(transaction?.earningDetails?.totalAdminCharge || 0).toFixed(2);
+        const taxAmount = parseFloat(transaction?.earningDetails?.taxAmount || 0).toFixed(2);
         const finalPayoutAmount = parseFloat(transaction?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
 
         const rowData = [
@@ -697,6 +718,7 @@ export function generateAllTransactionsPDF(transactionData, res) {
             String(transaction?.carDetails?.fullName || "-").substring(0, 12),
             `₹${serviceAmount}`,
             `₹${totalAdminCharge}`,
+            `₹${taxAmount}`,
             `₹${finalPayoutAmount}`,
             payoutStatus ? payoutStatus.text : "-",
             formatDate(transaction?.createdAt),

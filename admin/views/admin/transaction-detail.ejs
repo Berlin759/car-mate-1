@@ -313,36 +313,53 @@
 <% if (payoutStatus) { %>
     <div class="bg-white rounded-2 bs-border p-4 mt-30">
         <h6 class="mb-3">Payout Details</h6>
-        <hr>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <span class="text-gray fs-14 d-block mb-1">Total Amount</span>
-                <span class="fw-md fs-16">₹ <%= (txn?.bookingDetails?.totalAmount).toFixed(2) || 0 %></span>
-            </div>
-            <% if(parseFloat(txn?.bookingDetails?.cancellationFee) > 0) { %>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-1">
-                        Cancellation Fee (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %>%)
-                    </span>
-                    <span class="fw-md text-danger">- ₹ <%= txn?.earningDetails?.totalAdminCharge.toFixed(2) || 0 %></span>
-                </div>
-            <% } else { %>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-1">
-                        Admin Charge (<%= parseInt(txn?.earningDetails?.adminCharge || 0) %><%= parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %>)
-                    </span>
-                    <span class="fw-md text-danger">- ₹ <%= txn?.earningDetails?.totalAdminCharge.toFixed(2) || 0 %></span>
-                </div>
-            <% } %>
-            <div class="col-md-6">
-                <span class="text-gray fs-14 d-block mb-1">Final Payout</span>
-                <span class="fw-md fs-16 <%= payoutStatus ? payoutStatus.textClass : 'text-success' %>">
-                    ₹ <%= (txn?.earningDetails?.finalPayoutAmount).toFixed(2) || 0 %>
+
+        <div class="price-breakdown mt-3 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Service Amount</span>
+                <span class="fw-md">
+                    ₹ <%= Number(txn?.bookingDetails?.totalAmount || 0).toFixed(2) %>
                 </span>
             </div>
-            <div class="col-md-6">
-                <span class="text-gray fs-14 d-block mb-1">Payout Status</span>
-                <span class="bet-status <%= payoutStatus.class %>"><%= payoutStatus.text %></span>
+            <% if(parseFloat(txn?.bookingDetails?.cancellationFee) > 0) { %>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-gray fs-14">
+                        Cancellation Fee (<%= Number(txn?.earningDetails?.adminCharge || 0) %>%)
+                    </span>
+                    <span class="fw-md text-danger">
+                        - ₹ <%= Number(txn?.earningDetails?.totalAdminCharge || 0).toFixed(2) %>
+                    </span>
+                </div>
+            <% } else { %>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-gray fs-14">
+                        Admin Charge (<%= Number(txn?.earningDetails?.adminCharge || 0) %><%=  parseInt(txn?.earningDetails?.adminChargeType) === 1 ? "%" : "₹" %>)
+                    </span>
+                    <span class="fw-md text-danger">
+                        - ₹ <%= Number(txn?.earningDetails?.totalAdminCharge || 0).toFixed(2) %>
+                    </span>
+                </div>
+            <% } %>
+
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">
+                    GST Charge (<%= parseFloat(txn?.earningDetails?.taxPercentage || 0) %>%)
+                </span>
+                <span class="fw-md text-danger">
+                    - ₹ <%= Number(txn?.earningDetails?.taxAmount || 0).toFixed(2) %>
+                </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Final Payout</span>
+                <span class="fw-md <%= payoutStatus.textClass %>">
+                    ₹ <%= Number(txn?.earningDetails?.finalPayoutAmount || 0).toFixed(2) %>
+                </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center py-2">
+                <span class="text-gray fs-14">Payout Status</span>
+                <span class="bet-status <%= payoutStatus.class %>">
+                    <%= payoutStatus.text %>
+                </span>
             </div>
         </div>
     </div>

@@ -143,6 +143,8 @@ export const generateInvoicePDF = async (booking) => {
             const adminCharge = parseFloat(booking?.earningDetails?.adminCharge || 0).toFixed(2);
             const adminChargeType = parseFloat(booking?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
             const finalPayoutAmount = parseFloat(booking?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
+            const taxAmount = parseFloat(booking?.earningDetails?.taxAmount);
+            const taxPercentage = parseFloat(booking?.earningDetails?.taxPercentage);
 
             let feeTypeVal = `${adminCharge}%`;
             if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
@@ -151,6 +153,7 @@ export const generateInvoicePDF = async (booking) => {
 
             drawSummaryRow("Service Amount:", serviceAmount, true);
             drawSummaryRow(`Admin Charge (${feeTypeVal}):`, totalAdminCharge, true, true);
+            drawSummaryRow(`GST Charge (${taxPercentage}%):`, taxAmount, true, true);
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.primary).lineWidth(2).stroke();

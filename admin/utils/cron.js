@@ -8,6 +8,9 @@ import { sendPushNotification } from "../controllers/pushNotification.js";
 import Earning from "../models/earning.model.js";
 import Mechanic from "../models/mechanic.model.js";
 import Booking from "../models/booking.model.js";
+import Owner from "../models/owner.model.js";
+import Transaction from "../models/transaction.model.js";
+import Pricing from "../models/pricing.model.js";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY,
@@ -210,6 +213,284 @@ export const triggerRazorpayPayout = async (
         const errData = error.error || error.response?.data?.error || error;
         log1(["Failed to trigger Razorpay payout:", errData]);
         throw new Error(`Payout API call failed: ${errData.description || error.message || "Razorpay payout failed."}`);
+    };
+};
+
+export const autoCancelSingleBooking = async (booking, pricingDetails) => {
+    log1(["Processing auto-cancel booking:", booking?._id.toString()]);
+
+    const now = new Date();
+    const processingLockTime = new Date();
+    const staleLockTime = new Date(Date.now() - 15 * 60 * 1000);
+
+    const lockedBooking = await Booking.findOneAndUpdate(
+        {
+            _id: booking?._id,
+            status: Constants.BOOKING_STATUS.ACCEPTED,
+            autoCancelledAt: null,
+            $or: [
+                { startTime: null },
+                { startTime: { $exists: false } },
+            ],
+            $and: [
+                {
+                    $or: [
+                        { autoCancelProcessingAt: null },
+                        { autoCancelProcessingAt: { $exists: false } },
+                        { autoCancelProcessingAt: { $lte: staleLockTime } },
+                    ],
+                },
+            ],
+        },
+        {
+            $set: {
+                autoCancelProcessingAt: processingLockTime,
+            },
+        },
+        { new: true }
+    );
+
+    if (!lockedBooking) {
+        log1([`Booking ${booking?._id} was already processed or is no longer eligible.`]);
+        return;
+    };
+
+    const refundAmount = Number(booking?.totalAmount || 0);
+
+    if (refundAmount <= 0) {
+        log1([`Booking ${booking?._id} has no refundable amount.`]);
+
+        await markBookingAutoCancelled(lockedBooking);
+
+        return;
+    };
+
+    let refundResult;
+
+    try {
+        refundResult = await refundBookingPayment(booking, refundAmount, pricingDetails);
+    } catch (refundError) {
+        log1([`Refund failed for booking ${booking?._id}:`, refundError]);
+
+        await Booking.updateOne(
+            {
+                _id: booking?._id,
+                autoCancelProcessingAt: processingLockTime,
+                status: Constants.BOOKING_STATUS.ACCEPTED,
+            },
+            {
+                $set: {
+                    autoCancelProcessingAt: null,
+                },
+            }
+        );
+
+        return;
+    };
+
+    const cancelledBooking = await Booking.findOneAndUpdate(
+        {
+            _id: booking?._id,
+            status: Constants.BOOKING_STATUS.ACCEPTED,
+            autoCancelledAt: null,
+            autoCancelProcessingAt: processingLockTime,
+        },
+        {
+            $set: {
+                status: Constants.BOOKING_STATUS.CANCELLED,
+                cancelReason: "Booking automatically cancelled because the mechanic did not start the service within 24 hours.",
+                cancelTime: new Date(),
+                canceledBy: booking?.mechanicId?._id,
+                canceledByRole: Constants.USER_ROLE.MECHANIC,
+                cancellationPercentage: refundResult?.cancellationCharge,
+                cancellationFee: refundResult?.cancellationFee,
+                autoCancelledAt: new Date(),
+                autoCancelProcessingAt: null,
+            },
+        },
+        { new: true },
+    );
+
+    if (!cancelledBooking) {
+        log1([`Booking ${booking?._id} could not be cancelled after refund.`]);
+        return;
+    };
+
+    log1([
+        `Booking ${booking?._id} automatically cancelled.`,
+        `Refund status: ${refundResult.status}`,
+        `Refund ID: ${refundResult.refundId || "-"}`,
+        `Refund transaction ID: ${refundResult.transactionId || "-"}`
+    ]);
+
+    if (booking?.ownerId?.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE && booking?.ownerId?.deviceToken) {
+        const notificationObject = {
+            title: "Booking Cancelled",
+            description: "Your booking was automatically cancelled because the mechanic did not start the service within 24 hours. Your payment has been refunded.",
+            ownerId: booking?.ownerId?._id,
+            bookingId: booking?._id,
+            type: Constants.NOTIFICATION_TYPE.BOOKING,
+        };
+
+        await sendPushNotification(booking?.ownerId?.deviceToken, notificationObject);
+    };
+
+    if (booking?.mechanicId?.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE && booking?.mechanicId?.deviceToken) {
+        const notificationObject = {
+            title: "Booking Cancelled",
+            description: "Booking was automatically cancelled because the you did not start the service within 24 hours.",
+            mechanicId: booking?.mechanicId?._id,
+            bookingId: booking?._id,
+            type: Constants.NOTIFICATION_TYPE.BOOKING,
+        };
+
+        await sendPushNotification(booking?.mechanicId?.deviceToken, notificationObject);
+    };
+};
+
+export const markBookingAutoCancelled = async (booking) => {
+    const now = new Date();
+
+    await Booking.findOneAndUpdate(
+        {
+            _id: booking?._id,
+            status: Constants.BOOKING_STATUS.ACCEPTED,
+            autoCancelledAt: null,
+        },
+        {
+            $set: {
+                status: Constants.BOOKING_STATUS.CANCELLED,
+                cancelReason: "Booking automatically cancelled because the mechanic did not start the service within 24 hours.",
+                cancelTime: now,
+                canceledBy: booking?.mechanicId?._id,
+                canceledByRole: Constants.USER_ROLE.MECHANIC,
+                autoCancelledAt: now,
+                autoCancelProcessingAt: null,
+            },
+        },
+    );
+};
+
+export const refundBookingPayment = async (booking, refundAmount, pricingDetails) => {
+    try {
+        const existingRefund = await Transaction.findOne({
+            bookingId: booking?._id,
+            status: Constants.TRANSACTION_STATUS.REFUND,
+        }).select("_id trxId totalAmount status").lean();
+
+        if (existingRefund) {
+            log1([
+                `Refund transaction already exists for booking ${booking?._id}.`,
+                `Refund ID: ${existingRefund.trxId}`
+            ]);
+
+            return {
+                status: existingRefund.status,
+                refundId: existingRefund.trxId,
+                transactionId: existingRefund._id,
+            };
+        };
+
+        const paymentId = booking?.razorpayPaymentId;
+
+        if (!paymentId) {
+            throw new Error(`Razorpay payment ID not found for booking ${booking?._id}`);
+        };
+
+        const amountInPaise = Math.round(Number(refundAmount) * 100);
+
+        if (amountInPaise <= 0) {
+            throw new Error(`Invalid refund amount for booking ${booking?._id}`);
+        };
+
+        log1([
+            "Creating Razorpay refund:",
+            {
+                bookingId: booking?._id.toString(),
+                paymentId,
+                refundAmount,
+                amountInPaise,
+            }
+        ]);
+
+        const refund = await razorpay.payments.refund(
+            paymentId,
+            {
+                payment_id: paymentId,
+                amount: amountInPaise,
+                notes: {
+                    bookingId: booking?._id.toString(),
+                    reason: "Auto cancellation - mechanic did not start service within 24 hours",
+                },
+            }
+        );
+
+        log1([
+            "Razorpay refund created:",
+            {
+                refundId: refund.id,
+                bookingId: booking?._id.toString(),
+            }
+        ]);
+
+        const refundTransaction = await Transaction.create({
+            trxId: refund.id,
+            ownerId: booking?.ownerId?._id || booking?.ownerId,
+            mechanicId: booking?.mechanicId?._id || booking?.mechanicId,
+            serviceId: booking?.serviceId,
+            bookingId: booking?._id,
+            carId: booking?.carId || null,
+            invoiceId: booking?.invoiceId || "",
+            totalAmount: Number(refundAmount),
+            description: "Refund generated because the booking was automatically cancelled after the mechanic did not start the service within 24 hours.",
+            status: Constants.TRANSACTION_STATUS.REFUND,
+        });
+
+        const cancellationCharge = parseFloat(pricingDetails?.cancellationFee) || 0;
+        const cancellationFee = parseFloat((Number(refundAmount) * parseFloat(cancellationCharge)) / 100) || 0;
+
+        if (cancellationFee > 0) {
+            await Earning.create({
+                mechanicId: booking?.mechanicId?._id || booking?.mechanicId,
+                transactionId: null,
+                bookingId: booking?._id,
+                earningType: Constants.EARNING_TYPE.CANCELLATION_DEDUCTION,
+                earningAmount: 0,
+                serviceAmount: 0,
+                totalAdminCharge: cancellationFee,
+                adminCharge: cancellationCharge,
+                adminChargeType: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+                taxAmount: 0,
+                taxPercentage: 0,
+                finalPayoutAmount: -Math.abs(cancellationFee),
+                bankAccountNumber: booking?.mechanicId?.bankAccountNumber || "",
+                bankIfscCode: booking?.mechanicId?.bankIfscCode || "",
+                bankAccountHolderName: booking?.mechanicId?.bankAccountHolderName || "",
+                status: Constants.EARNING_STATUS.PENDING,
+            });
+        };
+
+        log1([
+            "Refund transaction created:",
+            {
+                transactionId: refundTransaction._id,
+                refundId: refund.id,
+                bookingId: booking?._id,
+                amount: refundAmount,
+            }
+        ]);
+
+        return {
+            status: Constants.TRANSACTION_STATUS.REFUND,
+            refundId: refund.id,
+            transactionId: refundTransaction._id,
+            cancellationCharge: cancellationCharge,
+            cancellationFee: cancellationFee,
+        };
+    } catch (error) {
+        log1([`Razorpay refund failed for booking ${booking?._id}:`, error]);
+
+        throw error;
     };
 };
 
@@ -421,11 +702,76 @@ export const processWeeklyPayouts = async () => {
 };
 
 /**
+ * Core function to process Auto-cancel bookings
+ */
+export const processAutoCancelBooking = async () => {
+    log1(["Running Auto-cancel bookings that haven’t started within 24 hours Process..."]);
+
+    const currentDate = momentTz.tz(Constants.CURRENT_TIMEZONE);
+
+    try {
+        const cutoffDate = currentDate.clone().subtract(24, "hours").toDate();
+
+        log1(["Auto-cancel cutoff date:", cutoffDate]);
+
+        const bookings = await Booking.find({
+            status: Constants.BOOKING_STATUS.ACCEPTED,
+            acceptedAt: { $ne: null, $lte: cutoffDate, },
+            autoCancelledAt: null,
+            $and: [
+                {
+                    $or: [
+                        { startTime: null },
+                        { startTime: { $exists: false } },
+                    ],
+                },
+                {
+                    $or: [
+                        { autoCancelProcessingAt: null },
+                        { autoCancelProcessingAt: { $exists: false } },
+                        { autoCancelProcessingAt: { $lte: new Date(Date.now() - 15 * 60 * 1000) } },
+                    ],
+                },
+
+            ],
+        }).populate({
+            path: "ownerId",
+            select: "_id fullName bookingNotification deviceToken",
+        }).populate({
+            path: "mechanicId",
+            select: "_id fullName bookingNotification bankAccountNumber bankIfscCode bankAccountHolderName deviceToken",
+        }).lean();
+
+        log1([`Found ${bookings.length} booking(s) for auto-cancellation.`]);
+
+        if (!bookings.length) {
+            log1(["No bookings found for auto-cancellation."]);
+            return;
+        };
+
+        const pricingDetails = await Pricing.findOne({}).lean();
+
+        for (const booking of bookings) {
+            try {
+                await autoCancelSingleBooking(booking, pricingDetails);
+            } catch (error) {
+                log1([`Auto-cancel failed for booking ${booking?._id}:`, error]);
+            };
+        };
+
+    } catch (dbError) {
+        log1(["Database error during Auto-cancel bookings:", dbError]);
+
+        throw dbError;
+    };
+};
+
+/**
  * Initializes the weekly payout cron schedule
  */
 export const initCronJobs = () => {
     /**
-     * For Run Cron Schedule every Monday at 12:00:00 AM (0 0 * * 1)
+     * For Run Weekly Payout Cron Schedule every Monday at 12:00:00 AM (0 0 * * 1)
      */
     cron.schedule("0 0 * * 1", async () => {
         log1(["Cron trigger fired: Weekly Earning Payout"]);
@@ -438,28 +784,15 @@ export const initCronJobs = () => {
     }, { timezone: Constants.CURRENT_TIMEZONE });
 
     /**
-     * For Run Cron Schedule every 1 hour
+     * For Run Auto-cancel bookings Cron Schedule every Minute
      */
-    // cron.schedule("0 * * * *", async () => {
-    //     log1(["Cron trigger fired for testing: Weekly Earning Payout"]);
+    cron.schedule("* * * * *", async () => {
+        log1(["Cron trigger fired: Auto-cancel bookings."]);
 
-    //     try {
-    //         await processWeeklyPayouts();
-    //     } catch (error) {
-    //         log1(["Weekly payout cron failed:", error]);
-    //     };
-    // }, { timezone: Constants.CURRENT_TIMEZONE });
-
-    /**
-     * For Testing Run Cron Schedule every 5 Minute
-     */
-    // cron.schedule("*/5 * * * *", async () => {
-    //     log1(["Cron trigger fired for testing: Weekly Earning Payout"]);
-
-    //     try {
-    //         await processWeeklyPayouts();
-    //     } catch (error) {
-    //         log1(["Weekly payout cron failed:", error]);
-    //     };
-    // }, { timezone: Constants.CURRENT_TIMEZONE });
+        try {
+            await processAutoCancelBooking();
+        } catch (error) {
+            log1(["Weekly payout cron failed:", error]);
+        };
+    }, { timezone: Constants.CURRENT_TIMEZONE });
 };

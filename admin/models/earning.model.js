@@ -45,6 +45,14 @@ const earningSchema = new Schema(
             enum: Object.values(Constants.PLATFORM_FEE_TYPE),
             default: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
         },
+        taxAmount: {
+            type: Number,
+            default: 0,
+        },
+        taxPercentage: {
+            type: Number,
+            default: Constants.DEFAULT_GST_PERCENTAGE,
+        },
         finalPayoutAmount: {
             type: Number,
             default: 0,

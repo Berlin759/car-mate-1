@@ -115,6 +115,10 @@
             <hr>
             <div class="d-flex flex-column gap-3">
                 <div class="d-flex justify-content-between">
+                    <span class="text-gray">Id</span>
+                    <span class="fw-md"><%= body?.kyc?.mechanicDetails?._id || "-" %></span>
+                </div>
+                <div class="d-flex justify-content-between">
                     <span class="text-gray">Name</span>
                     <span class="fw-md"><%= body?.kyc?.mechanicDetails?.fullName || "-" %></span>
                 </div>
