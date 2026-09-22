@@ -887,8 +887,8 @@ export const postHomeDetails = async (req, res) => {
 
         const response = {
             gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
-            platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
-            platformFeeType: parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            platformFee: parseFloat(pricingDetails?.mechanicPlatformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: parseInt(pricingDetails?.mechanicPlatformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
             cancellationFee: parseFloat(pricingDetails?.cancellationFee) ?? Constants.DEFAULT_CANCELLATION_FEE,
             totalEarnings,
             pendingPayouts,
@@ -2285,8 +2285,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                     updatePayload.materialCost = parseFloat(materialCost);
                 };
 
-                const platformFee = parseFloat(pricingDetails?.platformFee) || 0;
-                const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+                const platformFee = parseFloat(pricingDetails?.mechanicPlatformFee) || 0;
+                const platformFeeType = parseInt(pricingDetails?.mechanicPlatformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
                 const totalBookingAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
@@ -4239,7 +4239,7 @@ export const postEarningList = async (req, res) => {
                                     discountAmount: { $ifNull: ["$bookingDetails.discountAmount", 0] },
                                     adminCharge: { $ifNull: ["$bookingDetails.adminCharge", 0] },
                                     platformFee: { $ifNull: ["$bookingDetails.platformFee", 0] },
-                                    platformFeeType: { $ifNull: ["$bookingDetails.discountAmount", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
+                                    platformFeeType: { $ifNull: ["$bookingDetails.platformFeeType", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
                                     taxAmount: { $ifNull: ["$bookingDetails.taxAmount", 0] },
                                     taxPercentage: { $ifNull: ["$bookingDetails.taxPercentage", 0] },
                                     subTotal: { $ifNull: ["$bookingDetails.subTotal", 0] },

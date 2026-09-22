@@ -57,10 +57,12 @@ const validate_rules = {
         },
         update_pricing: {
             evAdminChargeType: "required",
-            platformFee: "required",
-            platformFeeType: "required",
             gstPercentage: "required",
             cancellationFee: "required",
+            ownerPlatformFee: "required",
+            ownerPlatformFeeType: "required",
+            mechanicPlatformFee: "required",
+            mechanicPlatformFeeType: "required",
         },
     },
 };

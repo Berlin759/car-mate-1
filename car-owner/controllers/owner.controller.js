@@ -889,8 +889,8 @@ export const postHomeDetails = async (req, res) => {
         return res.status(200).json(successResponse("Home details success", {
             evAdminChargeType: parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF,
             gstPercentage: parseFloat(pricingDetails?.gstPercentage) ?? Constants.DEFAULT_GST_PERCENTAGE,
-            platformFee: parseFloat(pricingDetails?.platformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
-            platformFeeType: parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            platformFee: parseFloat(pricingDetails?.ownerPlatformFee) ?? Constants.DEFAULT_PLATFORM_FEE,
+            platformFeeType: parseInt(pricingDetails?.ownerPlatformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
             cancellationFee: parseFloat(pricingDetails?.cancellationFee) ?? Constants.DEFAULT_CANCELLATION_FEE,
             location: locationObject,
             carList: carList,
@@ -3462,9 +3462,9 @@ export const postAddBooking = async (req, res) => {
         };
         log1(["postAddBooking discountAmount----->", discountAmount]);
 
-        const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
+        const platformFee = parseFloat(pricingDetails?.ownerPlatformFee) ?? 0;
         const evAdminChargeType = parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF;
-        const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+        const platformFeeType = parseInt(pricingDetails?.ownerPlatformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
         const remainingAmount = parseFloat(totalFee - discountAmount);
 
@@ -4789,8 +4789,8 @@ export const postRescheduleBooking = async (req, res) => {
         log1(["postRescheduleBooking discountAmount----->", discountAmount]);
 
         const evAdminChargeType = parseInt(pricingDetails?.evAdminChargeType) ?? Constants.EV_ADMIN_CHARGE_TYPE.OFF;
-        const platformFee = parseFloat(pricingDetails?.platformFee) ?? 0;
-        const platformFeeType = parseInt(pricingDetails?.platformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
+        const platformFee = parseFloat(pricingDetails?.ownerPlatformFee) ?? 0;
+        const platformFeeType = parseInt(pricingDetails?.ownerPlatformFeeType) ?? Constants.PLATFORM_FEE_TYPE.PERCENTAGE;
 
         const remainingAmount = parseFloat(totalFee - discountAmount);
 

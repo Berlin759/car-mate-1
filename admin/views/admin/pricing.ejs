@@ -2,80 +2,176 @@
     <div class="p-3">
         <form id="pricing-form">
             <div class="row g-4">
-                <div class="col-lg-6">
+                <div class="col-lg-12">
                     <div class="card bs-border">
                         <div class="card-header bg-white fw-semibold fs-15">
                             <i class="fa-solid fa-coins me-2"></i> Commission & Tax
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Enable EV Admin Charge</label>
-                                <select class="form-select" id="evAdminChargeType" name="evAdminChargeType" required>
-                                    <option value="1" <%= body?.pricing?.evAdminChargeType === 1 ? "selected" : "" %>>OFF</option>
-                                    <option value="2" <%= body?.pricing?.evAdminChargeType === 2 ? "selected" : "" %>>ON</option>
-                                </select>
-                                <small class="text-muted">
-                                    When enabled, admin charge will be deducted from the owner's payment.
-                                </small>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">Platform Fee Type</label>
-                                <select class="form-select" id="platformFeeType" name="platformFeeType" required>
-                                    <option value="1" <%= body?.pricing?.platformFeeType === 1 ? "selected" : "" %>>Percentage (%)</option>
-                                    <option value="2" <%= body?.pricing?.platformFeeType === 2 ? "selected" : "" %>>Fixed Amount(₹)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark" id="platformFeeLabel">Platform Fee (%)</label>
-                                <input
-                                    type="text"
-                                    inputmode="decimal"
-                                    class="form-control percentage-input"
-                                    id="platformFee"
-                                    name="platformFee"
-                                    min="0"
-                                    value="<%= body?.pricing?.platformFee || 5 %>"
-                                    autocomplete="off"
-                                >
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-dark">GST (%)</label>
-                                <input
-                                    type="text"
-                                    inputmode="decimal"
-                                    class="form-control percentage-input"
-                                    id="gstPercentage"
-                                    name="gstPercentage"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value="<%= body?.pricing?.gstPercentage || 18 %>"
-                                >
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-dark">Enable EV Admin Charge</label>
+                                        <select class="form-select" id="evAdminChargeType" name="evAdminChargeType" required>
+                                            <option value="1" <%= body?.pricing?.evAdminChargeType === 1 ? "selected" : "" %>>OFF</option>
+                                            <option value="2" <%= body?.pricing?.evAdminChargeType === 2 ? "selected" : "" %>>ON</option>
+                                        </select>
+                                        <small class="text-muted">
+                                            When enabled, admin charge will be deducted from the owner's payment.
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-dark">Cancellation Fee (%)</label>
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            class="form-control percentage-input"
+                                            id="cancellationFee"
+                                            name="cancellationFee"
+                                            step="0.01"
+                                            min="0"
+                                            max="100"
+                                            value="<%= body?.pricing?.cancellationFee || 0 %>"
+                                            autocomplete="off"
+                                        >
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-dark">GST (%)</label>
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            class="form-control percentage-input"
+                                            id="gstPercentage"
+                                            name="gstPercentage"
+                                            step="0.01"
+                                            min="0"
+                                            max="100"
+                                            value="<%= body?.pricing?.gstPercentage || 18 %>"
+                                            autocomplete="off"
+                                        >
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <div class="row g-4 mt-3">
                 <div class="col-lg-6">
                     <div class="card bs-border">
                         <div class="card-header bg-white fw-semibold fs-15">
-                            <i class="fa-solid fa-indian-rupee-sign me-2"></i> Base Pricing
+                            <i class="fa-solid fa-coins me-2"></i> Owner Platform Commission
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
-                                <label class="form-label text-dark">Cancellation Fee (%)</label>
-                                <input type="text" inputmode="decimal" class="form-control percentage-input" id="cancellationFee" name="cancellationFee" step="0.01" min="0" max="100" value="<%= body?.pricing?.cancellationFee || 0 %>">
+                                <label class="form-label text-dark">Platform Fee Type</label>
+                                <div class="d-flex align-items-center gap-4">
+                                    <div class="form-check position-relative">
+                                        <input
+                                            class="form-check-input"
+                                            type="radio"
+                                            name="ownerPlatformFeeType"
+                                            id="ownerPlatformFeePercentage"
+                                            value="1"
+                                            <%= parseInt(body?.pricing?.ownerPlatformFeeType) === 1 ? "checked" : "" %>
+                                        >
+                                        <label class="form-check-label" for="ownerPlatformFeePercentage">Percentage (%)</label>
+                                    </div>
+
+                                    <div class="form-check position-relative">
+                                        <input
+                                            class="form-check-input"
+                                            type="radio"
+                                            name="ownerPlatformFeeType"
+                                            id="ownerPlatformFeeFixed"
+                                            value="2"
+                                            <%= parseInt(body?.pricing?.ownerPlatformFeeType) === 2 ? "checked" : "" %>
+                                        >
+                                        <label class="form-check-label" for="ownerPlatformFeeFixed">Fixed Amount (₹)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark" id="ownerPlatformFeeLabel">Platform Fee (%)</label>
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    class="form-control percentage-input"
+                                    id="ownerPlatformFee"
+                                    name="ownerPlatformFee"
+                                    min="0"
+                                    value="<%= body?.pricing?.ownerPlatformFee || 5 %>"
+                                    autocomplete="off"
+                                >
                             </div>
                         </div>
                     </div>
                 </div>
+                <div class="col-lg-6">
+                    <div class="card bs-border">
+                        <div class="card-header bg-white fw-semibold fs-15">
+                            <i class="fa-solid fa-coins me-2"></i> Mechanic Platform Commission
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label text-dark">Platform Fee Type</label>
+                                <div class="d-flex align-items-center gap-4">
+                                    <div class="form-check position-relative">
+                                        <input
+                                            class="form-check-input"
+                                            type="radio"
+                                            name="mechanicPlatformFeeType"
+                                            id="mechanicPlatformFeePercentage"
+                                            value="1"
+                                            <%= parseInt(body?.pricing?.mechanicPlatformFeeType) === 1 ? "checked" : "" %>
+                                        >
+                                        <label class="form-check-label" for="mechanicPlatformFeePercentage">Percentage (%)</label>
+                                    </div>
 
-                <!-- Submit -->
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary" id="save-pricing-btn">
-                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Pricing
-                    </button>
+                                    <div class="form-check position-relative">
+                                        <input
+                                            class="form-check-input"
+                                            type="radio"
+                                            name="mechanicPlatformFeeType"
+                                            id="mechanicPlatformFeeFixed"
+                                            value="2"
+                                            <%= parseInt(body?.pricing?.mechanicPlatformFeeType) === 2 ? "checked" : "" %>
+                                        >
+
+                                        <label class="form-check-label" for="mechanicPlatformFeeFixed">Fixed Amount (₹)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-dark" id="mechanicPlatformFeeLabel">Platform Fee (%)</label>
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    class="form-control percentage-input"
+                                    id="mechanicPlatformFee"
+                                    name="mechanicPlatformFee"
+                                    min="0"
+                                    value="<%= body?.pricing?.mechanicPlatformFee || 5 %>"
+                                    autocomplete="off"
+                                >
+                            </div>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="col-12 mt-4">
+                <button type="submit" class="btn btn-primary" id="save-pricing-btn">
+                    <i class="fa-solid fa-floppy-disk me-1"></i> Save Pricing
+                </button>
             </div>
         </form>
     </div>

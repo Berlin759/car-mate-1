@@ -9,11 +9,6 @@ const pricingSchema = new Schema(
             default: Constants.EV_ADMIN_CHARGE_TYPE.OFF,
             description: "EV Admin Charge Type",
         },
-        platformFee: {
-            type: Number,
-            default: Constants.DEFAULT_PLATFORM_FEE,
-            description: "Platform fee",
-        },
         gstPercentage: {
             type: Number,
             default: Constants.DEFAULT_GST_PERCENTAGE,
@@ -24,11 +19,27 @@ const pricingSchema = new Schema(
             default: Constants.DEFAULT_CANCELLATION_FEE,
             description: "Cancellation fee charged to customer",
         },
-        platformFeeType: {
+        ownerPlatformFee: {
+            type: Number,
+            default: Constants.DEFAULT_PLATFORM_FEE,
+            description: "Owner platform fee",
+        },
+        ownerPlatformFeeType: {
             type: Number,
             enum: Object.values(Constants.PLATFORM_FEE_TYPE),
             default: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
-            description: "Platform fee type",
+            description: "Owner platform fee type",
+        },
+        mechanicPlatformFee: {
+            type: Number,
+            default: Constants.DEFAULT_PLATFORM_FEE,
+            description: "Mechanic platform fee",
+        },
+        mechanicPlatformFeeType: {
+            type: Number,
+            enum: Object.values(Constants.PLATFORM_FEE_TYPE),
+            default: Constants.PLATFORM_FEE_TYPE.PERCENTAGE,
+            description: "Mechanic platform fee type",
         },
     },
     {

@@ -6328,37 +6328,60 @@ export const postPricingDetails = async (req, res) => {
 export const postUpdatePricing = async (req, res) => {
     try {
         const {
-            platformFee,
             evAdminChargeType,
-            platformFeeType,
             gstPercentage,
             cancellationFee,
+            ownerPlatformFee,
+            mechanicPlatformFee,
+            ownerPlatformFeeType,
+            mechanicPlatformFeeType,
         } = req.body;
 
         const adminChargeEvType = Number(evAdminChargeType);
-        const type = Number(platformFeeType);
+        const ownerFeeType = Number(ownerPlatformFeeType);
+        const mechanicFeeType = Number(mechanicPlatformFeeType);
 
         if (!Object.values(Constants.EV_ADMIN_CHARGE_TYPE).includes(adminChargeEvType)) {
             return res.status(400).json(errorResponse("Invalid admin charge value."));
         };
 
-        if (!Object.values(Constants.PLATFORM_FEE_TYPE).includes(type)) {
-            return res.status(400).json(errorResponse("Invalid platform fee type."));
+        if (!Object.values(Constants.PLATFORM_FEE_TYPE).includes(ownerFeeType)) {
+            return res.status(400).json(errorResponse("Invalid owner platform fee type."));
         };
 
-        if (platformFee !== undefined) {
-            const fee = Number(platformFee);
+        if (!Object.values(Constants.PLATFORM_FEE_TYPE).includes(mechanicFeeType)) {
+            return res.status(400).json(errorResponse("Invalid mechanic platform fee type."));
+        };
+
+        if (ownerPlatformFee !== undefined) {
+            const fee = Number(ownerPlatformFee);
 
             if (!Number.isFinite(fee) || fee < 0) {
-                return res.status(400).json(errorResponse("Platform fee must be a valid number."));
+                return res.status(400).json(errorResponse("Owner platform fee must be a valid number."));
             };
 
-            if (type === Constants.PLATFORM_FEE_TYPE.PERCENTAGE && fee > 100) {
-                return res.status(400).json(errorResponse("Platform fee percentage must be between 0 and 100."));
+            if (ownerFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE && fee > 100) {
+                return res.status(400).json(errorResponse("Owner platform fee percentage must be between 0 and 100."));
             };
 
-            if (!/^\d+(\.\d{1,2})?$/.test(String(platformFee))) {
-                return res.status(400).json(errorResponse("Platform fee can have maximum 2 decimal places."));
+            if (!/^\d+(\.\d{1,2})?$/.test(String(ownerPlatformFee))) {
+                return res.status(400).json(errorResponse("Owner platform fee can have maximum 2 decimal places."));
+            };
+        };
+
+        if (mechanicPlatformFee !== undefined) {
+            const fee = Number(mechanicPlatformFee);
+
+            if (!Number.isFinite(fee) || fee < 0) {
+                return res.status(400).json(errorResponse("Mechanic platform fee must be a valid number."));
+            };
+
+            if (mechanicFeeType === Constants.PLATFORM_FEE_TYPE.PERCENTAGE && fee > 100) {
+                return res.status(400).json(errorResponse("Mechanic platform fee percentage must be between 0 and 100."));
+            };
+
+            if (!/^\d+(\.\d{1,2})?$/.test(String(mechanicPlatformFee))) {
+                return res.status(400).json(errorResponse("Mechanic platform fee can have maximum 2 decimal places."));
             };
         };
 
@@ -6387,12 +6410,17 @@ export const postUpdatePricing = async (req, res) => {
         };
 
         const updatePayload = {
-            ...(platformFee !== undefined && {
-                platformFee: Number(platformFee),
+            ...(ownerPlatformFee !== undefined && {
+                ownerPlatformFee: Number(ownerPlatformFee),
+            }),
+
+            ...(mechanicPlatformFee !== undefined && {
+                mechanicPlatformFee: Number(mechanicPlatformFee),
             }),
 
             evAdminChargeType: adminChargeEvType,
-            platformFeeType: type,
+            ownerPlatformFeeType: ownerFeeType,
+            mechanicPlatformFeeType: mechanicFeeType,
 
             ...(gstPercentage !== undefined && {
                 gstPercentage: Number(gstPercentage),

@@ -10,13 +10,14 @@ const keyName = [
     'End'
 ];
 
-$(document).ready(function () {
-    loadPricingDetails();
-    updatePlatformFeeUI();
+$(document).ready(function () {});
+
+$(document).on('change', 'input[name="ownerPlatformFeeType"]', function () {
+    updateOwnerPlatformFeeUI();
 });
 
-$(document).on('change', '#platformFeeType', function () {
-    updatePlatformFeeUI();
+$(document).on('change', 'input[name="mechanicPlatformFeeType"]', function () {
+    updateMechanicPlatformFeeUI();
 });
 
 $(document).on('keydown', '.amount-input, .percentage-input', function (e) {
@@ -75,8 +76,10 @@ $(document).on("submit", "#pricing-form", function (e) {
     e.preventDefault();
 
     const evAdminChargeType = parseInt($("#evAdminChargeType").val(), 10);
-    const platformFeeType = parseInt($("#platformFeeType").val(), 10);
-    const platformFeeValue = $("#platformFee").val().trim();
+    const ownerPlatformFeeType = parseInt($('input[name="ownerPlatformFeeType"]:checked').val(), 10);
+    const mechanicPlatformFeeType = parseInt($('input[name="mechanicPlatformFeeType"]:checked').val(), 10);
+    const ownerPlatformFeeValue = $("#ownerPlatformFee").val().trim();
+    const mechanicPlatformFeeValue = $("#mechanicPlatformFee").val().trim();
     const gstValue = $("#gstPercentage").val().trim();
     const cancellationValue = $("#cancellationFee").val().trim();
 
@@ -85,34 +88,64 @@ $(document).on("submit", "#pricing-form", function (e) {
         return;
     };
 
-    if (![1, 2].includes(platformFeeType)) {
-        showToast(0, "Invalid platform fee type.");
+    if (![1, 2].includes(ownerPlatformFeeType)) {
+        showToast(0, "Invalid owner platform fee type.");
         return;
     };
 
-    if (platformFeeValue === "") {
-        showToast(0, "Please enter platform fee.");
-        $("#platformFee").focus();
+    if (![1, 2].includes(mechanicPlatformFeeType)) {
+        showToast(0, "Invalid mechanic platform fee type.");
         return;
     };
 
-    const platformFee = parseFloat(platformFeeValue);
-
-    if (!Number.isFinite(platformFee) || platformFee < 0) {
-        showToast(0, "Platform fee must be a valid number.");
-        $("#platformFee").focus();
+    if (ownerPlatformFeeValue === "") {
+        showToast(0, "Please enter owner platform fee.");
+        $("#ownerPlatformFee").focus();
         return;
     };
 
-    if (platformFeeType === 1 && platformFee > 100) {
-        showToast(0, "Platform fee must be between 0 and 100.");
-        $("#platformFee").focus();
+    if (mechanicPlatformFeeValue === "") {
+        showToast(0, "Please enter mechanic platform fee.");
+        $("#mechanicPlatformFee").focus();
         return;
     };
 
-    if (!/^\d+(\.\d{1,2})?$/.test(platformFeeValue)) {
-        showToast(0, "Platform fee can have maximum 2 decimal places.");
-        $("#platformFee").focus();
+    const ownerPlatformFee = parseFloat(ownerPlatformFeeValue);
+    const mechanicPlatformFee = parseFloat(mechanicPlatformFeeValue);
+
+    if (!Number.isFinite(ownerPlatformFee) || ownerPlatformFee < 0) {
+        showToast(0, "Owner platform fee must be a valid number.");
+        $("#ownerPlatformFee").focus();
+        return;
+    };
+
+    if (!Number.isFinite(mechanicPlatformFee) || mechanicPlatformFee < 0) {
+        showToast(0, "Mechanic Platform fee must be a valid number.");
+        $("#mechanicPlatformFee").focus();
+        return;
+    };
+
+    if (ownerPlatformFeeType === 1 && ownerPlatformFee > 100) {
+        showToast(0, "Owner platform fee must be between 0 and 100.");
+        $("#ownerPlatformFee").focus();
+        return;
+    };
+
+    if (mechanicPlatformFeeType === 1 && mechanicPlatformFee > 100) {
+        showToast(0, "Mechanic platform fee must be between 0 and 100.");
+        $("#mechanicPlatformFee").focus();
+        return;
+    };
+
+    if (!/^\d+(\.\d{1,2})?$/.test(ownerPlatformFeeValue)) {
+        showToast(0, "Owner platform fee can have maximum 2 decimal places.");
+        $("#ownerPlatformFee").focus();
+        return;
+    };
+
+    if (!/^\d+(\.\d{1,2})?$/.test(mechanicPlatformFeeValue)) {
+        showToast(0, "Mechanic platform fee can have maximum 2 decimal places.");
+        $("#mechanicPlatformFee").focus();
         return;
     };
 
@@ -157,50 +190,65 @@ $(document).on("submit", "#pricing-form", function (e) {
     };
 
     const payload = {
-        platformFee: platformFee,
+        ownerPlatformFee: ownerPlatformFee,
+        mechanicPlatformFee: mechanicPlatformFee,
         evAdminChargeType: evAdminChargeType,
-        platformFeeType: platformFeeType,
+        ownerPlatformFeeType: ownerPlatformFeeType,
+        mechanicPlatformFeeType: mechanicPlatformFeeType,
         gstPercentage: gstPercentage,
         cancellationFee: cancellationFee,
     };
 
     postAjaxCall("/update-pricing", payload, function (response) {
         showToast(response.flag, response.msg);
-        if (response.flag === 1) {
-            loadPricingDetails();
-        } else if (response.flag === 8) {
+        if (response.flag !== 0) {
             window.location.reload();
         };
     });
 });
 
-function loadPricingDetails() {
-    postAjaxCall("/pricing-details", {}, function (response) {
-        if (response.flag === 1 && response.data) {
-            const p = response.data;
+function updateOwnerPlatformFeeUI() {
+    const type = parseInt($('input[name="ownerPlatformFeeType"]:checked').val(), 10);
 
-            $("#platformFee").val(p.platformFee ?? 5);
-            $("#evAdminChargeType").val(p.evAdminChargeType ?? 1);
-            $("#platformFeeType").val(p.platformFeeType ?? 1);
-            $("#gstPercentage").val(p.gstPercentage ?? 18);
-            $("#cancellationFee").val(p.cancellationFee ?? 3);
-
-            updatePlatformFeeUI();
-        };
-    });
-};
-
-function updatePlatformFeeUI() {
-    const type = parseInt($('#platformFeeType').val(), 10);
-
-    const $label = $('#platformFeeLabel');
-    const $input = $('#platformFee');
+    const $label = $('#ownerPlatformFeeLabel');
+    const $input = $('#ownerPlatformFee');
 
     if (type === 1) {
         // Percentage
         $label.text('Platform Fee (%)');
 
         $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(5);
+
+        const value = parseFloat($input.val());
+
+        if (Number.isFinite(value) && value > 100) {
+            $input.val('100');
+        };
+    } else if (type === 2) {
+        // Fixed Amount
+        $label.html('Platform Fee (₹)');
+
+        $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(25);
+    };
+};
+
+function updateMechanicPlatformFeeUI() {
+    const type = parseInt($('input[name="mechanicPlatformFeeType"]:checked').val(), 10);
+
+    const $label = $('#mechanicPlatformFeeLabel');
+    const $input = $('#mechanicPlatformFee');
+
+    if (type === 1) {
+        // Percentage
+        $label.text('Platform Fee (%)');
+
+        $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(5);
+
+        const value = parseFloat($input.val());
+
+        if (Number.isFinite(value) && value > 100) {
+            $input.val('100');
+        };
     } else if (type === 2) {
         // Fixed Amount
         $label.html('Platform Fee (₹)');
