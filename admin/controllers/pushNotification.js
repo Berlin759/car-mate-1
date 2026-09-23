@@ -21,8 +21,7 @@ admin.initializeApp({
 
 export const sendPushNotification = async (registrationToken, payload) => {
     try {
-        let messageType = payload.type ? payload.type.toString() : "0";
-        log1(["sendPushNotification messageType ----->", messageType]);
+        log1(["sendPushNotification payload ----->", payload]);
 
         const collapseKey = payload.bookingId ? `booking_${payload.bookingId}` : payload.transactionId ? `txn_${payload.transactionId}` : `notify_${Date.now()}`;
 
@@ -47,25 +46,28 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
         const message = {
             notification: {
-                title: payload.title ? payload.title : "Notification",
-                body: payload.description ? payload.description : "Notification Sent",
+                title: payload.title || "Notification",
+                body: payload.description || "Notification Sent",
             },
+
             android: {
-                collapseKey: collapseKey,
+                collapseKey,
                 priority: "high",
                 notification: {
                     channelId: "default",
                     sound: "default",
                 },
             },
+
             data: {
-                key1: 'value1',
-                messageType: messageType ? messageType : "0",
-                bookingId: payload.bookingId ? payload.bookingId.toString() : "",
-                transactionId: payload.transactionId ? payload.transactionId.toString() : "",
-                chatId: payload.chatId ? payload.chatId.toString() : "",
-                kycStatus: payload.kycStatus ? payload.kycStatus : null,
+                key1: "value1",
+                messageType: String(payload.type ?? "0"),
+                bookingId: String(payload.bookingId ?? ""),
+                transactionId: String(payload.transactionId ?? ""),
+                chatId: String(payload.chatId ?? ""),
+                kycStatus: String(payload.kycStatus ?? ""),
             },
+
             apns: {
                 headers: {
                     "apns-collapse-id": collapseKey,
@@ -73,14 +75,15 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 payload: {
                     aps: {
                         alert: {
-                            title: payload.title ? payload.title : "Notification",
-                            body: payload.description ? payload.description : "Notification Sent",
+                            title: payload.title || "Notification",
+                            body: payload.description || "Notification Sent",
                         },
-                        'thread-id': collapseKey,
+                        "thread-id": collapseKey,
                         sound: "default",
                     },
                 },
             },
+
             token: registrationToken,
         };
 
@@ -91,7 +94,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
         return addNotification ? addNotification : "";
     } catch (error) {
-        log1(["sendPushNotification Error ----->", error.message]);
+        log1(["sendPushNotification Error ----->", error]);
         return errorResponse(messages.unexpectedDataError);
     }
 };

@@ -21,8 +21,7 @@ admin.initializeApp({
 
 export const sendPushNotification = async (registrationToken, payload) => {
     try {
-        let messageType = payload.type ? payload.type.toString() : 0;
-        log1(["sendPushNotification messageType----->", messageType]);
+        log1(["sendPushNotification payload ----->", payload]);
 
         const collapseKey = payload.bookingId ? `booking_${payload.bookingId}` : payload.transactionId ? `txn_${payload.transactionId}` : `notify_${Date.now()}`;
 
@@ -47,37 +46,40 @@ export const sendPushNotification = async (registrationToken, payload) => {
 
         const message = {
             notification: {
-                title: payload.title ? payload.title : "Notification",
-                body: payload.description ? payload.description : "Notification Send",
+                title: payload.title || "Notification",
+                body: payload.description || "Notification Sent",
             },
+
             android: {
-                collapseKey: collapseKey,
+                collapseKey,
                 priority: "high",
                 notification: {
                     channelId: "default",
                     sound: "default",
                 },
             },
+
             data: {
                 key1: 'value1',
-                messageType: messageType ? messageType : 0,
-                bookingId: payload.bookingId ? payload.bookingId.toString() : "",
-                transactionId: payload.transactionId ? payload.transactionId.toString() : "",
-                chatId: payload.chatId ? payload.chatId.toString() : "",
-                kycStatus: payload.kycStatus ? payload.kycStatus : null,
+                messageType: String(payload.type ?? "0"),
+                bookingId: String(payload.bookingId ?? ""),
+                transactionId: String(payload.transactionId ?? ""),
+                chatId: String(payload.chatId ?? ""),
+                kycStatus: String(payload.kycStatus ?? ""),
 
                 // Owner Details
-                ownerId: payload.ownerId ? payload.ownerId.toString() : "",
-                ownerName: payload.ownerName ? payload.ownerName.toString() : "",
-                ownerProfileImage: payload.ownerProfileImage ? payload.ownerProfileImage.toString() : "",
-                isOwnerOnlineStatus: payload.isOwnerOnlineStatus ? payload.isOwnerOnlineStatus.toString() : "2",
+                ownerId: String(payload.ownerId ?? ""),
+                ownerName: String(payload.ownerName ?? ""),
+                ownerProfileImage: String(payload.ownerProfileImage ?? ""),
+                isOwnerOnlineStatus: String(payload.isOwnerOnlineStatus ?? "2"),
 
                 // Mechanic Details
-                mechanicId: payload.mechanicId ? payload.mechanicId.toString() : "",
-                mechanicName: payload.mechanicName ? payload.mechanicName.toString() : "",
-                mechanicProfileImage: payload.mechanicProfileImage ? payload.mechanicProfileImage.toString() : "",
-                isMechanicOnlineStatus: payload.isMechanicOnlineStatus ? payload.isMechanicOnlineStatus.toString() : "2",
+                mechanicId: String(payload.mechanicId ?? ""),
+                mechanicName: String(payload.mechanicName ?? ""),
+                mechanicProfileImage: String(payload.mechanicProfileImage ?? ""),
+                isMechanicOnlineStatus: String(payload.isMechanicOnlineStatus ?? "2"),
             },
+
             apns: {
                 headers: {
                     "apns-collapse-id": collapseKey,
@@ -85,14 +87,15 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 payload: {
                     aps: {
                         alert: {
-                            title: payload.title ? payload.title : "Notification",
-                            body: payload.description ? payload.description : "Notification Send",
+                            title: payload.title || "Notification",
+                            body: payload.description || "Notification Sent",
                         },
-                        'thread-id': collapseKey,
+                        "thread-id": collapseKey,
                         sound: "default",
                     },
                 },
             },
+
             token: registrationToken,
         };
 
@@ -102,8 +105,8 @@ export const sendPushNotification = async (registrationToken, payload) => {
         };
 
         return addNotification ? addNotification : "";
-    } catch (err) {
-        log1(["sendPushNotification Error----->", err.message]);
+    } catch (error) {
+        log1(["sendPushNotification Error----->", error]);
         return errorResponse(error.something_went_wrong);
     };
 };
