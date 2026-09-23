@@ -5046,11 +5046,12 @@ export const postApproveKYC = async (req, res) => {
 
         await sendPushNotification(isPushEnabled ? deviceToken : null,
             {
+                title: "KYC Verification Approved",
+                description: "Your KYC verification has been successfully approved. You can now access mechanic services.",
                 mechanicId: mechanicDetails._id,
                 type: Constants.NOTIFICATION_TYPE.KYC,
                 kycStatus: Constants.KYC_STATUS.APPROVED,
-                title: "KYC Verification Approved",
-                description: "Your KYC verification has been successfully approved. You can now access mechanic services."
+                kycId: kycDetails?._id,
             },
         );
 
@@ -5140,11 +5141,13 @@ export const postRejectKYC = async (req, res) => {
 
         await sendPushNotification(isPushEnabled ? deviceToken : null,
             {
+                title: "KYC Verification Rejected",
+                description: "Your KYC documents were rejected. Please review the rejection reason and resubmit the required documents.",
                 mechanicId: mechanicDetails._id,
                 type: Constants.NOTIFICATION_TYPE.KYC,
                 kycStatus: Constants.KYC_STATUS.REJECTED,
-                title: "KYC Verification Rejected",
-                description: "Your KYC documents were rejected. Please review the rejection reason and resubmit the required documents."
+                kycId: kycDetails?._id,
+                rejectReason: rejectReason,
             },
         );
 

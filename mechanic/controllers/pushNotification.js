@@ -66,6 +66,7 @@ export const sendPushNotification = async (registrationToken, payload) => {
                 transactionId: String(payload.transactionId ?? ""),
                 chatId: String(payload.chatId ?? ""),
                 kycStatus: String(payload.kycStatus ?? ""),
+                rejectReason: String(payload.rejectReason ?? ""),
 
                 // Owner Details
                 ownerId: String(payload.ownerId ?? ""),

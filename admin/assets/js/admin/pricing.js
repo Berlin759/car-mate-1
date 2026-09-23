@@ -10,14 +10,20 @@ const keyName = [
     'End'
 ];
 
-$(document).ready(function () {});
+$(document).ready(function () {
+    const ownerPlatformVal = $("#owner_platform_val").val() || 0;
+    const mechanicPlatformVal = $("#mechanic_platform_val").val() || 0;
+
+    updateOwnerPlatformFeeUI(ownerPlatformVal);
+    updateMechanicPlatformFeeUI(mechanicPlatformVal);
+});
 
 $(document).on('change', 'input[name="ownerPlatformFeeType"]', function () {
-    updateOwnerPlatformFeeUI();
+    updateOwnerPlatformFeeUI(0);
 });
 
 $(document).on('change', 'input[name="mechanicPlatformFeeType"]', function () {
-    updateMechanicPlatformFeeUI();
+    updateMechanicPlatformFeeUI(0);
 });
 
 $(document).on('keydown', '.amount-input, .percentage-input', function (e) {
@@ -207,7 +213,7 @@ $(document).on("submit", "#pricing-form", function (e) {
     });
 });
 
-function updateOwnerPlatformFeeUI() {
+function updateOwnerPlatformFeeUI(inputVal = 0) {
     const type = parseInt($('input[name="ownerPlatformFeeType"]:checked').val(), 10);
 
     const $label = $('#ownerPlatformFeeLabel');
@@ -217,7 +223,7 @@ function updateOwnerPlatformFeeUI() {
         // Percentage
         $label.text('Platform Fee (%)');
 
-        $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(5);
+        $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(inputVal || 0);
 
         const value = parseFloat($input.val());
 
@@ -228,11 +234,11 @@ function updateOwnerPlatformFeeUI() {
         // Fixed Amount
         $label.html('Platform Fee (₹)');
 
-        $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(25);
+        $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(inputVal || 0);
     };
 };
 
-function updateMechanicPlatformFeeUI() {
+function updateMechanicPlatformFeeUI(inputVal = 0) {
     const type = parseInt($('input[name="mechanicPlatformFeeType"]:checked').val(), 10);
 
     const $label = $('#mechanicPlatformFeeLabel');
@@ -242,7 +248,7 @@ function updateMechanicPlatformFeeUI() {
         // Percentage
         $label.text('Platform Fee (%)');
 
-        $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(5);
+        $input.removeClass('amount-input').addClass('percentage-input').attr('min', '0').attr('max', '100').val(inputVal || 0);
 
         const value = parseFloat($input.val());
 
@@ -253,6 +259,6 @@ function updateMechanicPlatformFeeUI() {
         // Fixed Amount
         $label.html('Platform Fee (₹)');
 
-        $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(25);
+        $input.removeClass('percentage-input').addClass('amount-input').attr('min', '0').removeAttr('max').val(inputVal || 0);
     };
 };

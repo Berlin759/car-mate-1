@@ -70,6 +70,7 @@
                             <i class="fa-solid fa-coins me-2"></i> Owner Platform Commission
                         </div>
                         <div class="card-body">
+                            <input type="hidden" id="owner_platform_val" value="<%= body?.pricing?.ownerPlatformFee || 0 %>" />
                             <div class="mb-3">
                                 <label class="form-label text-dark">Platform Fee Type</label>
                                 <div class="d-flex align-items-center gap-4">
@@ -120,6 +121,7 @@
                             <i class="fa-solid fa-coins me-2"></i> Mechanic Platform Commission
                         </div>
                         <div class="card-body">
+                            <input type="hidden" id="mechanic_platform_val" value="<%= body?.pricing?.mechanicPlatformFee || 0 %>" />
                             <div class="mb-3">
                                 <label class="form-label text-dark">Platform Fee Type</label>
                                 <div class="d-flex align-items-center gap-4">
