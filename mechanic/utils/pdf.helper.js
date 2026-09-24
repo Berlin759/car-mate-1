@@ -15,6 +15,13 @@ const COLORS = {
     red: "#d93025",
 };
 
+const CAR_FUEL_MAP = {
+    1: { text: "Petrol", color: COLORS.primary },
+    2: { text: "Diesel", color: COLORS.primary },
+    3: { text: "EV", color: COLORS.primary },
+    4: { text: "CNG", color: COLORS.primary },
+};
+
 function formatDate(date) {
     if (!date) return "-";
 
@@ -54,7 +61,7 @@ export const generateInvoicePDF = async (booking) => {
                 fs.mkdirSync(invoiceDir, { recursive: true });
             };
 
-            const fileName = `invoice-${booking.invoiceNo || booking._id}-${Date.now()}.pdf`;
+            const fileName = `invoice-${booking?.invoiceNo || booking?._id}-${Date.now()}.pdf`;
             const filePath = path.join(invoiceDir, fileName);
 
             const stream = fs.createWriteStream(filePath);
@@ -72,33 +79,38 @@ export const generateInvoicePDF = async (booking) => {
             let y = 85;
 
             doc.font(FONT_REGULAR).fontSize(10).fillColor(COLORS.dark);
-            doc.text(`Invoice No: ${booking.invoiceNo || "N/A"}`, ML, y);
-            doc.text(`Date: ${formatDate(booking.date)}, Slot: (${booking.slot || ""})`, ML, y + 15);
+            doc.text(`Booking ID: ${booking?._id || "N/A"}`, ML, y);
+            doc.text(`Invoice No: ${booking?.invoiceNo || "N/A"}`, ML, y + 18);
+            doc.text(`Date: ${formatDate(booking?.date)}`, ML, y + 36);
 
-            doc.text(`Mechanic: ${booking.mechanicDetails?.fullName || "N/A"}`, 350, y);
-            doc.text(`Contact: ${booking.mechanicDetails?.phoneNumber || "N/A"}`, 350, y + 15);
+            doc.text(`Mechanic: ${booking?.mechanicDetails?.fullName || "N/A"}`, 350, y);
+            doc.text(`Contact: ${booking?.mechanicDetails?.phoneNumber || "N/A"}`, 350, y + 18);
+            doc.text(`Slot: ${booking?.slot || "N/A"}`, 350, y + 36);
 
-            y += 45;
+            y += 66;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
             y += 15;
 
             doc.font(FONT_BOLD).fontSize(10).fillColor(COLORS.dark).text("Billed To:", ML, y);
             doc.font(FONT_REGULAR).fontSize(10);
-            doc.text(`Customer Name: ${booking.ownerDetails?.fullName || "N/A"}`, ML, y + 14);
-            doc.text(`Phone: ${booking.ownerDetails?.phoneNumber || "N/A"}`, ML, y + 28);
-            doc.text(`Address: ${booking.address || "N/A"}`, ML, y + 42);
+            doc.text(`Customer Name: ${booking?.ownerDetails?.fullName || "N/A"}`, ML, y + 18);
+            doc.text(`Phone: ${booking?.ownerDetails?.phoneNumber || "N/A"}`, ML, y + 40);
+            doc.text(`Address: ${booking?.address || "N/A"}`, ML, y + 62);
 
-            y += 65;
+            y += 95;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
             y += 15;
 
             doc.font(FONT_BOLD).fontSize(10).fillColor(COLORS.dark).text("Service & Vehicle Details:", ML, y);
             doc.font(FONT_REGULAR).fontSize(10);
-            doc.text(`Service Name: ${booking?.serviceDetails?.categoryName || "N/A"}`, ML, y + 14);
-            doc.text(`Car Name: ${booking?.carDetails?.fullName || "N/A"}`, ML, y + 28);
-            doc.text(`Vehicle Number: ${booking?.carDetails?.vehicleNumber || "N/A"}`, ML, y + 42);
 
-            y += 65;
+            const carFuelType = CAR_FUEL_MAP[booking?.carDetails?.fuelType] || { text: "-", color: COLORS.red, };
+
+            doc.text(`Car Name: ${booking?.carDetails?.fullName || "N/A"}`, ML, y + 18);
+            doc.text(`Vehicle Number: ${booking?.carDetails?.vehicleNumber || "N/A"}`, ML, y + 36);
+            doc.text(`Fuel Type: ${carFuelType.text || "N/A"}`, ML, y + 54);
+
+            y += 75;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
             y += 15;
 
@@ -121,39 +133,42 @@ export const generateInvoicePDF = async (booking) => {
                 y += 22;
             };
 
-            drawRow("Earning Amount", parseFloat(booking?.earningDetails?.earningAmount || 0).toFixed(2));
-            drawRow("Consultant Fee", parseFloat(booking?.consultantFee || 0).toFixed(2));
+            drawRow(`${booking?.serviceDetails?.categoryName || "Service"}`, booking?.servicePrice || 0);
 
-            y += 5;
+            if (booking?.consultantFee !== undefined && booking?.consultantFee !== null) {
+                drawRow("Consultant Fee", parseFloat(booking?.consultantFee || 0).toFixed(2));
+            };
+
+            (booking?.quotation || []).forEach((item) => {
+                drawRow(`Quotation: ${item.serviceName || "Service"}`, parseFloat(item.price || 0).toFixed(2));
+            });
+
+            if (booking?.discountAmount !== undefined && booking?.discountAmount !== null && parseFloat(booking?.discountAmount) > 0) {
+                drawRow("Discount", parseFloat(booking?.discountAmount || 0).toFixed(2), true);
+            };
+
+            y += 15;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.lightGray).lineWidth(1).stroke();
             y += 15;
 
-            const drawSummaryRow = (label, amount, isBold = false, minusVal = false) => {
+            const drawSummaryRow = (label, amount, isBold = false) => {
                 doc.font(isBold ? FONT_BOLD : FONT_REGULAR).fontSize(10).fillColor(COLORS.dark);
                 doc.text(label, ML + CW - 200, y, { width: 120, lineBreak: false });
 
                 const formattedAmount = parseFloat(amount || 0).toFixed(2);
 
-                doc.text(`${minusVal ? '-' : ''} ₹${formattedAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
+                doc.text(`₹${formattedAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
                 y += 18;
             };
 
-            const serviceAmount = parseFloat(booking?.earningDetails?.serviceAmount || 0).toFixed(2);
-            const totalAdminCharge = parseFloat(booking?.earningDetails?.totalAdminCharge || 0).toFixed(2);
-            const adminCharge = parseFloat(booking?.earningDetails?.adminCharge || 0).toFixed(2);
-            const adminChargeType = parseFloat(booking?.earningDetails?.adminChargeType || Constants.PLATFORM_FEE_TYPE.PERCENTAGE);
-            const finalPayoutAmount = parseFloat(booking?.earningDetails?.finalPayoutAmount || 0).toFixed(2);
-            const taxAmount = parseFloat(booking?.earningDetails?.taxAmount);
-            const taxPercentage = parseFloat(booking?.earningDetails?.taxPercentage);
-
-            let feeTypeVal = `${adminCharge}%`;
-            if (adminChargeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
+            let feeTypeVal = `${booking?.platformFee}%`;
+            if (booking?.platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
                 feeTypeVal = "Fixed ₹";
             };
 
-            drawSummaryRow("Service Amount:", serviceAmount, true);
-            drawSummaryRow(`Admin Charge (${feeTypeVal}):`, totalAdminCharge, true, true);
-            drawSummaryRow(`GST Charge (${taxPercentage}%):`, taxAmount, true, true);
+            drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking?.adminCharge || 0).toFixed(2));
+            drawSummaryRow("Subtotal:", parseFloat(booking?.subTotal || 0).toFixed(2));
+            drawSummaryRow(`GST (${booking?.taxPercentage || Constants.DEFAULT_GST_PERCENTAGE}%):`, parseFloat(booking?.taxAmount || 0).toFixed(2));
 
             y += 5;
             doc.moveTo(ML, y).lineTo(doc.page.width - MR, y).strokeColor(COLORS.primary).lineWidth(2).stroke();
@@ -161,7 +176,10 @@ export const generateInvoicePDF = async (booking) => {
 
             doc.font(FONT_BOLD).fontSize(12).fillColor(COLORS.primary);
             doc.text("Total Amount:", ML + CW - 200, y, { width: 120, lineBreak: false });
-            doc.text(`₹${finalPayoutAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
+
+            const totalAmount = parseFloat(booking?.totalAmount || 0).toFixed(2);
+
+            doc.text(`₹${totalAmount}`, ML + CW - 90, y, { width: 82, align: "right", lineBreak: false });
 
             // y += 50;
             doc.font(FONT_REGULAR).fontSize(9).fillColor(COLORS.gray).text(

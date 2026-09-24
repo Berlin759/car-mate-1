@@ -5000,6 +5000,7 @@ export const postCancelBooking = async (req, res) => {
 export const getBookingInvoice = async (req, res) => {
     try {
         const { bookingId } = req.params;
+
         if (!bookingId || !ObjectId.isValid(bookingId)) {
             return res.status(400).json(errorResponse("Invalid Booking ID."));
         };
@@ -5171,39 +5172,6 @@ export const getBookingInvoice = async (req, res) => {
                 },
             },
             {
-                $lookup: {
-                    from: "earnings",
-                    let: {
-                        bookingId: "$_id",
-                    },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $eq: ["$bookingId", "$$bookingId"],
-                                },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                                status: 1,
-                                earningAmount: 1,
-                                serviceAmount: 1,
-                                totalAdminCharge: 1,
-                                adminCharge: 1,
-                                adminChargeType: 1,
-                                taxAmount: 1,
-                                taxPercentage: 1,
-                                finalPayoutAmount: 1,
-                                processedAt: 1,
-                            },
-                        },
-                    ],
-                    as: "earningDetails",
-                },
-            },
-            {
                 $project: {
                     _id: 1,
                     ownerId: 1,
@@ -5232,9 +5200,6 @@ export const getBookingInvoice = async (req, res) => {
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
-                    earningDetails: {
-                        $arrayElemAt: ["$earningDetails", 0],
-                    },
                 },
             },
         ];
@@ -5251,8 +5216,6 @@ export const getBookingInvoice = async (req, res) => {
                 serviceFee += parseFloat(sub.price) || 0;
             };
         });
-
-        log1(["getBookingInvoice serviceFee sum----->", serviceFee]);
 
         booking.servicePrice = parseFloat(serviceFee || 0).toFixed(2);
 

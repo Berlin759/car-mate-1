@@ -2667,6 +2667,7 @@ export const getBookingInvoice = async (req, res) => {
                             $project: {
                                 fullName: 1,
                                 vehicleNumber: 1,
+                                fuelType: 1,
                                 model: 1,
                             },
                         },
@@ -2677,39 +2678,6 @@ export const getBookingInvoice = async (req, res) => {
                 $unwind: {
                     path: "$carDetails",
                     preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "earnings",
-                    let: {
-                        bookingId: "$_id",
-                    },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $eq: ["$bookingId", "$$bookingId"],
-                                },
-                            },
-                        },
-                        {
-                            $project: {
-                                _id: 1,
-                                status: 1,
-                                earningAmount: 1,
-                                serviceAmount: 1,
-                                totalAdminCharge: 1,
-                                adminCharge: 1,
-                                adminChargeType: 1,
-                                taxAmount: 1,
-                                taxPercentage: 1,
-                                finalPayoutAmount: 1,
-                                processedAt: 1,
-                            },
-                        },
-                    ],
-                    as: "earningDetails",
                 },
             },
             {
@@ -2724,6 +2692,16 @@ export const getBookingInvoice = async (req, res) => {
                     slot: 1,
                     address: 1,
                     consultantFee: 1,
+                    quotation: 1,
+                    discountAmount: 1,
+                    platformFee: 1,
+                    platformFeeType: 1,
+                    evAdminChargeType: 1,
+                    adminCharge: 1,
+                    subTotal: 1,
+                    taxAmount: 1,
+                    taxPercentage: 1,
+                    totalAmount: 1,
                     status: 1,
                     createdAt: 1,
                     updatedAt: 1,
@@ -2731,9 +2709,6 @@ export const getBookingInvoice = async (req, res) => {
                     ownerDetails: 1,
                     mechanicDetails: 1,
                     carDetails: 1,
-                    earningDetails: {
-                        $arrayElemAt: ["$earningDetails", 0],
-                    },
                 },
             },
         ];
@@ -2743,6 +2718,15 @@ export const getBookingInvoice = async (req, res) => {
         if (!booking) {
             return res.status(404).json(errorResponse("Booking not found."));
         };
+
+        let serviceFee = 0;
+        (booking?.serviceDetails.subCategory || []).forEach(sub => {
+            if (sub.price) {
+                serviceFee += parseFloat(sub.price) || 0;
+            };
+        });
+
+        booking.servicePrice = parseFloat(serviceFee || 0).toFixed(2);
 
         const { fileName, filePath, folder } = await generateInvoicePDF(booking);
 
