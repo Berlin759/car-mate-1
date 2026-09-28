@@ -23,16 +23,22 @@
                     Car Owners
                 </a>
             </li>
-            <li class="nav-item <%= header?.page === "Cars" ? "active" : "" %>">
-                <a href="/cars">
-                    <i class="fa-solid fa-car"></i>
-                    Cars
-                </a>
-            </li>
             <li class="nav-item <%= header?.page === "Mechanic" ? "active" : "" %>">
                 <a href="/mechanic">
                     <i class="fa-solid fa-screwdriver-wrench"></i>
                     Mechanics
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "KYC Review" ? "active" : "" %>">
+                <a href="/kyc">
+                    <i class="fa-solid fa-id-card"></i>
+                    KYC Review
+                </a>
+            </li>
+            <li class="nav-item <%= header?.page === "Cars" ? "active" : "" %>">
+                <a href="/cars">
+                    <i class="fa-solid fa-car"></i>
+                    Cars
                 </a>
             </li>
             <li class="nav-item <%= header?.page === "Service" ? "active" : "" %>">
@@ -41,12 +47,6 @@
                     Service
                 </a>
             </li>
-            <!-- <li class="nav-item <%= header?.page === "Users" ? "active" : "" %>">
-                <a href="/users">
-                    <i class="fa-solid fa-users"></i>
-                    Users
-                </a>
-            </li> -->
             <li class="nav-item <%= header?.page === "Bookings" ? "active" : "" %>">
                 <a href="/bookings">
                     <i class="fa-solid fa-calendar-check"></i>
@@ -63,12 +63,6 @@
                 <a href="/reviews">
                     <i class="fa-solid fa-star-half-stroke"></i>
                     Reviews
-                </a>
-            </li>
-            <li class="nav-item <%= header?.page === "KYC Review" ? "active" : "" %>">
-                <a href="/kyc">
-                    <i class="fa-solid fa-id-card"></i>
-                    KYC Review
                 </a>
             </li>
             <li class="nav-item <%= header?.page === "Disputes" ? "active" : "" %>">

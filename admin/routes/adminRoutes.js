@@ -23,11 +23,7 @@ import {
     postMechanicDelete,
     getCarsPage,
     getCarDetailPage,
-    postAddCar,
     postAllCarsList,
-    postCarDetails,
-    postUpdateCar,
-    postCarDelete,
     getServicePage,
     postAddService,
     postAllServiceList,
@@ -148,11 +144,7 @@ adminRouter.post("/mechanic-delete", authMiddleware, postMechanicDelete);
 // Car API
 adminRouter.get("/cars", authMiddleware, getCarsPage);
 adminRouter.get("/cars/:id", authMiddleware, getCarDetailPage);
-adminRouter.post("/add-car", authMiddleware, postAddCar);
 adminRouter.post("/car-list", authMiddleware, postAllCarsList);
-adminRouter.post("/car-details", authMiddleware, postCarDetails);
-adminRouter.post("/car-update", authMiddleware, postUpdateCar);
-adminRouter.post("/car-delete", authMiddleware, postCarDelete);
 
 // Service API
 adminRouter.get("/service", authMiddleware, getServicePage);

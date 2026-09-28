@@ -591,13 +591,24 @@ export function generateTransactionPDF(transaction, res) {
     doc.end();
 };
 
-function drawCell(doc, text, x, y, w, opts = {}) {
-    const fontSize = opts.fontSize || 7;
-    const color = opts.color || COLORS.dark;
+function drawCell(doc, text, x, y, width, options = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width)) {
+        console.error("Invalid PDF cell coordinates:", {
+            text,
+            x,
+            y,
+            width,
+        });
+
+        return;
+    };
+
+    const fontSize = options.fontSize || 7;
+    const color = options.color || COLORS.dark;
 
     doc.save();
-    doc.fontSize(fontSize).fillColor(color).font(opts.bold ? FONT_BOLD : FONT_REGULAR);
-    doc.text(String(text || "-"), x + 2, y + 4, { width: w - 4, height: 12, ellipsis: true, lineBreak: false });
+    doc.fontSize(fontSize).fillColor(color).font(options.bold ? FONT_BOLD : FONT_REGULAR);
+    doc.text(String(text || "-"), x + 2, y + 4, { width: width - 4, height: 12, ellipsis: true, lineBreak: false });
     doc.restore();
 };
 
@@ -636,8 +647,6 @@ export function generateAllTransactionsPDF(transactionData, res) {
     const completePayoutAmount = earningSummary.totalCompletePayout || 0;
     const pendingPayoutAmount = earningSummary.totalPendingPayouts || 0;
 
-    const serviceAmount = parseFloat(transactions?.earningDetails?.serviceAmount || 0).toFixed(2);
-
     doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`1. Total Transaction: ${transactions.length}`, ML, y, { width: USABLE_W, lineBreak: false });
     y += 18;
     doc.fontSize(9).fillColor(COLORS.dark).font(FONT_BOLD).text(`2. Revenue Amount: ₹${parseFloat(totalAmount || 0).toFixed(2)}`, ML, y, { width: USABLE_W, lineBreak: false });
@@ -650,8 +659,38 @@ export function generateAllTransactionsPDF(transactionData, res) {
     y += 25;
 
     // Column definitions — must sum to USABLE_W
-    const headers = ["#", "Payment ID", "Booking ID", "Owner", "Mechanic", "Service", "Car", "Service Amount", "Admin Charge", "Payout Amount", "Payout Status", "Date"];
-    const colWidths = [25, 85, 85, 80, 80, 80, 75, 60, 60, 65, 65, 75];
+    const headers = [
+        "#",
+        "Payment ID",
+        "Booking ID",
+        "Owner",
+        "Mechanic",
+        "Service",
+        // "Car",
+        "Service Amount",
+        "Admin Charge",
+        "Tax Amount",
+        "Payout Amount",
+        "Payout Status",
+        "Date",
+    ];
+
+    const colWidths = [
+        22, // #
+        100, // Payment ID
+        120, // Booking ID
+        70, // Owner
+        70, // Mechanic
+        70, // Service
+        // 75, // Car
+        60, // Service Amount
+        55, // Admin Charge
+        50, // Tax Amount
+        60, // Payout Amount
+        70, // Payout Status
+        68, // Date
+    ];
+
     const colX = [];
     let xAcc = ML;
 
@@ -710,23 +749,44 @@ export function generateAllTransactionsPDF(transactionData, res) {
 
         const rowData = [
             String(index + 1),
-            String(transaction?.trxId || "-").substring(0, 12),
-            String(transaction?.bookingDetails?._id || "-").substring(0, 12),
-            String(transaction?.ownerDetails?.fullName || "-").substring(0, 12),
-            String(transaction?.mechanicDetails?.fullName || "-").substring(0, 12),
-            String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
-            String(transaction?.carDetails?.fullName || "-").substring(0, 12),
+            // String(transaction?.trxId || "-").substring(0, 12),
+            // String(transaction?.bookingDetails?._id || "-").substring(0, 12),
+            // String(transaction?.ownerDetails?.fullName || "-").substring(0, 12),
+            // String(transaction?.mechanicDetails?.fullName || "-").substring(0, 12),
+            // String(transaction?.serviceDetails?.fullName || "-").substring(0, 12),
+            // String(transaction?.carDetails?.fullName || "-").substring(0, 12),
+
+            String(transaction?.trxId || "-"),
+            String(transaction?.bookingDetails?._id || "-"),
+            String(transaction?.ownerDetails?.fullName || "-"),
+            String(transaction?.mechanicDetails?.fullName || "-"),
+            String(transaction?.serviceDetails?.fullName || "-"),
+
             `₹${serviceAmount}`,
             `₹${totalAdminCharge}`,
             `₹${taxAmount}`,
             `₹${finalPayoutAmount}`,
-            payoutStatus ? payoutStatus.text : "-",
+            payoutStatus?.text || "-",
             formatDate(transaction?.createdAt),
         ];
 
+        if (headers.length !== colWidths.length) {
+            throw new Error(`PDF column configuration mismatch: headers=${headers.length}, widths=${colWidths.length}`);
+        };
+
+        if (transactions.length > 0) {
+            const expectedColumns = headers.length;
+
+            const rowColumnCount = rowData.length; // or derive from your rowData structure
+
+            if (rowColumnCount !== expectedColumns) {
+                throw new Error(`PDF row column mismatch: expected=${expectedColumns}, received=${rowColumnCount}`);
+            };
+        };
+
         for (let ci = 0; ci < rowData.length; ci++) {
-            if (ci === 11) {
-                drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci], { color: payoutStatus.color, bold: true });
+            if (ci === 10) {
+                drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci], { color: payoutStatus?.color || COLORS.dark, bold: true });
             } else {
                 drawCell(doc, rowData[ci], colX[ci], y, colWidths[ci]);
             };

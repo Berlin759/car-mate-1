@@ -3,20 +3,20 @@ $(document).ready(function () {
     initOwnerPhoneValidation();
 });
 
-$(document).on("keypress", "#addCarOwnerModal input, #addCarOwnerModal select", function (e) {
+$(document).on("keypress", "#addOwnerModal input, #addOwnerModal select", function (e) {
     if (e.key === "Enter") {
         e.preventDefault();
-        if (!$("#addCarOwnerModal #add_car_owner").hasClass("d-none")) {
-            $("#addCarOwnerModal #add_car_owner").trigger("click");
-        } else if (!$("#addCarOwnerModal #update_car_owner").hasClass("d-none")) {
-            $("#addCarOwnerModal #update_car_owner").trigger("click");
+        if (!$("#addOwnerModal #add_owner").hasClass("d-none")) {
+            $("#addOwnerModal #add_owner").trigger("click");
+        } else if (!$("#addOwnerModal #update_owner").hasClass("d-none")) {
+            $("#addOwnerModal #update_owner").trigger("click");
         };
     };
 });
 
 function initOwnerPhoneValidation() {
-    const $phoneCode = $("#addCarOwnerModal #phone_code");
-    const $phoneNumber = $("#addCarOwnerModal #phone_number");
+    const $phoneCode = $("#addOwnerModal #phone_code");
+    const $phoneNumber = $("#addOwnerModal #phone_number");
 
     function updatePhoneMaxLength() {
         const maxLen = $phoneCode.find(":selected").data("max-length") || 10;
@@ -37,7 +37,7 @@ function initOwnerPhoneValidation() {
         };
     });
 
-    $("#addCarOwnerModal #full_name").on("input", function () {
+    $("#addOwnerModal #full_name").on("input", function () {
         this.value = this.value.replace(/[^a-zA-Z\s]/g, "");
     });
 };
@@ -88,20 +88,20 @@ $(document).on("click", ".car_owner_delete", function () {
     });
 });
 
-$(document).on("hide.bs.modal", "#addCarOwnerModal", function (e) {
-    resetAddCarOwnerModal();
+$(document).on("hide.bs.modal", "#addOwnerModal", function (e) {
+    resetAddOwnerModal();
 });
 
-$(document).on("click", "#add_new_car_owner", function () {
-    $("#addCarOwnerModal #add_car_owner").removeClass("d-none");
-    $("#addCarOwnerModal #update_car_owner").addClass("d-none");
-    $("#addCarOwnerModal #addCarOwnerModalLabel").text("Add Owner");
+$(document).on("click", "#add_new_owner", function () {
+    $("#addOwnerModal #add_owner").removeClass("d-none");
+    $("#addOwnerModal #update_owner").addClass("d-none");
+    $("#addOwnerModal #addOwnerModalLabel").text("Add Owner");
 });
 
-$(document).on("click", "#add_car_owner", function () {
-    const full_name = $("#addCarOwnerModal #full_name").val();
-    const phone_code = $("#addCarOwnerModal #phone_code").val();
-    const phone_number = $("#addCarOwnerModal #phone_number").val();
+$(document).on("click", "#add_owner", function () {
+    const full_name = $("#addOwnerModal #full_name").val();
+    const phone_code = $("#addOwnerModal #phone_code").val();
+    const phone_number = $("#addOwnerModal #phone_number").val();
 
     const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
 
@@ -135,7 +135,7 @@ $(document).on("click", "#add_car_owner", function () {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
-            $("#addCarOwnerModal").modal("hide");
+            $("#addOwnerModal").modal("hide");
             fetchAllCarOwnerList();
         } else if (response.flag === 8) {
             window.location.reload();
@@ -153,17 +153,17 @@ $(document).on("click", ".edit-car-owner-button", function () {
         if (response.flag === 1) {
             const carOwnerDetails = response.data.carOwnerDetails;
 
-            $("#addCarOwnerModal").modal("show");
-            $("#addCarOwnerModal #add_car_owner").addClass("d-none");
-            $("#addCarOwnerModal #update_car_owner").removeClass("d-none");
-            $("#addCarOwnerModal #addCarOwnerModalLabel").text("Update Owner");
+            $("#addOwnerModal").modal("show");
+            $("#addOwnerModal #add_owner").addClass("d-none");
+            $("#addOwnerModal #update_owner").removeClass("d-none");
+            $("#addOwnerModal #addOwnerModalLabel").text("Update Owner");
 
-            $("#addCarOwnerModal #car_owner_id").val(carOwnerDetails._id);
-            $("#addCarOwnerModal #full_name").val(carOwnerDetails.fullName);
+            $("#addOwnerModal #car_owner_id").val(carOwnerDetails._id);
+            $("#addOwnerModal #full_name").val(carOwnerDetails.fullName);
             if (carOwnerDetails.phoneCode) {
-                $("#addCarOwnerModal #phone_code").val(carOwnerDetails.phoneCode);
+                $("#addOwnerModal #phone_code").val(carOwnerDetails.phoneCode);
             };
-            $("#addCarOwnerModal #phone_number").val(carOwnerDetails.phoneNumber);
+            $("#addOwnerModal #phone_number").val(carOwnerDetails.phoneNumber);
         } else if (response.flag === 8) {
             window.location.reload();
         } else if (response.flag === 0) {
@@ -173,11 +173,11 @@ $(document).on("click", ".edit-car-owner-button", function () {
     });
 });
 
-$(document).on("click", "#update_car_owner", function () {
-    const car_owner_id = $("#addCarOwnerModal #car_owner_id").val();
-    const full_name = $("#addCarOwnerModal #full_name").val();
-    const phone_code = $("#addCarOwnerModal #phone_code").val();
-    const phone_number = $("#addCarOwnerModal #phone_number").val();
+$(document).on("click", "#update_owner", function () {
+    const car_owner_id = $("#addOwnerModal #car_owner_id").val();
+    const full_name = $("#addOwnerModal #full_name").val();
+    const phone_code = $("#addOwnerModal #phone_code").val();
+    const phone_number = $("#addOwnerModal #phone_number").val();
 
     const regex = /^(?:\+?\d{1,3})?[\s\-]?(\(?\d{1,4}\)?[\s\-]?\d{1,4})[\s\-]?\d{1,4}[\s\-]?\d{1,4}$/;
     const nameRegex = /^[a-zA-Z\s]+$/;
@@ -213,7 +213,7 @@ $(document).on("click", "#update_car_owner", function () {
         showToast(response.flag, response.msg);
 
         if (response.flag === 1) {
-            $("#addCarOwnerModal").modal("hide");
+            $("#addOwnerModal").modal("hide");
 
             fetchAllCarOwnerList();
         } else if (response.flag === 8) {
@@ -222,12 +222,12 @@ $(document).on("click", "#update_car_owner", function () {
     });
 });
 
-function resetAddCarOwnerModal() {
-    $("#addCarOwnerModal #car_owner_id").val("");
-    $("#addCarOwnerModal #full_name").val("");
-    $("#addCarOwnerModal #phone_code").val("+91");
-    $("#addCarOwnerModal #phone_number").val("");
-    $("#addCarOwnerModal #phone_number").attr("maxlength", "10");
+function resetAddOwnerModal() {
+    $("#addOwnerModal #car_owner_id").val("");
+    $("#addOwnerModal #full_name").val("");
+    $("#addOwnerModal #phone_code").val("+91");
+    $("#addOwnerModal #phone_number").val("");
+    $("#addOwnerModal #phone_number").attr("maxlength", "10");
 };
 
 function fetchAllCarOwnerList(filterObj = {}) {

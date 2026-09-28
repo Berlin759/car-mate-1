@@ -4,9 +4,6 @@
             <!-- No filters for announcements -->
         </div>
         <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAnnouncementModal" id="add_new_announcement_btn">
-                <i class="fa-solid fa-plus me-1"></i> Add Announcement
-            </button>
             <div class="pagination-show d-flex align-items-center" id="pagination-div-announcement-list-table-data">
                 Show
                 <select id="recordPerPage-announcement-list-table-data" class="form-select form-select-sm w-auto" onchange="changeRecordPerPage('/announcement-list', 'announcement-list-table-data')">
@@ -21,6 +18,24 @@
         </div>
     </div>
     <div class="admin-table announcement-list-table mt-30" id="announcement-list-table-data"></div>
+
+    <div class="container">
+        <div id="add_new_announcement_btn" class="add-list" data-bs-toggle="modal" data-bs-target="#addAnnouncementModal">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_460_20805)">
+                    <path d="M20 8.33337V31.6667" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M8.32812 20H31.6615" stroke="#ffffff" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                </g>
+                <defs>
+                    <clipPath id="clip0_460_20805">
+                        <rect width="40" height="40" fill="white"></rect>
+                    </clipPath>
+                </defs>
+            </svg>
+        </div>
+    </div>
 
     <!-- Add Announcement Modal -->
     <div class="modal custom-popup fade" id="addAnnouncementModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
