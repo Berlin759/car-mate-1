@@ -1059,7 +1059,7 @@ export const postMyServiceList = async (req, res) => {
         // const skip = (page - 1) * limit;
 
         const mechanic = await Mechanic.findById(mechanicId)
-            .select("serviceIds")
+            .select("serviceIds consultantFee")
             .lean();
 
         if (!mechanic) {
@@ -1107,6 +1107,7 @@ export const postMyServiceList = async (req, res) => {
             // page,
             // limit,
             totalRecords,
+            consultantFee: mechanic.consultantFee || 0,
             items: items,
         };
 
