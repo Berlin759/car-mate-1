@@ -103,8 +103,8 @@ export const postLogin = async (req, res) => {
             mechanicDetails.deviceToken !== undefined
         ) {
             let notificationObject = {
-                title: mechanicDetails.fullName,
-                description: "Login OTP",
+                title: "New Login Detected",
+                description: "A new login was detected on your account.",
                 mechanicId: mechanicDetails._id,
                 type: Constants.NOTIFICATION_TYPE.DEFAULT,
             };
@@ -256,8 +256,8 @@ export const postResendOtp = async (req, res) => {
             mechanic.deviceToken !== undefined
         ) {
             let notificationObject = {
-                title: mechanic.fullName,
-                description: "Resend Login OTP",
+                title: "New Login OTP Requested",
+                description: "A new login OTP was requested for your account.",
                 mechanicId: mechanic._id,
                 type: Constants.NOTIFICATION_TYPE.DEFAULT,
             };

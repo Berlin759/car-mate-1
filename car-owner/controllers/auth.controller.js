@@ -104,8 +104,8 @@ export const postLogin = async (req, res) => {
             ownerDetails.deviceToken !== undefined
         ) {
             let notificationObject = {
-                title: ownerDetails.fullName,
-                description: "Login OTP",
+                title: "New Login Detected",
+                description: "A new login was detected on your account.",
                 ownerId: ownerDetails._id,
                 type: Constants.NOTIFICATION_TYPE.DEFAULT,
             };
@@ -315,8 +315,8 @@ export const postResendOtp = async (req, res) => {
             owner.deviceToken !== undefined
         ) {
             let notificationObject = {
-                title: owner.fullName,
-                description: "Resend Login OTP",
+                title: "New Login OTP Requested",
+                description: "A new login OTP was requested for your account.",
                 ownerId: owner._id,
                 type: Constants.NOTIFICATION_TYPE.DEFAULT,
             };
