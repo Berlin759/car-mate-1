@@ -162,8 +162,8 @@ export const generateInvoicePDF = async (booking) => {
             };
 
             let feeTypeVal = `${booking?.platformFee}%`;
-            if (booking?.platformFeeType === Constants.PLATFORM_FEE_TYPE.FIXED) {
-                feeTypeVal = "Fixed ₹";
+            if (parseInt(booking?.platformFeeType) === Constants.PLATFORM_FEE_TYPE.FIXED) {
+                feeTypeVal = "₹";
             };
 
             drawSummaryRow(`Platform Fee (${feeTypeVal}):`, parseFloat(booking?.adminCharge || 0).toFixed(2));
