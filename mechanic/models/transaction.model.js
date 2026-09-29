@@ -4,35 +4,40 @@ import Constants from "../config/constant.js";
 
 const transactionSchema = new Schema(
     {
-        invoiceId: {
-            type: String,
-            required: false,
-        },
         ownerId: {
             type: Schema.Types.ObjectId,
             ref: "Owner",
-            required: false,
+            required: true,
         },
         mechanicId: {
             type: Schema.Types.ObjectId,
             ref: "Mechanic",
-            required: false,
+            required: true,
         },
         serviceId: {
             type: Schema.Types.ObjectId,
             ref: "Service",
-            required: false,
+            required: true,
         },
         bookingId: {
             type: Schema.Types.ObjectId,
             ref: "Booking",
+            required: true,
+        },
+        carId: {
+            type: Schema.Types.ObjectId,
+            ref: "Car",
             required: false,
+        },
+        invoiceId: {
+            type: String,
+            default: "",
         },
         trxId: {
             type: String,
             default: "",
         },
-        tipAmount: {
+        totalQuotationAmount: {
             type: Number,
             default: 0,
         },
@@ -56,7 +61,10 @@ const transactionSchema = new Schema(
     },
 );
 
-transactionSchema.index({ chatId: 1 });
+transactionSchema.index({ ownerId: 1 });
+transactionSchema.index({ mechanicId: 1 });
+transactionSchema.index({ serviceId: 1 });
+transactionSchema.index({ bookingId: 1 });
 
 transactionSchema.virtual('readableCreatedAt').get(function () {
     return DateInHumanReadableFormat(this.createdAt);

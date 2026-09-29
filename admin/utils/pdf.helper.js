@@ -350,7 +350,7 @@ export function generateTransactionPDF(transaction, res) {
 
         if (cancellationFee > 0) {
             priceRow(
-                `Cancellation Fee (${numberValue(booking?.cancellationPercentage)}%)`,
+                `Cancellation Fee (${numberValue(booking?.cancellationPercentage)}%) (${capitalizeFirstLetter(booking?.canceledByRole || "User")} Side Charge)`,
                 `- ₹${amount(cancellationFee)}`,
                 {
                     labelColor: COLORS.danger,
@@ -361,7 +361,13 @@ export function generateTransactionPDF(transaction, res) {
             separator(3, 8);
         };
 
-        const totalAmount = numberValue(booking?.totalAmount) - cancellationFee;
+        let totalAmount = 0;
+
+        if (booking?.canceledByRole === "mechanic") {
+            totalAmount = numberValue(booking?.totalAmount);
+        } else {
+            totalAmount = numberValue(booking?.totalAmount) - cancellationFee;
+        };
 
         ensureSpace(35);
 

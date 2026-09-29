@@ -37,6 +37,10 @@ const transactionSchema = new Schema(
             type: String,
             default: "",
         },
+        totalQuotationAmount: {
+            type: Number,
+            default: 0,
+        },
         totalAmount: {
             type: Number,
             default: 0,
