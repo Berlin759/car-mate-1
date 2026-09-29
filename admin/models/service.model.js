@@ -18,7 +18,6 @@ const serviceSchema = new Schema(
         },
         subCategory: [
             {
-                _id: false,
                 fullname: {
                     type: String,
                     default: "",

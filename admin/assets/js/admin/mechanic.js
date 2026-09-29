@@ -98,21 +98,6 @@ $(document).on("click", "#reset-mechanic-filters", function () {
     fetchAllMechanicList({ status: "", kycStatus: "" });
 });
 
-$(document).on("click", ".mechanic_delete", function () {
-    const mechanicId = $(this).data("mechanic-id");
-    if (!mechanicId) {
-        showToast(0, "Invalid mechanic Id");
-        return;
-    };
-
-    postAjaxCall("/mechanic-delete", { mechanicId: mechanicId }, function (response) {
-        showToast(response.flag, response.msg);
-        if (response.flag === 1) {
-            filterData("/mechanic-list", "mechanic-list-table-data");
-        };
-    });
-});
-
 $(document).on("hide.bs.modal", "#addMechanicModal", function (e) {
     resetAddMechanicModal();
 });
@@ -164,36 +149,6 @@ $(document).on("click", "#add_mechanic", function () {
             fetchAllMechanicList();
         } else if (response.flag === 8) {
             window.location.reload();
-        };
-    });
-});
-
-$(document).on("click", ".edit-mechanic-button", function () {
-    const mechanicId = $(this).data("mechanic-id");
-    const mechanic_status = $(this).data("mechanic-status");
-
-    const data = { mechanicId: mechanicId };
-
-    postAjaxCall("/mechanic-details", data, function (response) {
-        if (response.flag === 1) {
-            const mechanicDetails = response.data.mechanicDetails;
-
-            $("#addMechanicModal").modal("show");
-            $("#addMechanicModal #add_mechanic").addClass("d-none");
-            $("#addMechanicModal #update_mechanic").removeClass("d-none");
-            $("#addMechanicModal #addMechanicModalLabel").text("Update Mechanic");
-
-            $("#addMechanicModal #mechanic_id").val(mechanicDetails._id);
-            $("#addMechanicModal #full_name").val(mechanicDetails.fullName);
-            if (mechanicDetails.phoneCode) {
-                $("#addMechanicModal #phone_code").val(mechanicDetails.phoneCode);
-            };
-            $("#addMechanicModal #phone_number").val(mechanicDetails.phoneNumber);
-        } else if (response.flag === 8) {
-            window.location.reload();
-        } else if (response.flag === 0) {
-            showToast(response.flag, response.msg);
-            return;
         };
     });
 });

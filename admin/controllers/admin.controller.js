@@ -827,69 +827,6 @@ export const postAllMechanicList = async (req, res) => {
     };
 };
 
-export const postMechanicDetails = async (req, res) => {
-    try {
-        const { mechanicId } = req?.body;
-
-        if (!mechanicId) {
-            return res.json(errorResponse("Invalid mechanic Id"));
-        };
-
-        let filter = {
-            _id: new ObjectId(mechanicId),
-        };
-
-        let mechanicPipeline = [
-            {
-                $match: filter,
-            },
-            {
-                $lookup: {
-                    from: "bookings",
-                    let: { mechanicId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: { $eq: ["$mechanicId", "$$mechanicId"] }
-                            }
-                        },
-                        {
-                            $count: "total"
-                        }
-                    ],
-                    as: "bookingCount"
-                },
-            },
-            {
-                $addFields: {
-                    totalBooking: {
-                        $ifNull: [{ $arrayElemAt: ["$bookingCount.total", 0] }, 0],
-                    },
-                },
-            },
-            {
-                $project: {
-                    _id: 1,
-                    fullName: 1,
-                    phoneNumber: 1,
-                    countryCode: 1,
-                    status: 1,
-                    totalBooking: 1,
-                    createdAt: 1,
-                    updatedAt: 1,
-                },
-            },
-        ];
-
-        let mechanicResp = await Mechanic.aggregate(mechanicPipeline);
-
-        return res.status(200).json(successResponse("Mechanic details get successfully!", mechanicResp[0]));
-    } catch (error) {
-        log1(["Error in postMechanicDetails----->", error]);
-        return res.json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
 export const postMechanicUpdate = async (req, res) => {
     try {
         const admin = req.session.admin;
@@ -965,6 +902,72 @@ export const postMechanicUpdate = async (req, res) => {
     };
 };
 
+export const postRemoveMechanicService = async (req, res) => {
+    try {
+        const admin = req.session.admin;
+
+        log1(["postRemoveMechanicService req.body----->", req.body]);
+        const { mechanicId, serviceId, subCategoryId } = req.body;
+
+        const validate = await custom_validation(req.body, "admin.remove_mechanic_service");
+        if (validate.flag !== 1) {
+            return res.status(400).json(validate);
+        };
+
+        if (!ObjectId.isValid(mechanicId)) {
+            return res.status(400).json(errorResponse("Invalid mechanic id."));
+        };
+
+        if (!ObjectId.isValid(serviceId)) {
+            return res.status(400).json(errorResponse("Invalid service id."));
+        };
+
+        if (!ObjectId.isValid(subCategoryId)) {
+            return res.status(400).json(errorResponse("Invalid sub-category id."));
+        };
+
+        const service = await Service.findOne({ _id: new ObjectId(serviceId) });
+        if (!service) {
+            return res.status(400).json(errorResponse("Service not found."));
+        };
+
+        if (!Array.isArray(service.subCategory)) {
+            return res.status(400).json(errorResponse("Sub-category not found."));
+        };
+
+        const subCategory = service.subCategory.find(
+            (item) => item._id?.toString() === subCategoryId.toString()
+        );
+
+        if (!subCategory) {
+            return res.status(400).json(errorResponse("Sub-category details not found."));
+        };
+
+        if (!Array.isArray(subCategory.mechanicIds)) {
+            return res.status(400).json(errorResponse("Mechanic service information not found."));
+        };
+
+        const mechanicObjectId = new ObjectId(mechanicId);
+
+        const mechanicIndex = subCategory.mechanicIds.findIndex(
+            (item) => item.mechanicId?.toString() === mechanicObjectId.toString()
+        );
+
+        if (mechanicIndex === -1) {
+            return res.status(400).json(errorResponse("This mechanic is not assigned to this sub-category."));
+        };
+
+        subCategory.mechanicIds.splice(mechanicIndex, 1);
+
+        await service.save();
+
+        return res.status(200).json(successResponse("Sub-category deleted successfully!"));
+    } catch (error) {
+        log1(["Error in postRemoveMechanicService----->", error]);
+        return res.status(400).json(errorResponse(messages.unexpectedDataError));
+    };
+};
+
 export const getMechanicDetailPage = async (req, res) => {
     try {
         const admin = req.session.admin;
@@ -974,8 +977,10 @@ export const getMechanicDetailPage = async (req, res) => {
             return res.redirect("/mechanic");
         };
 
+        const mechanicObjectId = new ObjectId(mechanicId);
+
         let filter = {
-            _id: new ObjectId(mechanicId),
+            _id: mechanicObjectId,
         };
 
         let mechanicPipeline = [
@@ -1007,22 +1012,133 @@ export const getMechanicDetailPage = async (req, res) => {
                 },
             },
             {
+                $lookup: {
+                    from: "earnings",
+                    let: {
+                        mechanicId: "$_id"
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$mechanicId", "$$mechanicId"] },
+                                        { $eq: ["$status", Constants.EARNING_STATUS.SUCCESS] },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: null,
+                                totalEarningCount: { $sum: 1 },
+                                totalEarning: { $sum: "$finalPayoutAmount" },
+                            },
+                        },
+                    ],
+                    as: "earningSummary",
+                },
+            },
+            {
+                $addFields: {
+                    totalEarningCount: {
+                        $ifNull: [{ $arrayElemAt: ["$earningSummary.totalEarningCount", 0] }, 0]
+                    },
+                    totalEarningAmount: {
+                        $ifNull: [{ $arrayElemAt: ["$earningSummary.totalEarning", 0] }, 0]
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: "services",
+                    let: {
+                        mechanicId: "$_id",
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                status: Constants.SERVICE_STATUS.ACTIVE,
+                            },
+                        },
+                        {
+                            $unwind: "$subCategory",
+                        },
+                        {
+                            $unwind: "$subCategory.mechanicIds",
+                        },
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$subCategory.mechanicIds.mechanicId", "$$mechanicId",],
+                                },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: "$_id",
+                                categoryId: { $first: { $toString: "$_id" } },
+                                categoryName: { $first: { $ifNull: ["$fullName", ""] } },
+                                categoryImage: { $first: { $ifNull: ["$image", ""] } },
+                                categoryDescription: { $first: { $ifNull: ["$description", ""] } },
+                                subCategory: {
+                                    $push: {
+                                        subCategoryId: { $ifNull: ["$subCategory._id", ""] },
+                                        subCategoryName: { $ifNull: ["$subCategory.fullname", ""] },
+                                        price: { $ifNull: ["$subCategory.mechanicIds.price", 0] },
+                                        description: { $ifNull: ["$subCategory.mechanicIds.description", ""] },
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                categoryId: { $toString: "$categoryId" },
+                                categoryName: { $ifNull: ["$categoryName", ""] },
+                                categoryImage: { $ifNull: ["$categoryImage", ""] },
+                                categoryDescription: { $ifNull: ["$categoryDescription", ""] },
+                                subCategory: 1,
+                            },
+                        },
+                    ],
+                    as: "serviceCategories",
+                },
+            },
+            {
                 $project: {
                     _id: 1,
                     fullName: 1,
                     phoneNumber: 1,
+                    phoneCode: 1,
                     countryCode: 1,
                     profileImage: 1,
                     countryName: 1,
                     address: 1,
                     description: 1,
-                    status: 1,
-                    totalBooking: 1,
-                    pushNotification: 1,
+                    bankAccountNumber: 1,
+                    bankIfscCode: 1,
+                    bankAccountHolderName: 1,
+                    bankName: 1,
+                    earningBalance: 1,
+                    consultantFee: 1,
+                    language: 1,
+                    isAutoDetectLanguage: 1,
                     isOnline: 1,
+                    pushNotification: 1,
+                    bookingNotification: 1,
+                    paymentNotification: 1,
+                    smsNotification: 1,
+                    kycStatus: 1,
+                    status: 1,
+                    isDeleted: 1,
+                    deleteAccount: 1,
                     lastLoginAt: 1,
                     createdAt: 1,
                     updatedAt: 1,
+                    totalBooking: 1,
+                    totalEarningAmount: 1,
+                    serviceCategories: 1,
                 },
             },
         ];
@@ -1034,7 +1150,7 @@ export const getMechanicDetailPage = async (req, res) => {
             return res.redirect("/mechanic");
         };
 
-        let kyc = await KYC.findOne({ mechanicId: new ObjectId(mechanicId) })
+        let kyc = await KYC.findOne({ mechanicId: mechanicObjectId })
             .select("status rejectReason reviewedAt createdAt")
             .lean();
 
@@ -1057,35 +1173,6 @@ export const getMechanicDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getMechanicDetailPage----->", error]);
         return res.redirect("/mechanic");
-    };
-};
-
-export const postMechanicDelete = async (req, res) => {
-    try {
-        const { mechanicId } = req?.body;
-
-        if (!mechanicId || !ObjectId.isValid(mechanicId)) {
-            return res.json(errorResponse("Invalid mechanic Id"));
-        };
-
-        let filter = {
-            _id: new ObjectId(mechanicId),
-        };
-
-        let mechanicDetails = await Mechanic.findOne(filter);
-        if (!mechanicDetails) {
-            return res.json(errorResponse("Invalid mechanic Id"));
-        };
-
-        let mechanicDelete = await Mechanic.findOneAndUpdate(filter, { isDeleted: true, loginToken: "" });
-        if (!mechanicDelete) {
-            return res.json(errorResponse("Mechanic delete failed!"));
-        };
-
-        return res.status(200).json(successResponse("Mechanic delete successfully!"));
-    } catch (error) {
-        log1(["Error in postMechanicDelete----->", error]);
-        return res.json(errorResponse(messages.unexpectedDataError));
     };
 };
 

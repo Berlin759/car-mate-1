@@ -14,6 +14,15 @@
 
         return `${year}-${month}-${day} ${hours}:${minutes}`;
     };
+
+    function formatAmount(amount) {
+        if (amount === null || amount === undefined || amount === "") return "0";
+
+        return Number(amount).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    };
 %>
 
 <div class="d-flex align-items-center justify-content-between mb-30">
@@ -40,7 +49,7 @@
                     <% if(body?.mechanic?.profileImage) { %>
                         <img src="<%= body.mechanic.profileImage %>" alt="Profile" class="rounded-circle" width="80" height="80">
                     <% } else { %>
-                        <img src="<%= process.env.SERVER_URL + '/images/profile.png' %>" alt="Profile" class="rounded-circle" height="80">
+                        <img src="<%= process.env.SERVER_URL + '/images/profile.png' %>" alt="Profile" class="rounded-circle" width="80" height="80">
                     <% } %>
                 </div>
                 <h5 class="mb-1"><%= body?.mechanic?.fullName || "-" %></h5>
@@ -51,7 +60,7 @@
                     <span class="text-gray">Phone</span>
                     <span class="fw-md">
                         <% if(body?.mechanic?.phoneNumber) { %>
-                            <%= body?.mechanic?.phoneCode || "+91" %> <%= body?.mechanic?.phoneNumber %>
+                            <%= body?.mechanic?.phoneCode || "+91" %> <%= body.mechanic.phoneNumber %>
                         <% } else { %>
                             -
                         <% } %>
@@ -92,7 +101,9 @@
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Push Notifications</span>
-                            <span class="fs-20 fw-bold"><%= body?.mechanic?.pushNotification === 2 ? "Enabled" : "Disabled" %></span>
+                            <span class="fs-20 fw-bold">
+                                <%= parseInt(body?.mechanic?.pushNotification) === 2 ? "Enabled" : "Disabled" %>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -105,91 +116,276 @@
                         </div>
                         <div>
                             <span class="fs-14 text-gray d-block">Online Status</span>
-                            <span class="fs-20 fw-bold"><%= body?.mechanic?.isOnline === 2 ? "Online" : "Offline" %></span>
+                            <span class="fs-20 fw-bold">
+                                <%= parseInt(body?.mechanic?.isOnline) === 2 ? "Online" : "Offline" %>
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="bg-white rounded-2 bs-border p-4 mt-30">
-            <h6 class="mb-3">Account Information</h6>
-            <hr>
+    </div>
+</div>
+<div class="bg-white rounded-2 bs-border mt-30">
+    <div class="border-bottom">
+        <ul class="nav nav-tabs px-4 pt-3" id="mechanicInformationTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button type="button" id="account-tab" class="nav-link active" data-bs-toggle="tab" data-bs-target="#account-information" role="tab">
+                    <i class="fa-solid fa-user me-2"></i> Account Information
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" id="kyc-tab" class="nav-link" data-bs-toggle="tab" data-bs-target="#kyc-information" role="tab">
+                    <i class="fa-solid fa-shield-halved me-2"></i> KYC Information
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" id="bank-tab" class="nav-link" data-bs-toggle="tab" data-bs-target="#bank-information" role="tab">
+                    <i class="fa-solid fa-building-columns me-2"></i> Bank Information
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" id="service-tab" class="nav-link" data-bs-toggle="tab" data-bs-target="#service-information" role="tab">
+                    <i class="fa-solid fa-screwdriver-wrench me-2"></i> Service Information
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="tab-content p-4" id="mechanicInformationTabsContent">
+        <div id="account-information" class="tab-pane fade show active" role="tabpanel" aria-labelledby="account-tab">
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-6 mb-4">
                     <span class="text-gray fs-14 d-block mb-2">Joined Date</span>
                     <span class="fw-md">
-                        <%= formatDateFull(body?.mechanic?.createdAt) || "-" %>
+                        <%= body?.mechanic?.createdAt ? formatDateFull(body.mechanic.createdAt) : "-" %>
                     </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-2">Last Updated</span>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Last Login Date</span>
                     <span class="fw-md">
-                        <%= formatDateFull(body?.mechanic?.updatedAt) || "-" %>
+                        <%= body?.mechanic?.lastLoginAt ? formatDateFull(body.mechanic.lastLoginAt) : "Never" %>
                     </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-2">Last Login</span>
-                    <span class="fw-md">
-                        <%= body?.mechanic?.lastLoginAt ? formatDateFull(body?.mechanic?.lastLoginAt) : "Never" %>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Earning Balance</span>
+                    <span class="fw-md fs-16">
+                        ₹ <%= formatAmount(body?.mechanic?.totalEarningAmount || 0) %>
                     </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-2">Description</span>
-                    <span class="fw-md"><%= body?.mechanic?.description || "-" %></span>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Consultant Fee</span>
+                    <span class="fw-md fs-16">
+                        ₹ <%= formatAmount(body?.mechanic?.consultantFee || 0) %>
+                    </span>
                 </div>
             </div>
         </div>
-
-        <div class="bg-white rounded-2 bs-border p-4 mt-30">
+        <div id="kyc-information" class="tab-pane fade" role="tabpanel" aria-labelledby="kyc-tab">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h6 class="mb-0">KYC Information</h6>
-                <div class="d-flex align-items-center gap-2">
-                    <!-- <a href="/kyc/add/<%= body?.mechanic?._id %>" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
-                        <i class="fa-solid fa-plus"></i> Submit KYC
-                    </a> -->
-                    <% if(body?.kyc) { %>
-                        <a href="/kyc/<%= body?.mechanic?._id %>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
-                            <i class="fa-solid fa-eye"></i> View KYC Details
-                        </a>
-                    <% } %>
-                </div>
+                <% if(body?.kyc) { %>
+                    <a href="/kyc/<%= body?.mechanic?._id %>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                        <i class="fa-solid fa-eye"></i> View KYC Details
+                    </a>
+                <% } %>
             </div>
             <hr>
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-6 mb-4">
                     <span class="text-gray fs-14 d-block mb-2">KYC Status</span>
+                    <% if(body?.kyc?.status === 2) { %>
+                        <span class="bet-status alert-success">Approved</span>
+                    <% } else if(body?.kyc?.status === 3) { %>
+                        <span class="bet-status alert-end">Rejected</span>
+                    <% } else if(body?.kyc) { %>
+                        <span class="bet-status alert-pending">Pending</span>
+                    <% } else { %>
+                        <span class="text-gray">Not Submitted</span>
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Reviewed At</span>
                     <span class="fw-md">
-                        <% if(body?.kyc?.status === 2) { %>
-                            <span class="bet-status alert-success">Approved</span>
-                        <% } else if(body?.kyc?.status === 3) { %>
-                            <span class="bet-status alert-end">Rejected</span>
-                        <% } else if(body?.kyc) { %>
-                            <span class="bet-status alert-pending">Pending</span>
-                        <% } else { %>
-                            <span class="text-gray">Not Submitted</span>
-                        <% } %>
+                        <%= body?.kyc?.reviewedAt ? formatDateFull(body.kyc.reviewedAt) : "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Submitted On</span>
+                    <span class="fw-md">
+                        <%= body?.kyc?.createdAt ? formatDateFull(body.kyc.createdAt) : "-" %>
                     </span>
                 </div>
                 <% if(body?.kyc?.status === 3 && body?.kyc?.rejectReason) { %>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6 mb-4">
                         <span class="text-gray fs-14 d-block mb-2">Rejection Reason</span>
-                        <span class="fw-md text-danger"><%= body.kyc.rejectReason %></span>
+                        <span class="fw-md text-danger"><%= body.kyc.rejectReason || "-" %></span>
                     </div>
                 <% } %>
-                <% if(body?.kyc?.reviewedAt) { %>
-                    <div class="col-md-6 mb-3">
-                        <span class="text-gray fs-14 d-block mb-2">Reviewed At</span>
-                        <span class="fw-md"><%= formatDateFull(body?.kyc?.reviewedAt) %></span>
-                    </div>
-                <% } %>
-                <div class="col-md-6 mb-3">
-                    <span class="text-gray fs-14 d-block mb-2">Submitted On</span>
-                    <span class="fw-md"><%= body?.kyc ? formatDateFull(body?.kyc?.createdAt) : "-" %></span>
+            </div>
+        </div>
+        <div id="bank-information" class="tab-pane fade" role="tabpanel" aria-labelledby="bank-tab">
+            <h6 class="mb-3">Bank Information</h6>
+            <hr>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Bank Account Holder Name</span>
+                    <span class="fw-md">
+                        <%= body?.mechanic?.bankAccountHolderName || "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Bank Name</span>
+                    <span class="fw-md">
+                        <%= body?.mechanic?.bankName || "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Bank Account Number</span>
+                    <span class="fw-md">
+                        <%= body?.mechanic?.bankAccountNumber || "-" %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <span class="text-gray fs-14 d-block mb-2">Bank IFSC Code</span>
+                    <span class="fw-md text-uppercase">
+                        <%= body?.mechanic?.bankIfscCode || "-" %>
+                    </span>
                 </div>
             </div>
+        </div>
+        <div id="service-information" class="tab-pane fade" role="tabpanel" aria-labelledby="service-tab">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="mb-0">Service Information</h6>
+                <span class="text-gray fs-14">
+                    <%= body?.mechanic?.serviceCategories?.length || 0 %> Categories
+                </span>
+            </div>
+            <hr>
+            <% if(body?.mechanic?.serviceCategories?.length) { %>
+                <div class="row g-3">
+                    <% body.mechanic.serviceCategories.forEach((category, categoryIndex) => { %>
+                        <div class="col-12">
+                            <div class="border rounded-2 p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 38px; height: 38px; background: #f1f5f9;">
+                                            <i class="fa-solid fa-layer-group"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray fs-12 d-block">Service Category</span>
+                                            <span class="fw-bold">
+                                                <%= category?.categoryName || "-" %>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-light text-dark">
+                                        <%= category?.subCategory?.length || 0 %> Sub Categories
+                                    </span>
+                                </div>
+                                <% if(category?.subCategory?.length) { %>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 25%;">Sub Category</th>
+                                                    <th style="width: 15%;">Price</th>
+                                                    <th>Description</th>
+                                                    <th style="width: 60px;"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% category.subCategory.forEach((subCategory, subCategoryIndex) => { %>
+                                                    <tr>
+                                                        <td>
+                                                            <span class="fw-md">
+                                                                <%= subCategory?.subCategoryName || "-" %>
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="fw-bold">
+                                                                ₹ <%= formatAmount(subCategory?.price || 0) %>
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="text-gray">
+                                                                <%= subCategory?.description || "-" %>
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end" style="width: 60px;">
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-outline-danger delete-service-subcategory"
+                                                                data-service-id="<%= category?.categoryId %>"
+                                                                data-subcategory-id="<%= subCategory?.subCategoryId %>"
+                                                                data-subcategory-name="<%= subCategory?.subCategoryName || "" %>"
+                                                                data-subcategory-price="<%= subCategory?.price || 0 %>"
+                                                                title="Delete Sub Category"
+                                                            >
+                                                                <i class="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <% } else { %>
+                                    <div class="text-center py-4 text-gray">No sub-categories found.</div>
+                                <% } %>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            <% } else { %>
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="fa-solid fa-screwdriver-wrench fs-30 text-gray"></i>
+                    </div>
+                    <h6 class="mb-1">No Services Found</h6>
+                    <p class="text-gray fs-14 mb-0">This mechanic has not selected any service yet.</p>
+                </div>
+            <% } %>
         </div>
     </div>
 </div>
 
 <%- include('../footer.ejs') %>
+
+<div class="modal fade" id="deleteServiceSubCategoryModal" tabindex="-1" aria-labelledby="deleteServiceSubCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-header mb-20">
+                    <h5 class="modal-title" id="deleteServiceSubCategoryModalLabel">Delete Sub Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <svg width="30" height="31" viewBox="0 0 30 31" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_161_15505)">
+                                <path d="M22.5 8L7.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M7.5 8L22.5 23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <defs>
+                                <clipPath id="clip0_161_15505">
+                                    <rect width="30" height="30" fill="white" transform="translate(0 0.5)" />
+                                </clipPath>
+                            </defs>
+                        </svg>
+                    </button>
+                </div>
+                <p class="fs-16 mb-4">Are you sure you want to delete this sub-category?</p>
+                <div class="bg-light rounded-2 p-3">
+                    <span class="text-gray fs-13 d-block">Sub Category</span>
+                    <span id="delete-subcategory-name" class="fw-bold">-</span>
+                    <span id="delete-subcategory-price" class="fw-bold">-</span>
+                </div>
+                <input type="hidden" id="delete-service-id">
+                <input type="hidden" id="delete-subcategory-id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-service-subcategory">
+                    <i class="fa-solid fa-trash me-1"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

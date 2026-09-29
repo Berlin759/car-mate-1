@@ -41,6 +41,11 @@ const validate_rules = {
             fullName: "required|regex:/^[a-zA-Z\\s]+$/|min:2|max:50",
             phoneCode: "required",
         },
+        remove_mechanic_service: {
+            mechanicId: "required",
+            serviceId: "required",
+            subCategoryId: "required",
+        },
         add_car: {
             vehicle_number: "required",
         },
