@@ -356,69 +356,6 @@ export const postAllCarOwnerList = async (req, res) => {
     };
 };
 
-export const postCarOwnerDetails = async (req, res) => {
-    try {
-        const { ownerId } = req?.body;
-
-        if (!ownerId || !ObjectId.isValid(ownerId)) {
-            return res.status(400).json(errorResponse("Invalid Owner ID."));
-        };
-
-        let filter = {
-            _id: new ObjectId(ownerId),
-        };
-
-        let ownerPipeline = [
-            {
-                $match: filter,
-            },
-            {
-                $lookup: {
-                    from: "bookings",
-                    let: { ownerId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: { $eq: ["$ownerId", "$$ownerId"] }
-                            }
-                        },
-                        {
-                            $count: "total"
-                        }
-                    ],
-                    as: "bookingCount"
-                },
-            },
-            {
-                $addFields: {
-                    totalBooking: {
-                        $ifNull: [{ $arrayElemAt: ["$bookingCount.total", 0] }, 0],
-                    },
-                },
-            },
-            {
-                $project: {
-                    _id: 1,
-                    fullName: 1,
-                    phoneNumber: 1,
-                    countryCode: 1,
-                    status: 1,
-                    totalBooking: 1,
-                    createdAt: 1,
-                    updatedAt: 1,
-                },
-            },
-        ];
-
-        let ownerResp = await Owner.aggregate(ownerPipeline);
-
-        return res.status(200).json(successResponse("Owner details get successfully!", ownerResp[0]));
-    } catch (error) {
-        log1(["Error in postCarOwnerDetails----->", error]);
-        return res.json(errorResponse(messages.unexpectedDataError));
-    };
-};
-
 export const postUpdateOwner = async (req, res) => {
     try {
         const admin = req.session.admin;
@@ -581,35 +518,6 @@ export const getCarOwnerDetailPage = async (req, res) => {
     } catch (error) {
         log1(["Error in getCarOwnerDetailPage----->", error]);
         return res.redirect("/car-owner");
-    };
-};
-
-export const postCarOwnerDelete = async (req, res) => {
-    try {
-        const { ownerId } = req.body;
-
-        if (!ownerId || !ObjectId.isValid(ownerId)) {
-            return res.json(errorResponse("Invalid car owner Id"));
-        };
-
-        let filter = {
-            _id: new ObjectId(ownerId),
-        };
-
-        let carOwnerDetails = await Owner.findOne(filter);
-        if (!carOwnerDetails) {
-            return res.json(errorResponse("Invalid car owner Id"));
-        };
-
-        let carOwnerDelete = await Owner.findOneAndUpdate(filter, { isDeleted: true, loginToken: "" });
-        if (!carOwnerDelete) {
-            return res.json(errorResponse("Car owner delete failed!"));
-        };
-
-        return res.status(200).json(successResponse("Car owner delete successfully!"));
-    } catch (error) {
-        log1(["Error in postCarOwnerDelete----->", error]);
-        return res.json(errorResponse(messages.unexpectedDataError));
     };
 };
 
@@ -1222,6 +1130,31 @@ export const postAllCarsList = async (req, res) => {
                 $match: filter,
             },
             {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                phoneCode: 1,
+                                profileImage: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     _id: 1,
                     fullName: 1,
@@ -1249,6 +1182,7 @@ export const postAllCarsList = async (req, res) => {
                     challanDetails: 1,
                     nocDetails: 1,
                     ownerId: 1,
+                    ownerDetails: 1,
                     status: 1,
                     createdAt: 1,
                     updatedAt: 1,
@@ -1305,6 +1239,31 @@ export const getCarDetailPage = async (req, res) => {
                 $match: filter,
             },
             {
+                $lookup: {
+                    from: "owners",
+                    localField: "ownerId",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                phoneNumber: 1,
+                                phoneCode: 1,
+                                profileImage: 1,
+                                status: 1,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $unwind: {
+                    path: "$ownerDetails",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
                 $project: {
                     _id: 1,
                     fullName: 1,
@@ -1333,6 +1292,7 @@ export const getCarDetailPage = async (req, res) => {
                     nocDetails: 1,
                     images: 1,
                     ownerId: 1,
+                    ownerDetails: 1,
                     status: 1,
                     createdAt: 1,
                     updatedAt: 1,
@@ -4463,23 +4423,12 @@ export const getKYCDetailPage = async (req, res) => {
         };
 
         let filter = {};
-        let text = "";
-        let backUrl = "/kyc";
 
         let mechanicDetails = await Mechanic.findById(id);
         if (mechanicDetails) {
             filter["mechanicId"] = new ObjectId(id);
-            text = "Mechanic";
-            backUrl = `/mechanic/${id}`;
         } else {
-            let kycDetails = await KYC.findById(id);
-            if (kycDetails) {
-                filter["_id"] = new ObjectId(id);
-                text = "KYC";
-                backUrl = `/kyc`;
-            } else {
-                return res.redirect("/kyc");
-            };
+            filter["_id"] = new ObjectId(id);
         };
 
         let kycPipeline = [
@@ -4532,10 +4481,10 @@ export const getKYCDetailPage = async (req, res) => {
             },
         ];
 
-        let kycResp = await KYC.aggregate(kycPipeline);
-        let kyc = kycResp[0];
+        const kycResp = await KYC.aggregate(kycPipeline);
+        const kycDetails = kycResp[0];
 
-        if (!kyc) {
+        if (!kycDetails) {
             return res.redirect("/kyc");
         };
 
@@ -4548,9 +4497,7 @@ export const getKYCDetailPage = async (req, res) => {
                 id: "kyc",
             },
             body: {
-                kyc: kyc,
-                text: text,
-                backUrl: backUrl,
+                kyc: kycDetails,
             },
             footer: {
                 js: ["admin/kyc-detail.js"],

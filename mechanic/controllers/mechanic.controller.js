@@ -4203,6 +4203,7 @@ export const postEarningList = async (req, res) => {
                                 totalAdminCharge: { $ifNull: ["$totalAdminCharge", 0] },
                                 adminCharge: { $ifNull: ["$adminCharge", 0] },
                                 adminChargeType: { $ifNull: ["$adminChargeType", Constants.PLATFORM_FEE_TYPE.PERCENTAGE] },
+                                earningType: { $ifNull: ["$earningType", Constants.EARNING_TYPE.SERVICE] },
                                 taxAmount: { $ifNull: ["$taxAmount", 0] },
                                 taxPercentage: { $ifNull: ["$taxPercentage", 0] },
                                 finalPayoutAmount: { $ifNull: ["$finalPayoutAmount", 0] },
@@ -4392,11 +4393,18 @@ export const postEarningDetails = async (req, res) => {
                     totalAdminCharge: 1,
                     adminCharge: 1,
                     adminChargeType: 1,
+                    earningType: 1,
                     taxAmount: 1,
                     taxPercentage: 1,
                     finalPayoutAmount: 1,
                     status: 1,
-                    consultantFee: { $ifNull: ["$bookingDetails.consultantFee", 0] },
+                    consultantFee: {
+                        $cond: [
+                            { $eq: ["$earningType", Constants.EARNING_TYPE.CANCELLATION_DEDUCTION] },
+                            0,
+                            { $ifNull: ["$bookingDetails.consultantFee", 0] }
+                        ]
+                    },
                     bookingLocation: "$bookingDetails.address",
                     service: {
                         categoryId: "$serviceDetails._id",

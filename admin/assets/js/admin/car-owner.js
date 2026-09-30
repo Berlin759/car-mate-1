@@ -73,21 +73,6 @@ $(document).on("click", "#reset-car-owner-filters", function () {
     fetchAllCarOwnerList({ status: "" });
 });
 
-$(document).on("click", ".car_owner_delete", function () {
-    const ownerId = $(this).data("car-owner-id");
-    if (!ownerId) {
-        showToast(0, "Invalid car owner Id");
-        return;
-    };
-
-    postAjaxCall("/car-owner-delete", { ownerId: ownerId }, function (response) {
-        showToast(response.flag, response.msg);
-        if (response.flag === 1) {
-            fetchAllCarOwnerList();
-        };
-    });
-});
-
 $(document).on("hide.bs.modal", "#addOwnerModal", function (e) {
     resetAddOwnerModal();
 });
@@ -139,36 +124,6 @@ $(document).on("click", "#add_owner", function () {
             fetchAllCarOwnerList();
         } else if (response.flag === 8) {
             window.location.reload();
-        };
-    });
-});
-
-$(document).on("click", ".edit-car-owner-button", function () {
-    const ownerId = $(this).data("car-owner-id");
-    const car_owner_status = $(this).data("car-owner-status");
-
-    const data = { ownerId: ownerId };
-
-    postAjaxCall("/car-owner-details", data, function (response) {
-        if (response.flag === 1) {
-            const carOwnerDetails = response.data.carOwnerDetails;
-
-            $("#addOwnerModal").modal("show");
-            $("#addOwnerModal #add_owner").addClass("d-none");
-            $("#addOwnerModal #update_owner").removeClass("d-none");
-            $("#addOwnerModal #addOwnerModalLabel").text("Update Owner");
-
-            $("#addOwnerModal #car_owner_id").val(carOwnerDetails._id);
-            $("#addOwnerModal #full_name").val(carOwnerDetails.fullName);
-            if (carOwnerDetails.phoneCode) {
-                $("#addOwnerModal #phone_code").val(carOwnerDetails.phoneCode);
-            };
-            $("#addOwnerModal #phone_number").val(carOwnerDetails.phoneNumber);
-        } else if (response.flag === 8) {
-            window.location.reload();
-        } else if (response.flag === 0) {
-            showToast(response.flag, response.msg);
-            return;
         };
     });
 });

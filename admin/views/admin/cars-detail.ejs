@@ -14,6 +14,19 @@
 
         return `${year}-${month}-${day} ${hours}:${minutes}`;
     };
+
+    function getCarFuelTypeText(type) {
+        const map = {
+            1: { text: "Petrol", class: "text-success" },
+            2: { text: "Diesel", class: "text-success" },
+            3: { text: "EV", class: "text-success" },
+            4: { text: "CNG", class: "text-success" },
+        };
+
+        return map[type] || { text: "Unknown", class: "text-gray" };
+    };
+
+    let carFuelInfo = getCarFuelTypeText(parseInt(body?.car?.fuelType));
 %>
 
 <div class="d-flex align-items-center justify-content-between mb-30">
@@ -38,7 +51,7 @@
                 </div>
                 <div>
                     <h5 class="mb-0"><%= body?.car?.vehicleNumber || "-" %></h5>
-                    <span class="text-gray"><%= body?.car?.model || "-" %> | <%= body?.car?.vehicleManufacturerName || "-" %></span>
+                    <span class="text-gray"><%= body?.car?.model || "" %> <%= body?.car?.vehicleManufacturerName ? "- " + body?.car?.vehicleManufacturerName : "" %></span>
                 </div>
             </div>
         </div>
@@ -54,7 +67,7 @@
                 </div>
                 <div>
                     <span class="fs-14 text-gray d-block">Owner Name</span>
-                    <span class="fw-md"><%= body?.car?.fullName || "-" %></span>
+                    <span class="fw-md"><%= body?.car?.ownerDetails?.fullName || "-" %></span>
                 </div>
             </div>
         </div>
@@ -67,7 +80,7 @@
                 </div>
                 <div>
                     <span class="fs-14 text-gray d-block">Owner Phone</span>
-                    <span class="fw-md"><%= body?.car?.ownerPhoneNumber || "-" %></span>
+                    <span class="fw-md"><%= body?.car?.ownerDetails?.phoneCode || "" %> <%= body?.car?.ownerDetails?.phoneNumber || "-" %></span>
                 </div>
             </div>
         </div>
@@ -92,8 +105,8 @@
                     <i class="fa-solid fa-car-side text-primary"></i>
                 </div>
                 <div>
-                    <span class="fs-14 text-gray d-block">Vehicle Type</span>
-                    <span class="fw-md"><%= body?.car?.vehicleType || "-" %></span>
+                    <span class="fs-14 text-gray d-block">Fuel Type</span>
+                    <span class="fw-bold fs-16 <%= carFuelInfo.class %>"><%= carFuelInfo.text %></span>
                 </div>
             </div>
         </div>

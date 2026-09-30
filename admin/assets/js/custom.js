@@ -1,4 +1,6 @@
-$(window).on('load', function () { // makes sure the whole site is loaded 
+$(document).ready(function () { });
+
+$(window).on('load', function () {
     $('.preloader').fadeOut();
 });
 
@@ -25,51 +27,25 @@ $(document).on("click", ".toggle-password.login", function () {
     };
 });
 
-$(document).ready(function () {
-    $(".slider-btn").click(function () {
-        $(".main-container").addClass("slider-active");
-    });
-    $(".slide-close-btn").click(function () {
-        $(".main-container").removeClass("slider-active");
-    });
+$(document).on("click", ".slider-btn", function () {
+    $(".main-container").addClass("slider-active");
 });
 
-$(document).ready(function () {
-    $(".toggle-password").on("click", function () {
-        const container = $(this).closest(".form-input");
-        const passwordInput = container.find(".password-input");
-        const toggleIcon = $(this).find("i");
-        const type = passwordInput.attr("type");
-        if (type === "password") {
-            passwordInput.attr("type", "text");
-            toggleIcon.removeClass("ti-eye-off").addClass("ti-eye");
-        } else {
-            passwordInput.attr("type", "password");
-            toggleIcon.removeClass("ti-eye").addClass("ti-eye-off");
-        };
-    });
+$(document).on("click", ".slide-close-btn", function () {
+    $(".main-container").removeClass("slider-active");
 });
 
-$(document).ready(function () {
-    const chatList = $('.chat-list');
-    const chatArea = $('.chatting-area-lg');
-    const chatTopics = $('.chating-topic');
-
-    chatList.on('click', (event) => {
-        const chatItem = event.target.closest('.chat-item');
-        if (chatItem) {
-            if (window.innerWidth <= 768) {
-                chatTopics.style.display = 'none';
-                chatArea.style.display = 'block';
-            };
-        };
-    });
-    const backBtn = $('.chat-back');
-    if (backBtn) {
-        backBtn.on('click', () => {
-            chatTopics.style.display = 'block';
-            chatArea.style.display = 'none';
-        });
+$(document).on("click", ".toggle-password", function () {
+    const container = $(this).closest(".form-input");
+    const passwordInput = container.find(".password-input");
+    const toggleIcon = $(this).find("i");
+    const type = passwordInput.attr("type");
+    if (type === "password") {
+        passwordInput.attr("type", "text");
+        toggleIcon.removeClass("ti-eye-off").addClass("ti-eye");
+    } else {
+        passwordInput.attr("type", "password");
+        toggleIcon.removeClass("ti-eye").addClass("ti-eye-off");
     };
 });
 
@@ -88,6 +64,31 @@ $(document).on("click", "#confirm-logout", function () {
     });
 });
 
+$(document).on("click", ".menu-toggle", function () {
+    const $this = $(this);
+    const targetId = $this.data("target");
+    const $target = $("#" + targetId);
+    const $parent = $this.closest(".dropdown-menu-item");
+
+    // Close other dropdowns
+    $(".dropdown-menu-item").not($parent).removeClass("active-parent");
+    $(".submenu").not($target).stop(true, true).slideUp(200).removeClass("show");
+
+    // Toggle current
+    if ($target.hasClass("show")) {
+        $target.stop(true, true).slideUp(200).removeClass("show");
+        $parent.removeClass("active-parent");
+    } else {
+        $target.stop(true, true).slideDown(200).addClass("show");
+        $parent.addClass("active-parent");
+    };
+});
+
+// handle time line active class
+$(document).on("click", ".filter-timeline", function () {
+    $(this).addClass("active").siblings().removeClass("active");
+});
+
 function collapseChangeTxt(el) {
     if (el.innerHTML === "Close") el.innerHTML = "See more";
     else el.innerHTML = "Close";
@@ -103,11 +104,6 @@ function toggleResetButtonVisibility(ResetBtn, filterIds) {
         $(`${ResetBtn}`).addClass("d-none");
     };
 };
-
-// handle time line active class
-$(document).on("click", ".filter-timeline", function () {
-    $(this).addClass("active").siblings().removeClass("active");
-});
 
 //  Date format function
 function customFormatDate(date, format = "DD/MM/YYYY:hh:mm A") {
