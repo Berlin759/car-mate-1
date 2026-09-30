@@ -11,6 +11,17 @@
         
         return `${year}-${month}-${day}`;
     };
+
+    function getCarFuelTypeText(type) {
+        const map = {
+            1: { text: "Petrol", class: "text-success" },
+            2: { text: "Diesel", class: "text-success" },
+            3: { text: "EV", class: "text-success" },
+            4: { text: "CNG", class: "text-success" },
+        };
+
+        return map[type] || { text: "Unknown", class: "text-gray" };
+    };
 %>
 
 <div class="table-responsive">
@@ -19,16 +30,10 @@
             <tr>
                 <th>#</th>
                 <th>Owner Name</th>
+                <th>Owner Phone</th>
                 <th>Vehicle Number</th>
+                <th>Fuel Type</th>
                 <th>Model</th>
-                <th>Register Number</th>
-                <th>Vehicle Manufacturer Name</th>
-                <th>Vehicle Colour</th>
-                <th>Vehicle Type</th>
-                <th>RC Status</th>
-                <th>RC Expiry Date</th>
-                <th>Vehicle Insurance Company</th>
-                <th>Vehicle Insurance Policy No</th>
                 <th>Status</th>
                 <th>Created Date</th>
                 <th>Action</th>
@@ -37,20 +42,21 @@
         <tbody>
             <% if(body?.carsList !== undefined && body?.carsList?.length > 0) { %>
                 <% body.carsList.forEach((item, index) => { %>
-                    <% let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1; %>
+                    <%
+                        let start_index = (parseInt(body?.payload?.currentPage) - 1) * parseInt(body?.payload?.itemPerPage) + index + 1;
+                        let carFuelInfo = getCarFuelTypeText(parseInt(item?.fuelType));
+                    %>
                     <tr>
                         <td><%= start_index %></td>
-                        <td><%= item?.fullName || "-" %></td>
+                        <td><%= item?.ownerDetails?.fullName || "-" %></td>
+                        <td>
+                            <%= item?.ownerDetails?.phoneCode || "" %> <%= item?.ownerDetails?.phoneNumber || "-" %>
+                        </td>
                         <td><%= item?.vehicleNumber || "-" %></td>
-                        <td><%= item?.model || "-" %></td>
-                        <td><%= item?.registerNumber || "-" %></td>
-                        <td><%= item?.vehicleManufacturerName || "-" %></td>
-                        <td><%= item?.vehicleColour || "-" %></td>
-                        <td><%= item?.vehicleType || "-" %></td>
-                        <td><%= item?.rcStatus || "-" %></td>
-                        <td><%= item?.rcExpiryDate || "-" %></td>
-                        <td><%= item?.vehicleInsuranceCompanyName || "-" %></td>
-                        <td><%= item?.vehicleInsurancePolicyNo || "-" %></td>
+                        <td class="fw-bold fs-16 <%= carFuelInfo.class %>"><%= carFuelInfo.text %></td>
+                        <td>
+                            <%= item?.model || "" %> <%= item?.vehicleManufacturerName ? "- " + item?.vehicleManufacturerName : "" %>
+                        </td>
                         <td>
                             <% if(item?.status === 1) { %>
                                 <span class="bet-status alert-success">Valid</span>
