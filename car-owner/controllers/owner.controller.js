@@ -4914,8 +4914,10 @@ export const postCancelBooking = async (req, res) => {
 
         let filter = { _id: new ObjectId(bookingId) };
 
-        const [bookingDetails, pricingDetails] = await Promise.all([
-            Booking.findOne({ ...filter }).lean(),
+        const [ownerDetails, bookingDetails, pricingDetails] = await Promise.all([
+            Owner.findById(ownerId).lean(),
+
+            Booking.findOne({ ...filter }).populate({ path: "mechanicId", select: "_id pushNotification bookingNotification deviceToken" }),
 
             Pricing.findOne({}).lean(),
         ]);
@@ -4942,22 +4944,7 @@ export const postCancelBooking = async (req, res) => {
         const transactionDetails = await Transaction.findOne({ bookingId: bookingDetails._id });
 
         if (transactionDetails && transactionDetails.trxId) {
-            let refundPayload = {
-                razorpayPaymentId: transactionDetails.trxId,
-                amount: refundAmount,
-                ownerId: bookingDetails?.ownerId,
-            };
-            log1(["postCancelBooking refundPayload----->", refundPayload]);
-
-            let paymentRefund = await razorpayRefund(req, refundPayload);
-            log1(["postCancelBooking paymentRefund----->", paymentRefund]);
-            if (paymentRefund.flag === 0) {
-                return res.status(400).json(paymentRefund);
-            };
-            let refundPayment = paymentRefund.data;
-
             let transactionPayload = {
-                trxId: refundPayment.refundId,
                 ownerId: new ObjectId(bookingDetails?.ownerId),
                 mechanicId: new ObjectId(bookingDetails?.mechanicId),
                 serviceId: new ObjectId(bookingDetails.serviceId),
@@ -4969,8 +4956,22 @@ export const postCancelBooking = async (req, res) => {
                 status: Constants.TRANSACTION_STATUS.REFUND,
             };
 
-            let transactionCreate = await Transaction.create(transactionPayload);
-            log1(["postCancelBooking transactionCreate----->", transactionCreate]);
+            const transactionCreate = await Transaction.create(transactionPayload);
+
+            let refundPayload = {
+                razorpayPaymentId: transactionDetails.trxId,
+                amount: refundAmount,
+                ownerId: bookingDetails?.ownerId,
+                transactionId: transactionCreate?._id,
+            };
+            log1(["postCancelBooking refundPayload----->", refundPayload]);
+
+            let paymentRefund = await razorpayRefund(req, refundPayload);
+            log1(["postCancelBooking paymentRefund----->", paymentRefund]);
+
+            if (paymentRefund.flag === 0) {
+                return res.status(400).json(paymentRefund);
+            };
         };
 
         let updatePayload = {
@@ -4986,6 +4987,21 @@ export const postCancelBooking = async (req, res) => {
         let updateBooking = await Booking.findByIdAndUpdate(bookingDetails._id, updatePayload, { new: true });
         if (!updateBooking) {
             return res.status(400).json(errorResponse(req.language.error.something_went_wrong));
+        };
+
+        const mechanicDetails = bookingDetails.mechanicId;
+
+        if (mechanicDetails.bookingNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
+            mechanicDetails.deviceToken && mechanicDetails.deviceToken !== "") {
+            let notificationObject = {
+                title: "Booking Cancelled",
+                description: `${ownerDetails?.fullName || "Owner"} has cancelled your booking.`,
+                mechanicId: mechanicDetails._id,
+                bookingId: bookingDetails._id,
+                type: Constants.NOTIFICATION_TYPE.BOOKING,
+            };
+
+            await sendPushNotification(mechanicDetails.deviceToken, notificationObject);
         };
 
         return res.status(200).json(successResponse("Booking Cancel Successfully."));

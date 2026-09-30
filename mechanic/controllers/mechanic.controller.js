@@ -2027,7 +2027,7 @@ export const postBookingUpdateStatus = async (req, res) => {
             Booking.findOne({
                 _id: new ObjectId(bookingId),
                 mechanicId: new ObjectId(mechanicId),
-            }).populate({ path: "ownerId", select: "_id pushNotification deviceToken" }),
+            }).populate({ path: "ownerId", select: "_id pushNotification bookingNotification deviceToken" }),
 
             Pricing.findOne({}).lean(),
         ]);
@@ -2088,24 +2088,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("This booking is already rejected."));
                 };
 
-                const refundAmount = parseFloat(bookingDetails?.totalAmount || 0);
-
-                let refundPayload = {
-                    razorpayPaymentId: transactionDetails.trxId,
-                    amount: refundAmount,
-                    ownerId: bookingDetails?.ownerId?._id,
-                };
-
-                let paymentRefund = await razorpayRefund(req, refundPayload);
-                log1(["postBookingUpdateStatus paymentRefund by reject booking----->", paymentRefund]);
-                if (paymentRefund.flag === 0) {
-                    return res.status(400).json(paymentRefund);
-                };
-
-                const refundPayment = paymentRefund.data;
-
                 let transactionPayload = {
-                    trxId: refundPayment.refundId,
                     ownerId: new ObjectId(bookingDetails?.ownerId?._id),
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
                     serviceId: new ObjectId(bookingDetails.serviceId),
@@ -2116,7 +2099,24 @@ export const postBookingUpdateStatus = async (req, res) => {
                     status: Constants.TRANSACTION_STATUS.REFUND,
                 };
 
-                await Transaction.create(transactionPayload);
+                const transactionCreated = await Transaction.create(transactionPayload);
+
+                const refundAmount = parseFloat(bookingDetails?.totalAmount || 0);
+
+                let refundPayload = {
+                    razorpayPaymentId: transactionDetails.trxId,
+                    amount: refundAmount,
+                    ownerId: bookingDetails?.ownerId?._id,
+                    transactionId: transactionCreated?._id,
+                };
+                log1(["postBookingUpdateStatus refundPayload----->", refundPayload]);
+
+                let paymentRefund = await razorpayRefund(req, refundPayload);
+                log1(["postBookingUpdateStatus paymentRefund by reject booking----->", paymentRefund]);
+
+                if (paymentRefund.flag === 0) {
+                    return res.status(400).json(paymentRefund);
+                };
 
                 notificationTitle = "Booking Rejected";
                 notificationDescription = `${mechanicDetails?.fullName || "Provider"} has rejected your booking request.`;
@@ -2145,22 +2145,7 @@ export const postBookingUpdateStatus = async (req, res) => {
                 const cancellationFee = parseFloat((totalBookingAmount * parseFloat(cancellationCharge)) / 100) || 0;
 
                 if (transactionDetails.trxId) {
-                    let refundPayload = {
-                        razorpayPaymentId: transactionDetails.trxId,
-                        amount: totalBookingAmount,
-                        ownerId: bookingDetails?.ownerId?._id,
-                    };
-
-                    let paymentRefund = await razorpayRefund(req, refundPayload);
-                    log1(["postBookingUpdateStatus paymentRefund by cancel booking----->", paymentRefund]);
-                    if (paymentRefund.flag === 0) {
-                        return res.status(400).json(paymentRefund);
-                    };
-
-                    const refundPayment = paymentRefund.data;
-
                     let transactionPayload = {
-                        trxId: refundPayment.refundId,
                         ownerId: new ObjectId(bookingDetails?.ownerId?._id),
                         mechanicId: new ObjectId(bookingDetails?.mechanicId),
                         serviceId: new ObjectId(bookingDetails.serviceId),
@@ -2172,7 +2157,20 @@ export const postBookingUpdateStatus = async (req, res) => {
                         status: Constants.TRANSACTION_STATUS.REFUND,
                     };
 
-                    await Transaction.create(transactionPayload);
+                    const transactionCreated = await Transaction.create(transactionPayload);
+
+                    let refundPayload = {
+                        razorpayPaymentId: transactionDetails.trxId,
+                        amount: totalBookingAmount,
+                        ownerId: bookingDetails?.ownerId?._id,
+                        transactionId: transactionCreated?._id,
+                    };
+
+                    let paymentRefund = await razorpayRefund(req, refundPayload);
+                    log1(["postBookingUpdateStatus paymentRefund by cancel booking----->", paymentRefund]);
+                    if (paymentRefund.flag === 0) {
+                        return res.status(400).json(paymentRefund);
+                    };
                 };
 
                 if (cancellationFee > 0) {

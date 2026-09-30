@@ -142,7 +142,7 @@ export const verifyRazorpayPayment = async (req, payload) => {
 
 export const razorpayRefund = async (req, payload) => {
     try {
-        const { razorpayPaymentId, amount, ownerId } = payload;
+        const { razorpayPaymentId, amount, ownerId, transactionId } = payload;
 
         if (!razorpayPaymentId) {
             return errorResponse("Payment ID is required for refund.");
@@ -159,14 +159,22 @@ export const razorpayRefund = async (req, payload) => {
         const refund = await razorpay.payments.refund(razorpayPaymentId, refundPayload);
 
         if (!refund) {
-            log1(["razorpayRefund Error----->", refund]);
+            await Transaction.findByIdAndDelete(transactionId);
+
+            log1(["razorpayRefund Error-------------------->", refund]);
             return errorResponse("Failed to process refund.");
         };
 
         log1(["razorpayRefund refund----->", refund]);
 
+        await Transaction.findByIdAndUpdate(
+            transactionId,
+            { trxId: refund.id },
+        );
+
         if (ownerId) {
             const ownerData = await Owner.findById(ownerId);
+
             if (
                 ownerData &&
                 ownerData.paymentNotification === Constants.NOTIFICATION_PREFERENCES_STATUS.TRUE &&
@@ -179,8 +187,10 @@ export const razorpayRefund = async (req, payload) => {
                     title: "Refund",
                     description: `Refund of ₹${(refund.amount / 100).toFixed(2)} has been initiated.`,
                     ownerId: ownerId,
+                    transactionId: transactionId,
                     type: Constants.NOTIFICATION_TYPE.TRANSACTION,
                 };
+
                 await sendPushNotification(ownerData.deviceToken, notificationObject);
             };
         };

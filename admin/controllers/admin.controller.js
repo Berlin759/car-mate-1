@@ -931,7 +931,7 @@ export const getMechanicDetailPage = async (req, res) => {
                                 $expr: {
                                     $and: [
                                         { $eq: ["$mechanicId", "$$mechanicId"] },
-                                        { $eq: ["$status", Constants.EARNING_STATUS.SUCCESS] },
+                                        { $ne: ["$status", Constants.EARNING_STATUS.FAILED] },
                                     ],
                                 },
                             },
