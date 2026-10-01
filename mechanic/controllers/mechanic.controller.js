@@ -2088,6 +2088,8 @@ export const postBookingUpdateStatus = async (req, res) => {
                     return res.status(400).json(errorResponse("This booking is already rejected."));
                 };
 
+                const refundAmount = parseFloat(bookingDetails?.totalAmount || 0);
+
                 let transactionPayload = {
                     ownerId: new ObjectId(bookingDetails?.ownerId?._id),
                     mechanicId: new ObjectId(bookingDetails?.mechanicId),
@@ -2100,8 +2102,6 @@ export const postBookingUpdateStatus = async (req, res) => {
                 };
 
                 const transactionCreated = await Transaction.create(transactionPayload);
-
-                const refundAmount = parseFloat(bookingDetails?.totalAmount || 0);
 
                 let refundPayload = {
                     razorpayPaymentId: transactionDetails.trxId,
